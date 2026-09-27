@@ -357,10 +357,9 @@ html,body{min-height:100vh;background:var(--bg2);font-family:"Zen Maru Gothic","
     <!-- NICKNAME -->
     <span class="field-lbl">NICKNAME</span>
     <div class="sug-wrap">
-      <input class="inp" id="nick-inp" type="text" placeholder="ニックネームを入力" oninput="onNickInput()" onblur="confirmNick()" onkeydown="if(event.key==='Enter'){event.preventDefault();confirmNick();}" autocomplete="off"/>
+      <input class="inp" id="nick-inp" type="text" placeholder="ニックネームを入力" oninput="onNickInput()" autocomplete="off"/>
       <div class="sug-list" id="sug-list"></div>
     </div>
-    <div style="font-size:10px;color:var(--sub);margin-top:5px;padding-left:2px">ニックネームを入力後、Enterまたは次の欄をタップしてください</div>
     <div class="nick-box" id="nick-box">
       <div>
         <div style="font-size:15px" id="conf-nick"></div>
@@ -374,7 +373,7 @@ html,body{min-height:100vh;background:var(--bg2);font-family:"Zen Maru Gothic","
     <span class="field-lbl">EMAIL ADDRESS</span>
     <input class="inp" id="email-inp" type="email" placeholder="iito membersに登録しているメールアドレス" oninput="onEmailInput()" autocomplete="email"/>
     <div class="email-fb" id="email-fb-ok"><i class="ti ti-circle-check" style="font-size:14px"></i>確認できました</div>
-    <div class="email-fb" id="email-fb-er"><i class="ti ti-alert-circle" style="font-size:14px"></i>登録されているメールアドレスと一致しません</div>
+    <div class="email-fb" id="email-fb-er"><i class="ti ti-alert-circle" style="font-size:14px"></i>ニックネームまたはメールアドレスが登録内容と一致しません</div>
 
     <!-- OSHI MODEL -->
     <span class="field-lbl">OSHI MODEL <span style="font-size:10px;font-weight:400;letter-spacing:0">（複数選択可・任意）</span></span>
@@ -667,7 +666,7 @@ html,body{min-height:100vh;background:var(--bg2);font-family:"Zen Maru Gothic","
       </div>
       <span class="field-lbl">新しいパスワード</span>
       <div class="pw-wrap">
-        <input class="inp" id="pw-new" type="password" placeholder="新しいパスワード（4文字以上）" style="font-size:13px"/>
+        <input class="inp" id="pw-new" type="password" placeholder="新しいパスワード（8文字以上）" style="font-size:13px"/>
         <button class="pw-eye" type="button" onclick="togglePw('pw-new',this)" aria-label="パスワードを表示"><i class="ti ti-eye"></i></button>
       </div>
       <span class="field-lbl">新しいパスワード（確認）</span>
@@ -707,8 +706,6 @@ html,body{min-height:100vh;background:var(--bg2);font-family:"Zen Maru Gothic","
 // ════════════════════════════════════════
 // 定数・設定
 // ════════════════════════════════════════
-const DEFAULT_PW='admin1234';
-function getAdmPW(){return ls(LS.pw)||DEFAULT_PW;}
 const PLANS={supporter:12,partner:40,producer:150};
 const PLAN_LBL={supporter:'サポーター',partner:'パートナー',producer:'プロデューサー'};
 const PLAN_MAP={'サポーター':'supporter','パートナー':'partner','プロデューサー':'producer'};
@@ -781,17 +778,36 @@ const actionCodeSettings = {
   url: window.location.href.split('#')[0],
   handleCodeInApp: true
 };
+// Firebaseがログイン状態を復元し終わるのを待つ（ページを開いた直後は未確定のため）
+const authReady = new Promise(res=>{ const un=auth.onAuthStateChanged(u=>{ un(); res(u); }); });
+// GASに本人であることを示すログイン証明(idToken)を取得。ログインしていなければ null
+async function getIdTokenSafe(){
+  try{ await authReady; const u=auth.currentUser; return u ? await u.getIdToken() : null; }
+  catch(e){ console.warn('idToken取得失敗', e); return null; }
+}
 
 // ════════════════════════════════════════
 // GAS通信
 // ════════════════════════════════════════
+// 管理者ログイン中なら、GASへの全通信に管理者トークンを付ける
+function admToken(){const a=ls(LS.admLogin);return (a&&a.token)||'';}
+// GASが「管理者の確認が必要」と返したら、管理者ログインをやり直してもらう
+function checkAdminRequired(json){
+  if(!json||json.error!=='admin_required'||!ls(LS.admLogin))return;
+  lsDel(LS.admLogin);
+  if(document.getElementById('s-admin')?.classList.contains('active')){
+    alert('管理者ログインの有効期限が切れました。もう一度パスワードを入力してください。');
+    SS('s-admin-login');
+  }
+}
 async function gasPost(action, payload={}){
   if(!GAS_URL) return null;
   try{
-    const body = JSON.stringify({ key:GAS_KEY, action, ...payload });
+    const body = JSON.stringify({ key:GAS_KEY, action, adminToken:admToken()||undefined, ...payload });
     const url = GAS_URL + '?d=' + encodeURIComponent(body);
     const res = await fetch(url, {method:'GET'});
     const json = await res.json();
+    checkAdminRequired(json);
     return json;
   } catch(e){
     console.warn('GAS通信エラー:', e);
@@ -803,10 +819,11 @@ async function gasPost(action, payload={}){
 async function gasPostBig(action, payload={}){
   if(!GAS_URL) return null;
   try{
-    const body = JSON.stringify({ key:GAS_KEY, action, ...payload });
+    const body = JSON.stringify({ key:GAS_KEY, action, adminToken:admToken()||undefined, ...payload });
     // text/plainにすることでCORSプリフライトを避ける（GAS標準の作法）
     const res = await fetch(GAS_URL, {method:'POST', body, headers:{'Content-Type':'text/plain;charset=utf-8'}});
     const json = await res.json();
+    checkAdminRequired(json);
     return json;
   } catch(e){
     console.warn('GAS通信エラー(POST):', e);
@@ -843,7 +860,10 @@ async function pullEventsModels(){
       ls(LS.models, models);
     }
   }catch(e){ console.warn('getModels失敗', e); }
-  // 会員データもSheetsから取得（投票者が新しい端末でもログインできるように）
+}
+// 【管理画面用】会員リストを取得（管理者トークンが必要。投票者の端末には配らない）
+async function pullMembers(){
+  if(!GAS_URL) return;
   try{
     const rmem = await gasPost('getMembers');
     if(rmem&&rmem.ok&&Array.isArray(rmem.members)&&rmem.members.length>0){
@@ -852,6 +872,41 @@ async function pullEventsModels(){
     }
     // 取得失敗・空のときは既存のlocalStorage値を保持（会員リストを消さない）
   }catch(e){ console.warn('getMembers失敗（前回値を使用）', e); }
+}
+// 【投票者用】本人の分だけのデータ（会員情報・全イベントの自分の票・付与履歴・期別プラン）をGASから取得する。
+//  GASはFirebaseのログイン証明で本人か確かめ、他の会員のデータは返さない。
+//  返り値: { member } または { error:'auth_required'|'not_member'|'email_mismatch'|'network'|... }
+async function pullMe(nick){
+  const idToken = await getIdTokenSafe();
+  if(!idToken) return {error:'auth_required'};
+  const r = await gasPost('me', {nick, idToken});
+  if(!r) return {error:'network'};
+  if(!r.ok||!r.member) return {error:r.error||'error'};
+  const n = r.member.nick;
+  // 自分の票をサーバーの記録で置き換える（他人の票は持たない）
+  Object.keys(allVotes).forEach(evId=>{ if(allVotes[evId]) delete allVotes[evId][n]; });
+  Object.entries(r.votes||{}).forEach(([evId,v])=>{ if(!allVotes[evId])allVotes[evId]={}; allVotes[evId][n]=v; });
+  ls(LS.votes, allVotes);
+  grants[n] = r.grants||{}; ls('iito_grants', grants);
+  termPlans[n] = r.termPlans||{}; ls('iito_termplans', termPlans);
+  return {member:r.member};
+}
+// ログインできなかったときの案内
+function loginErrorMessage(err){
+  if(err==='not_member') return '会員情報が確認できませんでした。お手数ですが、運営にお問い合わせください。';
+  if(err==='email_mismatch') return 'ログインしたメールアドレスが、会員登録のメールアドレスと一致しません。登録しているメールアドレスでログインしてください。';
+  if(err==='network') return '通信に失敗しました。通信環境を確認して、もう一度お試しください。';
+  return 'セキュリティ強化のため、お手数ですがもう一度ログインしてください。';
+}
+// 【個人情報保護】管理者でない端末から、他の会員のデータ（旧バージョンで保存されたもの）を消す
+function purgeOthersData(){
+  const me=(ls(LS.sess)||{}).nick||'';
+  lsDel(LS.members); members=[];
+  Object.keys(allVotes).forEach(evId=>{ const mine=(allVotes[evId]||{})[me]; allVotes[evId]=mine?{[me]:mine}:{}; });
+  ls(LS.votes, allVotes);
+  grants = me&&grants[me] ? {[me]:grants[me]} : {}; ls('iito_grants', grants);
+  termPlans = me&&termPlans[me] ? {[me]:termPlans[me]} : {}; ls('iito_termplans', termPlans);
+  lsDel(LS.pw); lsDel('iito_adm_fail'); // 旧：端末に保存していた管理パスワードとロック情報
 }
 
 // 各期に各ユーザーが投票時に使っていたプラン { nick: { term: plan } }
@@ -1613,75 +1668,48 @@ function saveOshi(){oshiMap[curUser.nick]=modalOshi;ls(LS.oshi,oshiMap);renderPi
 // ════════════════════════════════════════
 // ログイン
 // ════════════════════════════════════════
-function checkRegBtn(){document.getElementById('reg-btn').disabled=!(selNick&&emailVerified);}
-function onNickInput(){
-  const val=document.getElementById('nick-inp').value.trim();
-  selNick=null;emailVerified=false;
-  document.getElementById('nick-box').style.display='none';
+function checkRegBtn(){
+  const nick=document.getElementById('nick-inp').value.trim();
+  const email=document.getElementById('email-inp').value.trim();
+  document.getElementById('reg-btn').disabled=!(nick&&email.includes('@'));
+}
+function hideLoginErr(){
   document.getElementById('nick-err').style.display='none';
-  document.getElementById('email-inp').value='';
-  document.getElementById('email-inp').className='inp';
-  document.getElementById('email-fb-ok').className='email-fb';
   document.getElementById('email-fb-er').className='email-fb';
-  // 候補リスト（サジェスト）は表示しない（他人のニックネーム・プランを見せないため）
-  const sl=document.getElementById('sug-list');if(sl)sl.style.display='none';
-  checkRegBtn();
+  document.getElementById('email-inp').className='inp';
 }
-// ニックネーム欄で確定（Enter または フォーカスが外れたとき）に、完全一致で会員を照合する
-function confirmNick(){
-  const val=document.getElementById('nick-inp').value.trim();
-  const errEl=document.getElementById('nick-err');
-  if(!val){if(errEl)errEl.style.display='none';return;}
-  if(!members.length){
-    if(errEl){errEl.textContent='会員リストを読み込み中です。数秒待って、もう一度お試しください。';errEl.style.display='block';}
-    return;
-  }
-  // 完全一致（大文字小文字は無視）で照合。部分一致の候補は出さない
-  const m=members.find(x=>x.nick.toLowerCase()===val.toLowerCase());
-  if(!m){
-    if(errEl){errEl.textContent='登録されていないニックネームです';errEl.style.display='block';}
-    return;
-  }
-  if(errEl)errEl.style.display='none';
-  selectNick(m);
-}
-function selectNick(m){
-  selNick=m;document.getElementById('nick-inp').value='';document.getElementById('sug-list').style.display='none';
-  document.getElementById('nick-err').style.display='none';document.getElementById('conf-nick').textContent=m.nick;
-  document.getElementById('conf-plan').textContent=PLAN_LBL[m.plan];document.getElementById('nick-box').style.display='flex';
-  document.getElementById('email-inp').value='';document.getElementById('email-inp').className='inp';
-  document.getElementById('email-fb-ok').className='email-fb';document.getElementById('email-fb-er').className='email-fb';
-  emailVerified=false;
-  setTimeout(()=>document.getElementById('email-inp').focus(),100);
-  checkRegBtn();
-}
+// 入力中は判定しない（他の会員の情報を探れないよう、送信ボタンでまとめてGASに確認する）
+function onNickInput(){ selNick=null; hideLoginErr(); checkRegBtn(); }
+function onEmailInput(){ hideLoginErr(); checkRegBtn(); }
 function resetNick(){
-  selNick=null;emailVerified=false;document.getElementById('nick-inp').value='';
+  selNick=null;emailVerified=false;
+  document.getElementById('nick-inp').value='';document.getElementById('email-inp').value='';
   document.getElementById('nick-box').style.display='none';document.getElementById('sug-list').style.display='none';
-  document.getElementById('email-inp').value='';document.getElementById('email-inp').className='inp';
-  document.getElementById('email-fb-ok').className='email-fb';document.getElementById('email-fb-er').className='email-fb';
-  checkRegBtn();
-}
-function onEmailInput(){
-  const val=document.getElementById('email-inp').value.trim().toLowerCase();
-  document.getElementById('email-fb-ok').className='email-fb';document.getElementById('email-fb-er').className='email-fb';
-  document.getElementById('email-inp').className='inp';emailVerified=false;
-  if(!val||!val.includes('@')){checkRegBtn();return;}
-  const match=selNick?(selNick.email&&selNick.email.toLowerCase()===val):!!members.find(m=>m.email&&m.email.toLowerCase()===val);
-  if(match){document.getElementById('email-inp').className='inp ok';document.getElementById('email-fb-ok').className='email-fb ok';emailVerified=true;}
-  else if(val.length>5){document.getElementById('email-inp').className='inp er';document.getElementById('email-fb-er').className='email-fb er';}
-  checkRegBtn();
+  hideLoginErr();checkRegBtn();
 }
 async function doRegister(){
-  if(!selNick||!emailVerified)return;
+  const nick=document.getElementById('nick-inp').value.trim();
   const email=document.getElementById('email-inp').value.trim().toLowerCase();
+  if(!nick||!email.includes('@'))return;
   const regBtn=document.getElementById('reg-btn');
-  if(regBtn){regBtn.disabled=true;regBtn.textContent='送信中...';}
+  const restore=()=>{ if(regBtn){regBtn.textContent='確認メールを送信';} checkRegBtn(); };
+  if(regBtn){regBtn.disabled=true;regBtn.textContent='確認中...';}
+  hideLoginErr();
+  // ニックネームとメールアドレスの組み合わせをGASで確認（どちらが違うかは伝えない）
+  const r=await gasPost('checkMember',{nick,email});
+  if(!r){ alert('通信に失敗しました。通信環境を確認して、もう一度お試しください。'); restore(); return; }
+  if(!r.match){
+    document.getElementById('email-inp').className='inp er';
+    document.getElementById('email-fb-er').className='email-fb er';
+    restore(); return;
+  }
+  selNick={nick:r.nick}; emailVerified=true;
+  if(regBtn){regBtn.textContent='送信中...';}
   try{
     await auth.sendSignInLinkToEmail(email, actionCodeSettings);
     // 同一端末で戻ってきたときに自動でログイン完了できるよう保存
     window.localStorage.setItem('iito_pending_email', email);
-    window.localStorage.setItem('iito_pending_nick', selNick.nick);
+    window.localStorage.setItem('iito_pending_nick', r.nick);
     // 【重要】ログイン画面で選んだ推しも保存する。
     //  メールリンクを開くとページが再読み込みされ、変数loginOshiは空に戻ってしまう。
     //  ここで保存しておかないと、ログイン時に選んだ推しが毎回失われる
@@ -1690,7 +1718,7 @@ async function doRegister(){
     showEmailSentNotice(email);
   }catch(err){
     alert('確認メールの送信に失敗しました：'+err.message);
-    if(regBtn){regBtn.disabled=false;regBtn.textContent='確認メールを送信';}
+    restore();
   }
 }
 function showEmailSentNotice(email){
@@ -1702,30 +1730,27 @@ function backToLoginForm(){
   document.getElementById('email-sent-area').style.display='none';
   document.getElementById('login-area').style.display='block';
   const regBtn=document.getElementById('reg-btn');
-  if(regBtn){regBtn.disabled=!(selNick&&emailVerified);regBtn.textContent='確認メールを送信';}
+  if(regBtn){regBtn.textContent='確認メールを送信';}
+  checkRegBtn();
 }
 // メールリンク認証の完了後、実際にログインを完了させる処理
 // （旧doRegisterの本体。selNickの代わりに会員データmを受け取る）
-async function completeLoginAfterLink(m){
-  selNick=m;
+async function completeLoginAfterLink(nick){
   showLoading('ログイン中...');
   try{
-    // 【高速化】ログインに必要な取得を並列で行う。
-    //  以前は events→votes→termPlans→grants を1つずつ順番に待っていたため遅かった。
-    //  events は先に必要（curEvId確定・投票データの対象を決める）だが、
-    //  termPlans と grants は votes と同時に取得してよいので Promise.all でまとめる。
-    await pullEventsModels();
+    // イベント一覧と「本人の分だけのデータ」を同時に取得（GASがFirebaseのログイン証明で本人確認する）
+    const [,me]=await Promise.all([pullEventsModels(), pullMe(nick)]);
     // 現在のイベントに合わせる
     curEvId=getActEv()?.id||curEvId;
-    // 現イベントの投票データを最優先で取得（投票者が今すぐ投票するのに必要）
-    const curEv=events.find(e=>e.id===curEvId);
-    await Promise.all([
-      curEv?gasPost('getResults',{evId:curEv.id}).then(rv=>{
-        if(rv&&rv.ok&&rv.votes){if(!allVotes[curEv.id])allVotes[curEv.id]={};Object.entries(rv.votes).forEach(([nick,v])=>{allVotes[curEv.id][nick]=v;});ls(LS.votes,allVotes);}
-      }).catch(e=>{}):Promise.resolve(),
-      pullTermPlans(),
-      pullGrants()
-    ]);
+    if(me.error){
+      hideLoading();
+      if(me.error!=='network')lsDel(LS.sess);
+      alert('ログインできませんでした。\n'+loginErrorMessage(me.error));
+      refreshResumeCard();
+      return;
+    }
+    const m=me.member;
+    selNick=m;
     const evV=(allVotes[curEvId]||{})[m.nick]||{};
     curUser={...m,locked:{...evV}};
     const sentKey='iito_sent_'+(curEvId||'')+'_'+m.nick;
@@ -1743,14 +1768,9 @@ async function completeLoginAfterLink(m){
       oshiMap[m.nick]=[];
     }
     ls(LS.oshi,oshiMap);
-    ls(LS.sess,{nick:m.nick,ts:Date.now()});
+    ls(LS.sess,{nick:m.nick,ts:Date.now(),me:{nick:m.nick,plan:m.plan,mid:m.mid}});
     pending={};buildVoteScreen();SS('s-vote');startCd();
   }finally{ hideLoading(); }
-  // 裏で「全イベントの投票データ」を取得（前月・前々月の繰越計算に必要）。
-  //  ログイン直後は現イベント分だけで画面を出して速く見せ、繰越は届き次第反映する。
-  syncAllEventVotes().then(()=>{ if(curUser){buildVoteScreen();} }).catch(e=>{});
-  // 裏でイベント・モデルも最新化し、届いたら投票画面を再描画
-  pullEventsModels().then(()=>{ if(curUser){buildVoteScreen();} });
 }
 // ページを開いたときにメールリンク経由かどうかをチェックし、そうなら認証を完了させる
 async function checkEmailLinkSignIn(){
@@ -1780,9 +1800,8 @@ async function checkEmailLinkSignIn(){
     const vMatch=window.location.search.match(/[?&]v=([^&]+)/);
     const cleanUrl=window.location.pathname+(vMatch?('?v='+vMatch[1]):'');
     history.replaceState(null,'',cleanUrl);
-    const m=members.find(x=>x.nick===nick);
-    if(m){
-      await completeLoginAfterLink(m);
+    if(nick){
+      await completeLoginAfterLink(nick);
     }else{
       hideLoading();
       alert('会員情報が見つかりませんでした。お手数ですが、ニックネームから再度ログインしてください。');
@@ -1793,21 +1812,22 @@ async function checkEmailLinkSignIn(){
   }
 }
 async function resumeSession(){
-  const sess=ls(LS.sess);if(!sess)return;
-  const m=members.find(x=>x.nick===sess.nick);if(!m)return;
+  const sess=ls(LS.sess);if(!sess||!sess.nick)return;
   showLoading('ログイン中...');
   try{
-    // 【高速化】現イベント分だけ先に取得して素早く表示。全イベント（繰越用）は裏で取得。
-    await pullEventsModels();
+    const [,me]=await Promise.all([pullEventsModels(), pullMe(sess.nick)]);
     curEvId=getActEv()?.id||curEvId;
-    const curEv=events.find(e=>e.id===curEvId);
-    await Promise.all([
-      curEv?gasPost('getResults',{evId:curEv.id}).then(rv=>{
-        if(rv&&rv.ok&&rv.votes){if(!allVotes[curEv.id])allVotes[curEv.id]={};Object.entries(rv.votes).forEach(([nick,v])=>{allVotes[curEv.id][nick]=v;});ls(LS.votes,allVotes);}
-      }).catch(e=>{}):Promise.resolve(),
-      pullTermPlans(),
-      pullGrants()
-    ]);
+    if(me.error){
+      hideLoading();
+      if(me.error==='network'){ alert('ログインできませんでした。\n'+loginErrorMessage(me.error)); refreshResumeCard(); return; }
+      // 本人確認ができない（Firebaseのログインが切れた等）→ ログインし直してもらう
+      lsDel(LS.sess); refreshResumeCard();
+      const el=document.getElementById('nick-err');
+      if(el){el.textContent=loginErrorMessage(me.error);el.style.display='block';}
+      return;
+    }
+    const m=me.member;
+    ls(LS.sess,{...sess,me:{nick:m.nick,plan:m.plan,mid:m.mid}});
     const evV=(allVotes[curEvId]||{})[m.nick]||{};
     curUser={...m,locked:{...evV}};pending={};
     // 送信済み（完全確定）票を復元（サーバー記録を正）
@@ -1817,9 +1837,6 @@ async function resumeSession(){
     submitted=false;
     buildVoteScreen();SS('s-vote');startCd();
   }finally{ hideLoading(); }
-  // 裏で全イベントの投票データを取得（繰越計算）＋イベント最新化。届き次第再描画
-  syncAllEventVotes().then(()=>{ if(curUser){buildVoteScreen();} }).catch(e=>{});
-  pullEventsModels().then(()=>{ if(curUser){buildVoteScreen();} });
 }
 // ログイン画面のセッション復元カードを（再）描画する。curUserが無いときだけ有効
 // ログイン前でも使える「指定会員の残り票数」計算（基本票＋前期繰り越し−今期使用）
@@ -1913,7 +1930,7 @@ function calcRemainingForMember(m){ const r=calcMemberVotes(m); return r?r.remai
 function refreshResumeCard(){
   if(curUser)return;
   const sess=ls(LS.sess);
-  if(!(sess&&members.find(m=>m.nick===sess.nick))){
+  if(!(sess&&sess.nick)){
     document.getElementById('resume-area').style.display='none';
     document.getElementById('login-area').style.display='block';
     return;
@@ -1922,10 +1939,10 @@ function refreshResumeCard(){
   const sessAge=Date.now()-(sess.ts||0);
   const expired=sessAge>SESSION_TTL;
   if(expired){lsDel(LS.sess);document.getElementById('login-area').style.display='block';document.getElementById('resume-area').style.display='none';return;}
-  const m=members.find(x=>x.nick===sess.nick);
-  const rem=calcRemainingForMember(m);
+  // 会員リストは持たないので、前回ログイン時に保存した本人の情報で表示する
+  const m=sess.me||{nick:sess.nick};
   document.getElementById('r-name').textContent=sess.nick;
-  document.getElementById('r-meta').textContent=`${PLAN_LBL[m.plan]} ／ 残り${rem}票`;
+  document.getElementById('r-meta').textContent=m.plan?`${PLAN_LBL[m.plan]} ／ 残り${calcRemainingForMember(m)}票`:'';
   renderPills('r-oshi',oshiMap[m.nick]||[],null);
   document.getElementById('resume-area').style.display='block';
   document.getElementById('login-area').style.display='none';
@@ -2062,6 +2079,16 @@ async function doSubmit(){
     return;
   }
 
+  // 本人確認用のログイン証明を付ける（GASがFirebaseに問い合わせて本人か確かめる）
+  const idToken=await getIdTokenSafe();
+  if(!idToken){
+    if(okBtn){okBtn.disabled=false;okBtn.textContent=okOrig;}
+    if(backBtn)backBtn.disabled=false;
+    alert('ログインの有効期限が切れました。\nお手数ですが、一度ログアウトして、もう一度ログインしてください。\n（この票はまだ送信されていません）');
+    return;
+  }
+  payload.idToken=idToken;
+
   let ok=false;let hardError=null;
   for(let attempt=1;attempt<=3&&!ok;attempt++){
     // リトライ時は状況を表示
@@ -2070,7 +2097,7 @@ async function doSubmit(){
       const r=await gasPost('saveVote',payload);
       if(r&&r.ok){ok=true;break;}
       // サーバーが明確に拒否（リトライ不要）
-      if(r&&(r.error==='not_member'||r.error==='over_limit'||r.error==='over_model_cap'||r.error==='ended'||r.error==='before')){hardError=r;break;}
+      if(r&&(r.error==='not_member'||r.error==='over_limit'||r.error==='over_model_cap'||r.error==='ended'||r.error==='before'||r.error==='auth_required'||r.error==='email_mismatch')){hardError=r;break;}
     }catch(err){console.warn('saveVote失敗 試行'+attempt,err);}
     if(!ok&&attempt<3)await new Promise(res=>setTimeout(res,800)); // 少し待って再送
   }
@@ -2090,6 +2117,8 @@ async function doSubmit(){
     if(backBtn)backBtn.disabled=false;
     if(hardError.error==='not_member'){
       alert('投票を記録できませんでした。\n会員情報が確認できません（会員登録されていない可能性があります）。お手数ですが運営にお問い合わせください。');
+    }else if(hardError.error==='auth_required'||hardError.error==='email_mismatch'){
+      alert('投票を記録できませんでした。\n'+loginErrorMessage(hardError.error)+'\n（この票はまだ送信されていません）');
     }else if(hardError.error==='ended'){
       alert('この投票は終了しました。\nこれ以上の投票はできません。');
     }else if(hardError.error==='before'){
@@ -2129,6 +2158,7 @@ function goAdminLogin(){SS('s-admin-login');}
 
 // 管理者ログアウト（パスワード記憶を消去）
 function adminLogout(){
+  if(admToken())gasPost('adminLogout'); // サーバー側のログインも解除
   lsDel(LS.admLogin);
   lsDel('iito_in_admin'); // 管理画面フラグも消す（更新後に管理画面へ戻さない）
   SS('s-login');
@@ -2136,41 +2166,28 @@ function adminLogout(){
 }
 
 // ブルートフォース対策：連続失敗ロックアウト（localStorageで永続化。リロードでリセットされないように）
-const MAX_FAIL=5;       // 5回失敗でロック
-const LOCK_MIN=15;      // 15分ロック
-function getAdmFail(){return ls('iito_adm_fail')||{count:0,until:0};}
-function setAdmFail(o){ls('iito_adm_fail',o);}
-
-function doAdminLogin(){
+// パスワードの確認・失敗回数のロック（5回で15分）はGAS側で行う
+async function doAdminLogin(){
   const errEl=document.getElementById('adm-pw-err');
-  const f=getAdmFail();
-  const now=Date.now();
-  // ロック中ならブロック
-  if(f.until&&now<f.until){
-    const mins=Math.ceil((f.until-now)/60000);
-    if(errEl){errEl.style.display='block';errEl.textContent=`試行回数が上限に達しました。約${mins}分後に再度お試しください。`;}
+  const inp=document.getElementById('adm-pw');
+  const pw=inp.value.trim();
+  if(!pw)return;
+  const showErr=t=>{if(errEl){errEl.style.display='block';errEl.textContent=t;}};
+  showLoading('確認中...');
+  const r=await gasPost('adminLogin',{pw});
+  hideLoading();
+  inp.value='';
+  if(r&&r.ok&&r.token){
+    if(errEl)errEl.style.display='none';
+    ls(LS.admLogin,{ts:Date.now(),token:r.token}); // ログイン状態を保持（30日）
+    enterAdmin();
     return;
   }
-  const pw=document.getElementById('adm-pw').value.trim();
-  if(pw===getAdmPW()){
-    // 成功：失敗カウントをリセット
-    setAdmFail({count:0,until:0});
-    if(errEl)errEl.style.display='none';
-    document.getElementById('adm-pw').value='';
-    ls(LS.admLogin,{ts:Date.now()}); // ログイン状態を保持
-    enterAdmin();
-  } else {
-    // 失敗：カウントを増やし、上限に達したらロック
-    const nc=(f.count||0)+1;
-    if(nc>=MAX_FAIL){
-      setAdmFail({count:nc,until:now+LOCK_MIN*60000});
-      if(errEl){errEl.style.display='block';errEl.textContent=`パスワードを${MAX_FAIL}回間違えました。約${LOCK_MIN}分間ロックします。`;}
-    }else{
-      setAdmFail({count:nc,until:0});
-      if(errEl){errEl.style.display='block';errEl.textContent=`パスワードが違います（残り${MAX_FAIL-nc}回）`;}
-    }
-    document.getElementById('adm-pw').value='';
-  }
+  if(!r)showErr('通信に失敗しました。通信環境を確認して、もう一度お試しください。');
+  else if(r.error==='locked')showErr(`パスワードを続けて間違えたため、約${r.minutes}分間ロックしています。`);
+  else if(r.error==='wrong_pw')showErr(`パスワードが違います（残り${r.remain}回）`);
+  else if(r.error==='admin_pw_not_set')showErr('管理パスワードがまだ設定されていません（GASのスクリプトプロパティ ADMIN_PW）。');
+  else showErr('ログインできませんでした：'+(r.error||''));
 }
 // 管理画面に入る共通処理
 function enterAdmin(){
@@ -2194,8 +2211,10 @@ function enterAdmin(){
     try{renderEvList();}catch(e){}
     try{renderMcGrids();}catch(e){}
     // 推しモデル（投票シート由来）とプラン付与履歴を取得
+    try{await pullMembers();}catch(e){}
     try{await pullOshi();}catch(e){}
     try{await pullGrants();}catch(e){}
+    try{await pullTermPlans();}catch(e){}
     // 全イベントの投票データを取得（繰越情報で各月の使用票を正しく集計するために必要）
     try{await syncAllEventVotes();}catch(e){}
     try{renderMember();}catch(e){}
@@ -2204,7 +2223,7 @@ function enterAdmin(){
 }
 // 管理者ログイン済みかチェック
 function isAdmLoggedIn(){
-  const a=ls(LS.admLogin);return a&&a.ts;
+  const a=ls(LS.admLogin);return !!(a&&a.token);
 }
 // 管理画面を終了（ログアウトはせず、投票/ログイン画面へ戻る）。更新時に管理画面へ戻さないようフラグを消す
 function exitAdmin(){
@@ -3057,34 +3076,23 @@ function togglePw(inputId,btn){
 }
 
 // パスワード変更
-function changePassword(){
+async function changePassword(){
   const cur=document.getElementById('pw-current').value.trim();
   const nw=document.getElementById('pw-new').value.trim();
   const nw2=document.getElementById('pw-new2').value.trim();
   const msg=document.getElementById('pw-msg');
-  msg.style.display='block';
-  if(cur!==getAdmPW()){
-    msg.style.cssText='display:block;color:var(--rd);';
-    msg.textContent='現在のパスワードが正しくありません';return;
-  }
-  if(nw.length<4){
-    msg.style.cssText='display:block;color:var(--rd);';
-    msg.textContent='新しいパスワードは4文字以上にしてください';return;
-  }
-  if(nw!==nw2){
-    msg.style.cssText='display:block;color:var(--rd);';
-    msg.textContent='新しいパスワードが一致しません';return;
-  }
-  ls(LS.pw,nw);
+  const show=(t,ok)=>{msg.style.cssText='display:block;color:var('+(ok?'--gr':'--rd')+');';msg.textContent=t;};
+  if(nw.length<8){show('新しいパスワードは8文字以上にしてください');return;}
+  if(nw!==nw2){show('新しいパスワードが一致しません');return;}
+  const r=await gasPost('changeAdminPw',{cur,next:nw});
+  if(!r){show('通信に失敗しました。もう一度お試しください');return;}
+  if(!r.ok){show(r.error==='wrong_pw'?'現在のパスワードが正しくありません':'変更できませんでした：'+(r.error||''));return;}
   document.getElementById('pw-current').value='';
   document.getElementById('pw-new').value='';
   document.getElementById('pw-new2').value='';
-  msg.style.cssText='display:block;color:var(--gr);';
-  msg.textContent='パスワードを変更しました';
-  setTimeout(()=>{msg.style.display='none';},3000);
+  show('パスワードを変更しました（他の端末は再ログインが必要です）',true);
+  setTimeout(()=>{msg.style.display='none';},4000);
 }
-
-// データリセット
 function showResetConfirm(){
   document.getElementById('reset-step1').style.display='none';
   document.getElementById('reset-step2').style.display='block';
@@ -3117,6 +3125,8 @@ function resetAllData(){
 // 初期化
 // ════════════════════════════════════════
 (async function init(){
+  // 管理者でない端末からは、旧バージョンで保存された他の会員のデータを消す
+  if(!isAdmLoggedIn())purgeOthersData();
   // モデルをlocalStorageに確実に保存
   ls(LS.models,models);
   // 推しボックス初期描画
@@ -3149,7 +3159,7 @@ function resetAllData(){
   // 自動ログイン：管理画面でない かつ メールリンク未ログイン かつ 有効なセッションがあれば投票画面へ
   if(!handledAdmin && !curUser){
     const sess=ls(LS.sess);
-    const sessValid=sess&&sess.nick&&((Date.now()-(sess.ts||0))<=SESSION_TTL)&&members.find(m=>m.nick===sess.nick);
+    const sessValid=sess&&sess.nick&&((Date.now()-(sess.ts||0))<=SESSION_TTL);
     if(sessValid){
       await resumeSession(); // 自動ログイン（ボタンを押さなくても投票画面へ）
     }else{

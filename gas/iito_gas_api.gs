@@ -9,6 +9,17 @@ const SHEET_MODELS  = 'モデル';
 const SHEET_GRANTS  = 'プラン付与履歴'; // その月に付与済みのプランを記録
 const SECRET_KEY    = 'iito2026secret'; // HTMLと合わせること
 
+// ── 本人確認・管理者確認（2026-09 セキュリティ強化） ──
+// Firebase のWeb APIキー（HTMLの firebaseConfig.apiKey と同じ。公開してよい種類のキー）
+const FIREBASE_API_KEY = 'AIzaSyCdeel4Yitk9WmrEHq9o1tFOfnFZ5Rgk8M';
+// 移行期間：この時刻までは旧HTMLからの呼び出しも従来どおり受け付ける（新HTMLの公開までのつなぎ）
+// 時刻を過ぎると、本人確認・管理者確認が必須になる
+const LEGACY_UNTIL = new Date('2026-09-27T21:00:00+09:00').getTime();
+// 管理者ログインの有効期間（30日）と、パスワード失敗時のロック（5回失敗で15分）
+const ADMIN_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const ADMIN_MAX_FAIL = 5;
+const ADMIN_LOCK_SEC = 15 * 60;
+
 // プランごとの基本持ち票（HTML側の PLANS と必ず一致させること）
 const PLAN_VOTES = {
   supporter: 12,
@@ -48,21 +59,196 @@ function doGet(e) {
 }
 
 // doPost / doGet 共通のアクション振り分け
+//  ・だれでも使える：ping / getEvents / getModels / checkMember / adminLogin
+//  ・投票者本人（Firebaseのログイン証明 idToken が必要）：me / saveVote
+//  ・管理者（adminLogin で受け取った adminToken が必要）：それ以外すべて
 function handleAction(action, data) {
-  if (action === 'saveVote')    return saveVote(data);
-  if (action === 'getResults')  return getResults(data);
-  if (action === 'getTermPlans') return getTermPlans();
-  if (action === 'saveMembers') return saveMembers(data);
-  if (action === 'getMembers')  return getMembers();
-  if (action === 'saveEvents')  return saveEvents(data);
-  if (action === 'getEvents')   return getEvents();
-  if (action === 'saveModels')  return saveModels(data);
-  if (action === 'getModels')   return getModels();
-  if (action === 'recordGrants') return recordGrants(data);
-  if (action === 'getGrants')   return getGrants();
-  if (action === 'getOshi')     return getOshi();
+  // だれでも使える
   if (action === 'ping')        return { ok: true, msg: 'pong' };
+  if (action === 'getEvents')   return getEvents();
+  if (action === 'getModels')   return getModels();
+  if (action === 'checkMember') return checkMember(data);
+  if (action === 'adminLogin')  return adminLogin(data);
+  // 投票者本人
+  if (action === 'me')          return getMe(data);
+  if (action === 'saveVote')    return saveVote(data);
+  // 管理者
+  const ADMIN_ACTIONS = {
+    getResults: getResults, getTermPlans: getTermPlans, saveMembers: saveMembers, getMembers: getMembers,
+    saveEvents: saveEvents, saveModels: saveModels, recordGrants: recordGrants, getGrants: getGrants,
+    getOshi: getOshi, changeAdminPw: changeAdminPw, adminLogout: adminLogout
+  };
+  if (ADMIN_ACTIONS[action]) {
+    if (!isLegacy_() && !isAdmin_(data)) return { ok: false, error: 'admin_required' };
+    return ADMIN_ACTIONS[action](data);
+  }
   return { ok: false, error: 'unknown action' };
+}
+
+// 移行期間中か（旧HTMLの呼び出しも受け付ける）
+function isLegacy_() { return Date.now() < LEGACY_UNTIL; }
+
+// ════════════════════════════════════════
+// 投票者の本人確認（Firebase の idToken を Google に問い合わせてメールアドレスを得る）
+//  結果は30分キャッシュする（毎回問い合わせると遅いため）。無効なら null
+// ════════════════════════════════════════
+function verifyIdToken_(idToken) {
+  if (!idToken) return null;
+  const cache = CacheService.getScriptCache();
+  const key = 'tk_' + Utilities.base64EncodeWebSafe(
+    Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, idToken)).slice(0, 43);
+  const hit = cache.get(key);
+  if (hit) return hit;
+  const res = UrlFetchApp.fetch(
+    'https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=' + FIREBASE_API_KEY,
+    { method: 'post', contentType: 'application/json', payload: JSON.stringify({ idToken: idToken }), muteHttpExceptions: true });
+  if (res.getResponseCode() !== 200) return null;
+  const users = JSON.parse(res.getContentText()).users || [];
+  const email = users[0] && users[0].email ? String(users[0].email).trim().toLowerCase() : '';
+  if (!email) return null;
+  cache.put(key, email, 1800);
+  return email;
+}
+
+// 会員データから1人分を探す（ニックネームは大文字小文字を区別しない）
+function findMember_(nick) {
+  const target = String(nick || '').trim().toLowerCase();
+  if (!target) return null;
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_MEMBERS);
+  if (!sheet || sheet.getLastRow() <= 1) return null;
+  const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 5).getValues();
+  for (var i = 0; i < rows.length; i++) {
+    if (String(rows[i][1]).trim().toLowerCase() === target) {
+      return { mid: String(rows[i][0] || ''), nick: String(rows[i][1]).trim(), plan: String(rows[i][2] || 'supporter').trim(),
+               email: String(rows[i][3] || '').trim().toLowerCase() };
+    }
+  }
+  return null;
+}
+
+// 投票者本人の確認：idToken のメールと、会員データのメールが一致するか
+//  返り値: { member } または { error }
+function authVoter_(data) {
+  const m = findMember_(data.nick);
+  if (!m) return { error: 'not_member' };
+  const email = verifyIdToken_(data.idToken);
+  if (!email) return { error: 'auth_required' };
+  if (!m.email || m.email !== email) return { error: 'email_mismatch' };
+  return { member: m };
+}
+
+// ログイン前の確認：ニックネームとメールアドレスの組み合わせが会員データと一致するか
+//  他人の情報は返さない（一致したかどうかと、正式なニックネームだけ）
+function checkMember(data) {
+  const m = findMember_(data.nick);
+  const email = String(data.email || '').trim().toLowerCase();
+  if (!m || !email || m.email !== email) return { ok: true, match: false };
+  return { ok: true, match: true, nick: m.nick };
+}
+
+// ログイン後に、本人の分だけのデータを返す
+//  { member:{nick,plan,mid,email}, votes:{evId:{modelId:票数}}, grants:{期:[plan]}, termPlans:{期:plan} }
+function getMe(data) {
+  const a = authVoter_(data);
+  if (a.error) return { ok: false, error: a.error };
+  const nick = a.member.nick;
+  const rank = { supporter: 1, partner: 2, producer: 3 };
+  const votes = {}, termPlans = {};
+  SpreadsheetApp.getActiveSpreadsheet().getSheets().forEach(function(sh){
+    if (sh.getName().indexOf('投票_') !== 0 || sh.getLastRow() <= 2) return;
+    const rows = sh.getRange(3, 1, sh.getLastRow() - 2, 12).getValues();
+    rows.forEach(function(r){
+      if (String(r[4]).trim() !== nick) return;
+      const evId = String(r[1] || '').trim();
+      const modelId = String(r[8] || '').trim();
+      if (evId && modelId) {
+        if (!votes[evId]) votes[evId] = {};
+        votes[evId][modelId] = (votes[evId][modelId] || 0) + (Number(r[10]) || 0);
+      }
+      const plan = String(r[5] || '').trim(), term = String(r[11] || '').trim();
+      if (plan && term && (!termPlans[term] || (rank[plan] || 0) > (rank[termPlans[term]] || 0))) termPlans[term] = plan;
+    });
+  });
+  const grants = {};
+  const gs = getGrantSheet_();
+  if (gs.getLastRow() > 1) {
+    gs.getRange(2, 1, gs.getLastRow() - 1, 3).getValues().forEach(function(r){
+      if (String(r[0]).trim() !== nick) return;
+      const plan = String(r[1]).trim(), term = String(r[2]).trim();
+      if (!plan || !term) return;
+      if (!grants[term]) grants[term] = [];
+      if (grants[term].indexOf(plan) < 0) grants[term].push(plan);
+    });
+  }
+  return { ok: true, member: a.member, votes: votes, grants: grants, termPlans: termPlans };
+}
+
+// ════════════════════════════════════════
+// 管理者の確認
+//  パスワードは「プロジェクトの設定 → スクリプト プロパティ」の ADMIN_PW に保存する（コードやHTMLには書かない）
+//  ログインに成功すると adminToken を発行し、30日間有効
+// ════════════════════════════════════════
+function adminLogin(data) {
+  const props = PropertiesService.getScriptProperties();
+  const pw = props.getProperty('ADMIN_PW');
+  if (!pw) return { ok: false, error: 'admin_pw_not_set' };
+  const cache = CacheService.getScriptCache();
+  const fails = Number(cache.get('adm_fail') || 0);
+  if (fails >= ADMIN_MAX_FAIL) return { ok: false, error: 'locked', minutes: Math.ceil(ADMIN_LOCK_SEC / 60) };
+  if (String(data.pw || '') !== pw) {
+    cache.put('adm_fail', String(fails + 1), ADMIN_LOCK_SEC);
+    if (fails + 1 >= ADMIN_MAX_FAIL) return { ok: false, error: 'locked', minutes: Math.ceil(ADMIN_LOCK_SEC / 60) };
+    return { ok: false, error: 'wrong_pw', remain: ADMIN_MAX_FAIL - fails - 1 };
+  }
+  cache.remove('adm_fail');
+  // 期限切れのトークンを掃除してから、新しいトークンを発行
+  const now = Date.now();
+  const all = props.getProperties();
+  Object.keys(all).forEach(function(k){ if (k.indexOf('ADMTOK_') === 0 && Number(all[k]) < now) props.deleteProperty(k); });
+  const token = Utilities.getUuid();
+  props.setProperty('ADMTOK_' + token, String(now + ADMIN_TOKEN_TTL_MS));
+  return { ok: true, token: token };
+}
+
+function isAdmin_(data) {
+  const t = String(data.adminToken || '');
+  if (!t) return false;
+  const exp = Number(PropertiesService.getScriptProperties().getProperty('ADMTOK_' + t) || 0);
+  return exp > Date.now();
+}
+
+function adminLogout(data) {
+  if (data.adminToken) PropertiesService.getScriptProperties().deleteProperty('ADMTOK_' + data.adminToken);
+  return { ok: true };
+}
+
+// 管理パスワードの変更（変更した端末以外のログインは解除される）
+function changeAdminPw(data) {
+  const props = PropertiesService.getScriptProperties();
+  if (String(data.cur || '') !== props.getProperty('ADMIN_PW')) return { ok: false, error: 'wrong_pw' };
+  const next = String(data.next || '');
+  if (next.length < 8) return { ok: false, error: 'too_short' };
+  props.setProperty('ADMIN_PW', next);
+  const all = props.getProperties();
+  Object.keys(all).forEach(function(k){ if (k.indexOf('ADMTOK_') === 0 && k !== 'ADMTOK_' + data.adminToken) props.deleteProperty(k); });
+  return { ok: true };
+}
+
+// ════════════════════════════════════════
+// 【初回に1回だけエディタから実行】設定の確認
+//  ・外部への問い合わせ（Firebase）の許可を求める画面が出るので「許可」する
+//  ・実行ログに「すべてOK」と出れば設定完了
+// ════════════════════════════════════════
+function testSetup() {
+  const pw = PropertiesService.getScriptProperties().getProperty('ADMIN_PW');
+  Logger.log(pw ? '✓ 管理パスワード(ADMIN_PW)：設定済み（' + pw.length + '文字）' : '✗ 管理パスワード(ADMIN_PW)が未設定です');
+  const res = UrlFetchApp.fetch(
+    'https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=' + FIREBASE_API_KEY,
+    { method: 'post', contentType: 'application/json', payload: JSON.stringify({ idToken: 'test' }), muteHttpExceptions: true });
+  const body = res.getContentText();
+  const fbOk = body.indexOf('INVALID_ID_TOKEN') >= 0;
+  Logger.log(fbOk ? '✓ Firebaseとの接続：OK' : '✗ Firebaseとの接続に失敗：' + body.slice(0, 300));
+  Logger.log(pw && fbOk ? '★ すべてOK' : '★ ✗の項目を確認してください');
 }
 
 function corsRes(obj) {
@@ -275,7 +461,7 @@ function getEventWindow(evId) {
   }
 }
 
-// 投票データを保存（会員確認＋締切チェック＋繰り越し込み上限チェック）
+// 投票データを保存（会員確認＋本人確認＋締切チェック＋繰り越し込み上限チェック）
 function saveVote(data) {
   const evId   = data.evId;
   const evName = data.evName;
@@ -291,6 +477,12 @@ function saveVote(data) {
   // 1. 会員確認
   if (!isMemberValid(nick)) {
     return { ok: false, error: 'not_member', message: '会員として登録されていません' };
+  }
+  // 1.2 本人確認：Firebaseでログインしたメールと、会員データのメールが一致するか
+  //     （移行期間中で idToken が無い＝旧HTMLからの送信 だけは従来どおり通す）
+  if (data.idToken || !isLegacy_()) {
+    const a = authVoter_(data);
+    if (a.error) return { ok: false, error: a.error, message: '本人確認ができませんでした。もう一度ログインしてください' };
   }
 
   // 1.5 締切チェック（サーバー側）：Sheetsに保存されたイベントの開始・終了時刻で判定
