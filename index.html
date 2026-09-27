@@ -292,6 +292,22 @@ html,body{min-height:100vh;background:var(--bg2);font-family:"Zen Maru Gothic","
 <body>
 <!-- 読み込み中オーバーレイ -->
 <div class="load-ov" id="load-ov"><div class="load-spin"></div><div class="load-txt" id="load-txt">読み込み中...</div></div>
+  <!-- CSV対象月の確認モーダル -->
+  <div class="overlay" id="csv-term-modal">
+    <div class="mbox" style="max-width:360px">
+      <h3><i class="ti ti-calendar" style="font-size:15px;vertical-align:-2px;margin-right:6px;color:var(--ac)"></i>このCSVを何月分として登録しますか？</h3>
+      <p id="csv-term-info" style="font-size:12px;color:var(--sub);margin-bottom:12px;line-height:1.7"></p>
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <select class="inp" id="csv-term-y" style="font-size:13px" onchange="updCsvTermWarn()"></select>
+        <select class="inp" id="csv-term-m" style="font-size:13px" onchange="updCsvTermWarn()"></select>
+      </div>
+      <p id="csv-term-warn" style="font-size:12px;color:var(--rd);margin-bottom:12px;line-height:1.6;display:none"></p>
+      <div class="m-btns">
+        <button class="m-back" onclick="cancelCsvTerm()">キャンセル</button>
+        <button class="m-ok" onclick="confirmCsvTerm()">この月で登録</button>
+      </div>
+    </div>
+  </div>
 <div class="app-wrap" id="app">
 <!-- ポップ装飾（幾何学） -->
 <div class="pop-deco d1"></div>
@@ -2346,7 +2362,8 @@ function deleteEv(id){const ev=events.find(e=>e.id===id);if(!confirm(`イベン�
 function loadCSV(input){
   const file=input.files[0];if(!file)return;const reader=new FileReader();
   const oldMembers=[...members]; // 変更検出用に、読み込み前の会員リストを退避
-  reader.onload=e=>{
+  input.value=''; // 同じファイルを続けて選び直せるようにする
+  reader.onload=async e=>{
     const text=e.target.result.replace(/^\uFEFF/,'');const lines=text.split('\n').filter(l=>l.trim());
     if(lines.length<2){alert('CSVの形式が正しくありません');return;}
     const h=parseCSVLine(lines[0]);
@@ -2397,8 +2414,80 @@ function loadCSV(input){
     //  以前は todayTermId()（＝今日の月）に記録していたため、9月に8月分CSVを読むと
     //  9月期として誤記録され、繰越がズレていた。決済日ベースにすることで正しい月に記録される。
     const _det=detectCsvTerm(lines, idx.payDate);
-    const curTerm=_det.term||todayTermId(); // 決済日が読めない場合は従来どおり今日の月
-    const csvTermInfo=_det;
+    // 【確認画面】自動判定した月を初期値にして、管理者に確かめてもらってから登録する。
+    //  月の前半は前月の決済が多く、最多月方式だと前月と誤判定されることがあるため。
+    //  「最新の月」を正しく出すため、先にサーバーの付与履歴を取り直す。
+    showLoading('確認中...');
+    try{ await pullGrants(); }catch(err){}
+    hideLoading();
+    openCsvTermModal(nm, _det);
+  };
+  reader.readAsText(file,'UTF-8');
+}
+// 付与履歴に記録されている中で最も新しい期（＝これまでに読み込んだ最新月のCSV）。無ければ ''
+//  会員リストが何月のCSVで作られたかの基準。サーバーの付与履歴から求めるので、どの端末でも同じ結果になる。
+function latestGrantTerm(){
+  let best='';
+  Object.values(grants||{}).forEach(byTerm=>{
+    Object.keys(byTerm||{}).forEach(t=>{ if(termRank(t)>termRank(best))best=t; });
+  });
+  return best;
+}
+// CSV対象月の確認画面
+let csvPending=null; // {nm, det}
+function csvYearOpts(sel){
+  const cur=new Date().getFullYear();let html='';
+  for(let y=cur-1;y<=cur+1;y++)html+=`<option value="${y}"${String(sel)===String(y)?' selected':''}>${y}年</option>`;
+  return html;
+}
+function openCsvTermModal(nm, det){
+  csvPending={nm, det};
+  const init=parseTerm(det.term||todayTermId());
+  document.getElementById('csv-term-y').innerHTML=csvYearOpts(init.y);
+  document.getElementById('csv-term-m').innerHTML=buildMonthOpts(det.term||todayTermId());
+  const info=document.getElementById('csv-term-info');
+  if(det.term){
+    const bd=Object.keys(det.counts||{}).sort().map(k=>`${k}：${det.counts[k]}件`).join('、');
+    info.innerHTML=`${nm.length}名（解約除く）を読み込みました。<br>決済日から <b>${det.term}</b> と判定しました。<br><span style="font-size:11px">決済日の内訳：${bd}</span>`;
+  }else{
+    info.innerHTML=`${nm.length}名（解約除く）を読み込みました。<br><span style="color:var(--rd)">決済日から月を判定できませんでした。</span>月を選んでください。`;
+  }
+  updCsvTermWarn();
+  document.getElementById('csv-term-modal').classList.add('open');
+}
+function selCsvTerm(){
+  return `${document.getElementById('csv-term-y').value}年${document.getElementById('csv-term-m').value}月期`;
+}
+// 選んだ月が「最新より過去」なら、会員リストを更新しないことを事前に知らせる（C案）
+function updCsvTermWarn(){
+  const w=document.getElementById('csv-term-warn');
+  const t=selCsvTerm(), latest=latestGrantTerm();
+  let msg='';
+  if(latest&&termRank(t)<termRank(latest)){
+    msg=`⚠️ 最新は ${latest} です。過去の月のため、<b>会員リストは更新せず</b>、プラン付与履歴だけを記録します。`;
+  }else if(termRank(t)>termRank(todayTermId())){
+    msg=`⚠️ ${t} は未来の月です。月をもう一度確認してください。`;
+  }
+  w.innerHTML=msg;w.style.display=msg?'block':'none';
+}
+function cancelCsvTerm(){
+  csvPending=null;
+  document.getElementById('csv-term-modal').classList.remove('open');
+  const resEl=document.getElementById('csv-result');
+  if(resEl)resEl.innerHTML='CSVの読み込みをキャンセルしました（何も変更していません）';
+}
+function confirmCsvTerm(){
+  if(!csvPending)return;
+  const {nm, det}=csvPending;csvPending=null;
+  document.getElementById('csv-term-modal').classList.remove('open');
+  applyCsvImport(nm, selCsvTerm(), det);
+}
+// 確認画面で決まった月(curTerm)で、会員リストの更新と付与履歴の記録を行う
+function applyCsvImport(nm, curTerm, csvTermInfo){
+    // 【C案】過去月のCSVでは会員リストを上書きしない（付与履歴だけ記録する）。
+    //  最新月のCSVを読んだあとに過去月のCSVを読むと、会員リストが古い状態に戻ってしまうため。
+    const latestTerm=latestGrantTerm();
+    const isPastCsv=!!(latestTerm&&termRank(curTerm)<termRank(latestTerm));
     // 【重要修正】その月に会員だった「全員」を、その月の付与履歴として記録する。
     //  以前は「前回リストと比較して新規・アップグレードした人だけ」を記録していたため、
     //  ずっと同じプランで継続している人（例：えぼちんがプロデューサー継続）は付与履歴に
@@ -2407,24 +2496,22 @@ function loadCSV(input){
     //  ※GAS側で「nick|plan|term が既にあれば二重記録しない」ので、同月に何度読んでも重複しない。
     const grantsToRecord=nm.map(m=>({nick:m.nick, plan:m.plan, term:curTerm}));
 
-    members=nm;ls(LS.members,members);
+    if(!isPastCsv){members=nm;ls(LS.members,members);}
     const resEl=document.getElementById('csv-result');
     // 対象月を明示（自動判別）。判別できた月と件数を出し、想定と違えば気づけるようにする。
-    let termMsg='';
-    if(csvTermInfo&&csvTermInfo.term){
-      const others=Object.keys(csvTermInfo.counts||{}).length;
-      termMsg=` <span style="color:var(--ac-d);font-size:11px;font-weight:700">／ 対象月：${csvTermInfo.term}</span>`
-        +(others>1?` <span style="color:var(--sub);font-size:10px">（決済日が複数月に分散：最多月を採用）</span>`:'');
+    const picked=(csvTermInfo&&csvTermInfo.term===curTerm)?'自動判定':'手動で選択';
+    const termMsg=` <span style="color:var(--ac-d);font-size:11px;font-weight:700">／ 対象月：${curTerm}</span> <span style="color:var(--sub);font-size:10px">（${picked}）</span>`;
+    if(isPastCsv){
+      resEl.innerHTML=`<i class="ti ti-info-circle" style="color:var(--bl)"></i> 過去月のCSVのため、会員リストは更新していません（最新：${latestTerm}のまま${members.length}名）${termMsg}`;
     }else{
-      termMsg=` <span style="color:var(--rd);font-size:11px">／ ⚠️ 対象月を判別できませんでした（今月として記録）</span>`;
+      resEl.innerHTML=`<i class="ti ti-circle-check" style="color:var(--gr)"></i> ${members.length}名を読み込みました（解約除く・メールアドレス含む）${termMsg}`;
     }
-    resEl.innerHTML=`<i class="ti ti-circle-check" style="color:var(--gr)"></i> ${members.length}名を読み込みました（解約除く・メールアドレス含む）${termMsg}`;
     renderMember();
     // GASへ会員データを保存。
     //  会員数が多いと GET(gasPost) はURL長制限を超えて失敗し、Sheets側は古い会員数のまま残る。
     //  その状態で「同期」を押すと古い人数で上書きされ会員が消えるため、必ず POST(gasPostBig) で送る。
     //  さらに保存の成否を画面に明示し、失敗時は同期しないよう警告する。
-    gasPostBig('saveMembers',{members}).then(r=>{
+    if(!isPastCsv)gasPostBig('saveMembers',{members}).then(r=>{
       // 【重要】サーバーが実際に保存した件数(saved)が返ってきた場合のみ「成功」とみなす。
       //  ok だけで判定すると、保存されていなくても成功表示になり、
       //  そのまま「同期」を押して古いデータで上書き＝会員が消える事故につながる。
@@ -2459,8 +2546,6 @@ function loadCSV(input){
         }
       });
     }
-  };
-  reader.readAsText(file,'UTF-8');
 }
 function parseCSVLine(line){const r=[];let cur='';let inQ=false;for(let i=0;i<line.length;i++){const c=line[i];if(c==='"'){if(inQ&&line[i+1]==='"'){cur+='"';i++;}else inQ=!inQ;}else if(c===','&&!inQ){r.push(cur);cur='';}else cur+=c;}r.push(cur);return r.map(s=>s.trim());}
 function resolveOshiNames(nick){
