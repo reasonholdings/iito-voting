@@ -138,6 +138,13 @@ html,body{min-height:100vh;background:var(--bg2);font-family:"Zen Maru Gothic","
 .cand-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
 /* 投票画面のランク別サブ見出し（専属 / 1st） */
 .rank-hd{font-size:12px;font-weight:700;color:var(--ac-d);background:var(--ac-l);border-radius:8px;padding:5px 12px;margin:6px 0 12px;display:inline-block}
+/* ランク切り替え（専属・1st・2nd）：1列に均等幅で並べ、指で押しやすい高さ52pxにする */
+.rank-filter{display:flex;gap:6px;margin:-4px 0 14px}
+.rank-filter button{flex:1 1 0;min-width:0;min-height:52px;padding:6px 2px;border-radius:14px;border:1.5px solid var(--bd);background:#fff;color:var(--tx);font-family:inherit;font-size:14px;font-weight:500;line-height:1.2;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;-webkit-tap-highlight-color:transparent}
+.rank-filter button .rf-n{font-size:11px;font-weight:400;color:var(--sub)}
+.rank-filter button.on{background:var(--ac);border-color:var(--ac);color:#fff;font-weight:700}
+.rank-filter button.on .rf-n{color:#fff;opacity:.85}
+.rank-filter button:focus-visible{outline:3px solid var(--ac-m);outline-offset:2px}
 .cc{background:transparent;border:none;padding:6px 2px;cursor:pointer;text-align:center;position:relative;-webkit-tap-highlight-color:transparent}
 .cc.pending .cn{color:var(--ac-d);font-weight:600}
 .cc.tempvote .cn{color:var(--gr);font-weight:600}.cc.tempvote .cv{color:var(--gr);font-weight:700}.cc.tempvote .cav{box-shadow:0 0 0 3px var(--gr)}
@@ -1382,31 +1389,43 @@ function switchTab(grp){
 function buildGrids(){buildGrid('japan');buildGrid('osaka');}
 // 投票画面に出すモデル（非表示フラグが立っていないもの）
 function visibleMods(grp){return (models[grp]||[]).filter(m=>!m.hidden);}
+// モデルランク（管理画面のモデル登録で指定）。この順で表示する。未設定は「その他」
+const RANKS=['専属','1st','2nd'];
+function rankOf(m){return RANKS.includes(m.rank)?m.rank:'';}
+function rankLabel(r){return r||'その他';}
+// 投票画面で選んでいるランク（グループごと）。'all'＝すべて表示
+const rankFilter={japan:'all',osaka:'all'};
 function buildGrid(grp){
   const sec=document.getElementById('g-'+grp);sec.innerHTML='';
   const all=visibleMods(grp);
-  // ランク別に分ける：専属 → 1st → 未設定 の順。ランク未設定の人は見出し無しで従来通り。
-  const groups=[
-    {rank:'専属', list:all.filter(m=>m.rank==='専属')},
-    {rank:'1st',  list:all.filter(m=>m.rank==='1st')},
-    {rank:'',      list:all.filter(m=>!m.rank||(m.rank!=='専属'&&m.rank!=='1st'))}
-  ];
-  let rowIdx=0; // 行の通し番号（見出しをまたいでも連番。getCardRowと整合させる）
+  // ランク別に分ける：専属 → 1st → 2nd → その他（未設定）
+  const groups=[...RANKS,''].map(r=>({rank:r,list:all.filter(m=>rankOf(m)===r)})).filter(g=>g.list.length);
+  const anyRanked=groups.some(g=>g.rank);
+  // 選んでいたランクが無くなっていたら「すべて」に戻す
+  if(rankFilter[grp]!=='all'&&!groups.some(g=>g.rank===rankFilter[grp]))rankFilter[grp]='all';
+  // ランクが設定されているときだけ、切り替えボタンを出す
+  if(anyRanked){
+    const bar=document.createElement('div');
+    bar.className='rank-filter';bar.setAttribute('role','group');bar.setAttribute('aria-label','モデルランクで絞り込む');
+    [{rank:'all',n:all.length},...groups.map(g=>({rank:g.rank,n:g.list.length}))].forEach(o=>{
+      const b=document.createElement('button');b.type='button';
+      b.dataset.rank=o.rank;
+      b.innerHTML=`<span>${o.rank==='all'?'すべて':rankLabel(o.rank)}</span><span class="rf-n">${o.n}人</span>`;
+      b.onclick=()=>setRankFilter(grp,o.rank);
+      bar.appendChild(b);
+    });
+    sec.appendChild(bar);
+  }
+  let rowIdx=0; // 行の通し番号（見出しをまたいでも連番）
   groups.forEach(g=>{
-    if(g.list.length===0)return;
-    // 見出し（ランク名）を出す。ただし、専属・1st が1つでも設定されている場合のみ区切りを表示。
-    const anyRanked=all.some(m=>m.rank==='専属'||m.rank==='1st');
-    if(g.rank&&anyRanked){
+    // ランクごとの箱。票の入力パネルは行の直後＝この箱の中に入るので、箱ごと隠せばパネルも一緒に隠れる
+    const box=document.createElement('div');
+    box.className='rank-sec';box.dataset.rank=g.rank;
+    if(anyRanked){
       const hd=document.createElement('div');
       hd.className='rank-hd';
-      hd.textContent=g.rank;
-      sec.appendChild(hd);
-    }else if(!g.rank&&anyRanked&&(groups[0].list.length||groups[1].list.length)){
-      // 未設定グループにも、ランク付きが他にあるなら「その他」見出しを出す
-      const hd=document.createElement('div');
-      hd.className='rank-hd';
-      hd.textContent='その他';
-      sec.appendChild(hd);
+      hd.textContent=rankLabel(g.rank);
+      box.appendChild(hd);
     }
     for(let i=0;i<g.list.length;i+=COL){
       const row=document.createElement('div');row.className='cand-row';row.id='cr-'+grp+'-'+rowIdx;
@@ -1417,9 +1436,30 @@ function buildGrid(grp){
         d.innerHTML=`<div class="chk-dot"><i class="ti ti-check" style="font-size:10px;color:white"></i></div><div class="cav">${avC}</div><div class="cn">${m.name}</div><div class="cv" id="cv-${m.id}"></div>`;
         row.appendChild(d);
       }
-      sec.appendChild(row);
+      box.appendChild(row);
       rowIdx++;
     }
+    sec.appendChild(box);
+  });
+  applyRankFilter(grp);
+}
+// ランクの切り替え。選択中（未確定）の票は消さずに残す（JAPAN/OSAKAの切り替えと同じ扱い）
+function setRankFilter(grp,rank){
+  rankFilter[grp]=rank;
+  applyRankFilter(grp);
+  // 切り替えたら、ボタンの位置まで画面を戻す（下の方で押しても一覧の先頭から見られるように）
+  const bar=document.querySelector('#g-'+grp+' .rank-filter');
+  if(bar&&bar.getBoundingClientRect().top<0)bar.scrollIntoView({block:'start',behavior:'smooth'});
+}
+function applyRankFilter(grp){
+  const sec=document.getElementById('g-'+grp);if(!sec)return;
+  const cur=rankFilter[grp];
+  sec.querySelectorAll('.rank-filter button').forEach(b=>{
+    const on=b.dataset.rank===cur;
+    b.classList.toggle('on',on);b.setAttribute('aria-pressed',on?'true':'false');
+  });
+  sec.querySelectorAll('.rank-sec').forEach(box=>{
+    box.style.display=(cur==='all'||box.dataset.rank===cur)?'':'none';
   });
 }
 // モデルIDからそのカードが属する行要素を返す（ランク見出しで並びが変わっても、DOMを直接たどる）
@@ -2702,7 +2742,7 @@ function renderMcGrid(grp){
     card.setAttribute('data-mid',m.id);card.setAttribute('data-grp',grp);
     const avC=m.img?`<img src="${m.img}" alt="${m.name}"/>`:`<span>${m.name.replace(/[a-zA-Z]/g,'').slice(0,1)||m.name[0]}</span>`;
     const hiddenBadge=m.hidden?`<div style="font-size:9px;color:#fff;background:#b0b0b0;border-radius:999px;padding:1px 7px;display:inline-block;margin-top:2px">非表示</div>`:'';
-    const rankBadge=(m.rank==='専属'||m.rank==='1st')?`<div style="font-size:9px;color:var(--ac-d);background:var(--ac-l);border:.5px solid var(--ac-m);border-radius:999px;padding:1px 7px;display:inline-block;margin-top:2px;margin-left:3px">${m.rank}</div>`:'';
+    const rankBadge=RANKS.includes(m.rank)?`<div style="font-size:9px;color:var(--ac-d);background:var(--ac-l);border:.5px solid var(--ac-m);border-radius:999px;padding:1px 7px;display:inline-block;margin-top:2px;margin-left:3px">${m.rank}</div>`:'';
     card.innerHTML=`<div class="mc-drag" title="ドラッグで並べ替え"><i class="ti ti-grip-vertical" style="font-size:13px"></i></div><div class="mav-w"><div class="mav" onclick="openMcForm('edit','${grp}','${m.id}')"${m.hidden?' style="opacity:.45"':''}>${avC}</div><div class="mav-cam" onclick="openMcForm('edit','${grp}','${m.id}')"><i class="ti ti-camera" style="font-size:10px;color:#fff"></i></div></div><div class="mc-nm">${m.name}</div>${hiddenBadge}${rankBadge}<div class="mc-acts"><button class="mc-edit" onclick="openMcForm('edit','${grp}','${m.id}')"><i class="ti ti-edit" style="font-size:11px"></i> 編集</button><button class="mc-del" onclick="confirmMcDel('${m.id}')"><i class="ti ti-trash" style="font-size:11px"></i></button></div>`;
     grid.appendChild(card);
     // このカードが編集中なら、直下にインライン編集フォームを差し込む
@@ -2809,10 +2849,12 @@ function buildMcFormHTML(mode,grp,m){
 </select>
 <span class="field-lbl">モデルランク</span>
 <select class="inp" id="mc-rank-sel" style="font-size:13px;margin-bottom:14px">
-<option value="" ${(m&&(m.rank==='専属'||m.rank==='1st'))?'':'selected'}>未設定</option>
+<option value="" ${(m&&RANKS.includes(m.rank))?'':'selected'}>未設定</option>
 <option value="専属" ${(m&&m.rank==='専属')?'selected':''}>専属</option>
 <option value="1st" ${(m&&m.rank==='1st')?'selected':''}>1st</option>
+<option value="2nd" ${(m&&m.rank==='2nd')?'selected':''}>2nd</option>
 </select>
+<div style="font-size:11px;color:var(--sub);margin:-8px 0 14px;line-height:1.6">投票画面では「専属」「1st」「2nd」のボタンでランクごとに切り替えて表示されます（未設定は「その他」）。</div>
 <div style="display:flex;gap:10px;justify-content:flex-end">
 <button class="btn-ghost-sm" onclick="closeMcForm()">キャンセル</button>
 <button class="btn-gold" style="width:auto;padding:9px 20px;margin-top:0" onclick="saveMcForm('${mode}')">保存</button>
@@ -2849,8 +2891,8 @@ function handleMcImg(input){
 function saveMcForm(mode){
   const name=(document.getElementById('mc-nm-inp')?.value||'').trim();const grp=document.getElementById('mc-grp-sel')?.value||'japan';
   const hidden=(document.getElementById('mc-vis-sel')?.value==='hide'); // 非表示フラグ
-  const rankSel=document.getElementById('mc-rank-sel')?.value||''; // モデルランク（専属/1st/未設定）
-  const rank=(rankSel==='専属'||rankSel==='1st')?rankSel:'';
+  const rankSel=document.getElementById('mc-rank-sel')?.value||''; // モデルランク（専属/1st/2nd/未設定）
+  const rank=RANKS.includes(rankSel)?rankSel:'';
   if(!name){alert('名前を入力してください');return;}
   if(mode==='add'){models[grp].push({id:genId(),name,grp,img:mcImg,hidden,rank});}
   else{const m=findMod(mcEditId);if(!m)return;const og=m.grp;m.name=name;m.img=mcImg;m.hidden=hidden;m.rank=rank;if(og!==grp){models[og]=models[og].filter(x=>x.id!==m.id);m.grp=grp;models[grp].push(m);}}

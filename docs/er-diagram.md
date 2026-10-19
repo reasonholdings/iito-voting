@@ -53,7 +53,7 @@ erDiagram
         string id PK "jp-01 / os-01 / genId()"
         string name "モデル名"
         string grp "japan / osaka"
-        string rank "専属 / 1st / 空"
+        string rank "専属 / 1st / 2nd / 空"
         bool hidden "非表示"
         string img "画像（データURL）"
     }
