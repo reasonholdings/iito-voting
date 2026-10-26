@@ -134,7 +134,7 @@ html,body{min-height:100vh;background:var(--bg2);font-family:"Zen Maru Gothic","
 .met .n{font-size:22px;font-weight:300}.met .l{font-size:10px;color:var(--sub);margin-top:3px}
 
 /* 候補者グリッド */
-.cand-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}
+.cand-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px} /* 列数は colsFor() で行ごとに上書き（すべて＝4列、ランク選択時＝3列） */
 /* 投票画面のランク別サブ見出し（専属 / 1st） */
 .rank-hd{font-size:12px;font-weight:700;color:var(--ac-d);background:var(--ac-l);border-radius:8px;padding:5px 12px;margin:6px 0 12px;display:inline-block}
 /* ランク切り替え（専属・1st・2nd）：1列に均等幅で並べる。検索欄と同じ細いピル形で控えめに（人数は出さない） */
@@ -723,7 +723,8 @@ const PLANS={supporter:12,partner:40,producer:150};
 const PLAN_LBL={supporter:'サポーター',partner:'パートナー',producer:'プロデューサー'};
 const PLAN_MAP={'サポーター':'supporter','パートナー':'partner','プロデューサー':'producer'};
 const SESSION_TTL=90*24*60*60*1000; // セッション有効期間：90日（ログイン時刻から）
-const COL=4; // 投票画面のモデル一覧の列数（.cand-row の列数と合わせる）
+// 投票画面のモデル一覧の列数：「すべて」は4列、ランク（専属・1st・2nd・その他）を選んだときは3列
+function colsFor(rank){return rank==='all'?4:3;}
 
 // localStorage キー（v2 = 固定IDバージョン）
 const LS={
@@ -1426,6 +1427,7 @@ function buildGrid(grp){
   // 名前検索中は、名前に検索文字を含むモデルだけを並べる（ランクのボタンは検索前のまま）
   const q=normName(nameQuery);
   const shown=q?groups.map(g=>({rank:g.rank,list:g.list.filter(m=>normName(m.name).includes(q))})).filter(g=>g.list.length):groups;
+  const COL=colsFor(rankFilter[grp]);
   shown.forEach(g=>{
     // ランクごとの箱。票の入力パネルは行の直後＝この箱の中に入るので、箱ごと隠せばパネルも一緒に隠れる
     const box=document.createElement('div');
@@ -1437,7 +1439,7 @@ function buildGrid(grp){
       box.appendChild(hd);
     }
     for(let i=0;i<g.list.length;i+=COL){
-      const row=document.createElement('div');row.className='cand-row';row.id='cr-'+grp+'-'+rowIdx;
+      const row=document.createElement('div');row.className='cand-row';row.id='cr-'+grp+'-'+rowIdx;row.style.gridTemplateColumns=`repeat(${COL},1fr)`;
       for(let j=i;j<Math.min(i+COL,g.list.length);j++){
         const m=g.list[j];const d=document.createElement('div');d.className='cc';d.id='cc-'+m.id;
         d.onclick=()=>onCardClick(m.id);
@@ -1454,8 +1456,13 @@ function buildGrid(grp){
 }
 // ランクの切り替え。選択中（未確定）の票は消さずに残す
 function setRankFilter(grp,rank){
+  const reflow=colsFor(rankFilter[grp])!==colsFor(rank);
   rankFilter[grp]=rank;
-  applyRankFilter(grp);
+  if(reflow){
+    // 列数が変わるので並べ直す。開いている票の入力欄は閉じるだけ（選択中の票は消さない）
+    document.querySelectorAll('#g-'+grp+' .ialloc').forEach(p=>p.remove());
+    buildGrids();updUI();
+  }else applyRankFilter(grp);
   // 切り替えたら、ボタンの位置まで画面を戻す（下の方で押しても一覧の先頭から見られるように）
   const bar=document.querySelector('#g-'+grp+' .rank-filter');
   if(bar&&bar.getBoundingClientRect().top<0)bar.scrollIntoView({block:'start',behavior:'smooth'});
