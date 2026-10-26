@@ -138,7 +138,16 @@ html,body{min-height:100vh;background:var(--bg2);font-family:"Zen Maru Gothic","
 /* 投票画面のランク別サブ見出し（専属 / 1st） */
 .rank-hd{font-size:12px;font-weight:700;color:var(--ac-d);background:var(--ac-l);border-radius:8px;padding:5px 12px;margin:6px 0 12px;display:inline-block}
 /* ランク切り替え（専属・1st・2nd）：1列に均等幅で並べ、指で押しやすい高さ52pxにする */
-.rank-filter{display:flex;gap:6px;margin:-4px 0 14px}
+.rank-filter{display:flex;gap:6px;margin:0 0 14px}
+/* 名前検索（投票画面）：指で押しやすい高さ。フォント16px以上でiPhoneの自動ズームを防ぐ */
+.name-search{position:relative;margin:-4px 0 10px}
+.name-search .ti-search{position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:18px;color:var(--sub);pointer-events:none}
+.name-search input{width:100%;min-height:48px;border:1.5px solid var(--bd);border-radius:14px;padding:10px 46px 10px 42px;font-family:inherit;font-size:16px;color:var(--tx);background:#fff;outline:none;-webkit-appearance:none}
+.name-search input:focus{border-color:var(--ac)}
+.name-search input::-webkit-search-cancel-button{display:none}
+.name-search .ns-clear{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:40px;height:40px;border:none;background:transparent;color:var(--sub);font-size:18px;cursor:pointer;display:none;align-items:center;justify-content:center}
+.name-search.has-q .ns-clear{display:flex}
+.ns-empty{text-align:center;padding:24px 12px;font-size:13px;color:var(--sub);background:var(--bg2);border:.5px solid var(--bd);border-radius:12px;margin-bottom:14px}
 .rank-filter button{flex:1 1 0;min-width:0;min-height:52px;padding:6px 2px;border-radius:14px;border:1.5px solid var(--bd);background:#fff;color:var(--tx);font-family:inherit;font-size:14px;font-weight:500;line-height:1.2;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;-webkit-tap-highlight-color:transparent}
 .rank-filter button .rf-n{font-size:11px;font-weight:400;color:var(--sub)}
 .rank-filter button.on{background:var(--ac);border-color:var(--ac);color:#fff;font-weight:700}
@@ -440,6 +449,11 @@ html,body{min-height:100vh;background:var(--bg2);font-family:"Zen Maru Gothic","
   </div>
   <div id="term-note" style="display:none;font-size:11px;color:var(--sub);text-align:center;margin:-6px 0 14px;line-height:1.5"></div>
 
+  <div class="name-search" id="name-search">
+    <i class="ti ti-search"></i>
+    <input type="search" id="ns-inp" placeholder="名前で検索" aria-label="モデルの名前で検索" autocomplete="off" oninput="setNameQuery(this.value)">
+    <button type="button" class="ns-clear" aria-label="検索をクリア" onclick="setNameQuery('');document.getElementById('ns-inp').focus()"><i class="ti ti-x"></i></button>
+  </div>
   <div id="g-all"></div>
 
   <div class="warn-txt" id="warn-txt">票数が上限を超えています</div>
@@ -1378,6 +1392,17 @@ function rankOf(m){return RANKS.includes(m.rank)?m.rank:'';}
 function rankLabel(r){return r||'その他';}
 // 投票画面で選んでいるランク（グループごと）。'all'＝すべて表示
 const rankFilter={all:'all'};
+// 名前検索の文字。ひらがな/カタカナ・全角/半角・大文字/小文字の違いは無視して部分一致で探す
+let nameQuery='';
+function normName(t){return String(t||'').normalize('NFKC').toLowerCase().replace(/[\u30a1-\u30f6]/g,c=>String.fromCharCode(c.charCodeAt(0)-0x60)).replace(/\s+/g,'');}
+function setNameQuery(q){
+  nameQuery=q;
+  const inp=document.getElementById('ns-inp');if(inp&&inp.value!==q)inp.value=q;
+  document.getElementById('name-search')?.classList.toggle('has-q',!!q.trim());
+  // 開いている票の入力欄は閉じるだけ（選択中の票は消さない）。並べ直して表示を戻す
+  document.querySelectorAll('#g-all .ialloc').forEach(p=>p.remove());
+  buildGrids();updUI();
+}
 function buildGrid(grp){
   const sec=document.getElementById('g-'+grp);sec.innerHTML='';
   const all=visibleMods(grp);
@@ -1400,7 +1425,10 @@ function buildGrid(grp){
     sec.appendChild(bar);
   }
   let rowIdx=0; // 行の通し番号（見出しをまたいでも連番）
-  groups.forEach(g=>{
+  // 名前検索中は、名前に検索文字を含むモデルだけを並べる（ランクのボタンと人数は検索前のまま）
+  const q=normName(nameQuery);
+  const shown=q?groups.map(g=>({rank:g.rank,list:g.list.filter(m=>normName(m.name).includes(q))})).filter(g=>g.list.length):groups;
+  shown.forEach(g=>{
     // ランクごとの箱。票の入力パネルは行の直後＝この箱の中に入るので、箱ごと隠せばパネルも一緒に隠れる
     const box=document.createElement('div');
     box.className='rank-sec';box.dataset.rank=g.rank;
@@ -1441,9 +1469,17 @@ function applyRankFilter(grp){
     const on=b.dataset.rank===cur;
     b.classList.toggle('on',on);b.setAttribute('aria-pressed',on?'true':'false');
   });
-  sec.querySelectorAll('.rank-sec').forEach(box=>{
+  const boxes=[...sec.querySelectorAll('.rank-sec')];
+  boxes.forEach(box=>{
     box.style.display=(cur==='all'||box.dataset.rank===cur)?'':'none';
   });
+  // 名前検索で1人も出ないときは、その旨を表示する
+  sec.querySelector('.ns-empty')?.remove();
+  if(nameQuery.trim()&&!boxes.some(b=>b.style.display!=='none')){
+    const em=document.createElement('div');em.className='ns-empty';
+    em.textContent=`「${nameQuery.trim()}」に当てはまるモデルはいません`+(boxes.length?`（「すべて」に切り替えると${boxes.reduce((n,b)=>n+b.querySelectorAll('.cc').length,0)}人見つかります）`:'');
+    sec.appendChild(em);
+  }
 }
 // モデルIDからそのカードが属する行要素を返す（ランク見出しで並びが変わっても、DOMを直接たどる）
 function getCardRow(mid){
@@ -1999,8 +2035,8 @@ function buildVoteScreen(){
   const noEvent=getPublicEvents().length===0;
   const noteEl=document.getElementById('novote-note');
   if(noteEl)noteEl.style.display=noEvent?'block':'none';
-  // 投票の操作系（バナー・グリッド・確定ボタン）は隠す
-  ['vote-banner','g-all','btn-final'].forEach(id=>{
+  // 投票の操作系（バナー・検索・グリッド・確定ボタン）は隠す
+  ['vote-banner','name-search','g-all','btn-final'].forEach(id=>{
     const el=document.getElementById(id);if(el)el.style.display=noEvent?'none':'';
   });
   const hint=document.querySelector('#s-vote .hint');if(hint)hint.style.display=noEvent?'none':'';
