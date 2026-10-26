@@ -132,7 +132,6 @@ html,body{min-height:100vh;background:var(--bg2);font-family:"Zen Maru Gothic","
 .met.met-rm{background:var(--rd-l);border:1.5px solid var(--rd-m)}.met.met-rm .n{color:var(--rd)}.met.met-rm .l{color:var(--rd)}
 .met.met-pd-on{background:var(--gr-l);border:1.5px solid var(--gr-m)}.met.met-pd-on .n{color:var(--gr)}.met.met-pd-on .l{color:var(--gr)}
 .met .n{font-size:22px;font-weight:300}.met .l{font-size:10px;color:var(--sub);margin-top:3px}
-.tab-row{display:flex;gap:8px;margin-bottom:16px}
 
 /* 候補者グリッド */
 .cand-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
@@ -441,12 +440,7 @@ html,body{min-height:100vh;background:var(--bg2);font-family:"Zen Maru Gothic","
   </div>
   <div id="term-note" style="display:none;font-size:11px;color:var(--sub);text-align:center;margin:-6px 0 14px;line-height:1.5"></div>
 
-  <div class="tab-row">
-    <button id="tb-jp" onclick="switchTab('japan')">iito JAPAN</button>
-    <button id="tb-os" onclick="switchTab('osaka')">iito OSAKA</button>
-  </div>
-  <div id="g-japan"></div>
-  <div id="g-osaka" style="display:none"></div>
+  <div id="g-all"></div>
 
   <div class="warn-txt" id="warn-txt">票数が上限を超えています</div>
   <div id="novote-note" style="display:none;text-align:center;padding:14px;background:var(--bg2);border:.5px solid var(--bd);border-radius:12px;font-size:13px;color:var(--sub);margin-bottom:12px">現在投票受付中のイベントはありません</div>
@@ -1372,29 +1366,18 @@ function applyEvUI(){
 }
 
 // ════════════════════════════════════════
-// タブ（投票画面）
-// ════════════════════════════════════════
-const TON={padding:'6px 16px',fontSize:'11px',fontWeight:'700',background:'#FFD028',color:'#7A5C00',border:'1px solid #FFD028',borderRadius:'999px',cursor:'pointer',whiteSpace:'nowrap'};
-const TOFF={padding:'6px 16px',fontSize:'11px',fontWeight:'400',background:'#FFF7FA',color:'#8A8A8A',border:'1px solid #E8E8E8',borderRadius:'999px',cursor:'pointer',whiteSpace:'nowrap'};
-function switchTab(grp){
-  document.getElementById('g-japan').style.display=grp==='japan'?'':'none';
-  document.getElementById('g-osaka').style.display=grp==='osaka'?'':'none';
-  Object.assign(document.getElementById('tb-jp').style,grp==='japan'?TON:TOFF);
-  Object.assign(document.getElementById('tb-os').style,grp==='osaka'?TON:TOFF);
-}
-
-// ════════════════════════════════════════
 // 候補者グリッド
 // ════════════════════════════════════════
-function buildGrids(){buildGrid('japan');buildGrid('osaka');}
-// 投票画面に出すモデル（非表示フラグが立っていないもの）
-function visibleMods(grp){return (models[grp]||[]).filter(m=>!m.hidden);}
+// 投票画面はJAPAN/OSAKAを分けず、全モデルを1つの一覧に出す（グループ分けは管理画面だけ）
+function buildGrids(){buildGrid('all');}
+// 投票画面に出すモデル（非表示フラグが立っていないもの）。'all'＝JAPAN→OSAKAの順で全員
+function visibleMods(grp){return (grp==='all'?allMod():(models[grp]||[])).filter(m=>!m.hidden);}
 // モデルランク（管理画面のモデル登録で指定）。この順で表示する。未設定は「その他」
 const RANKS=['専属','1st','2nd'];
 function rankOf(m){return RANKS.includes(m.rank)?m.rank:'';}
 function rankLabel(r){return r||'その他';}
 // 投票画面で選んでいるランク（グループごと）。'all'＝すべて表示
-const rankFilter={japan:'all',osaka:'all'};
+const rankFilter={all:'all'};
 function buildGrid(grp){
   const sec=document.getElementById('g-'+grp);sec.innerHTML='';
   const all=visibleMods(grp);
@@ -1443,7 +1426,7 @@ function buildGrid(grp){
   });
   applyRankFilter(grp);
 }
-// ランクの切り替え。選択中（未確定）の票は消さずに残す（JAPAN/OSAKAの切り替えと同じ扱い）
+// ランクの切り替え。選択中（未確定）の票は消さずに残す
 function setRankFilter(grp,rank){
   rankFilter[grp]=rank;
   applyRankFilter(grp);
@@ -1683,17 +1666,14 @@ function updUI(){
 // ════════════════════════════════════════
 function buildMsBox(boxId,getF,setF){
   const box=document.getElementById(boxId);if(!box)return;box.innerHTML='';
-  [{label:'iito JAPAN',list:models.japan},{label:'iito OSAKA',list:models.osaka}].forEach(({label,list})=>{
-    const hd=document.createElement('div');hd.className='ms-grp';hd.textContent=label;box.appendChild(hd);
-    list.forEach(m=>{
-      const item=document.createElement('div');item.className='ms-item';
-      const uid='chk-'+boxId+'-'+m.id;
-      const chk=document.createElement('input');chk.type='checkbox';chk.id=uid;chk.value=m.id;chk.checked=getF().includes(m.id);
-      chk.onchange=()=>{const cur=getF();if(chk.checked){if(!cur.includes(m.id))setF([...cur,m.id]);}else setF(cur.filter(x=>x!==m.id));};
-      const lbl=document.createElement('label');lbl.htmlFor=uid;lbl.textContent=m.name;
-      const tag=document.createElement('span');tag.className='ms-tag';tag.textContent=label.replace('iito ','');
-      item.appendChild(chk);item.appendChild(lbl);item.appendChild(tag);box.appendChild(item);
-    });
+  // 投票者向けなのでJAPAN/OSAKAの見出し・タグは出さず、全モデルを1つの一覧にする
+  allMod().forEach(m=>{
+    const item=document.createElement('div');item.className='ms-item';
+    const uid='chk-'+boxId+'-'+m.id;
+    const chk=document.createElement('input');chk.type='checkbox';chk.id=uid;chk.value=m.id;chk.checked=getF().includes(m.id);
+    chk.onchange=()=>{const cur=getF();if(chk.checked){if(!cur.includes(m.id))setF([...cur,m.id]);}else setF(cur.filter(x=>x!==m.id));};
+    const lbl=document.createElement('label');lbl.htmlFor=uid;lbl.textContent=m.name;
+    item.appendChild(chk);item.appendChild(lbl);box.appendChild(item);
   });
 }
 function renderPills(cid,ids,rmFn){
@@ -2014,20 +1994,18 @@ function buildVoteScreen(){
   document.getElementById('chip-nm').textContent=curUser.nick;
   document.getElementById('v-badge').textContent=`${PLAN_LBL[curUser.plan]} — ${PLANS[curUser.plan]}票`;
   renderPills('v-oshi-pills',oshiMap[curUser.nick]||[],null);
-  buildGrids();switchTab('japan');updUI();
+  buildGrids();updUI();
   // 公開中のイベントが無い場合：投票UIは隠すが、残り票数（基本票＋繰り越し）は表示する
   const noEvent=getPublicEvents().length===0;
   const noteEl=document.getElementById('novote-note');
   if(noteEl)noteEl.style.display=noEvent?'block':'none';
-  // 投票の操作系（バナー・タブ・グリッド・確定ボタン）は隠す
-  ['vote-banner','tb-jp','tb-os','g-japan','g-osaka','btn-final'].forEach(id=>{
+  // 投票の操作系（バナー・グリッド・確定ボタン）は隠す
+  ['vote-banner','g-all','btn-final'].forEach(id=>{
     const el=document.getElementById(id);if(el)el.style.display=noEvent?'none':'';
   });
-  const tabRow=document.querySelector('#s-vote .tab-row');if(tabRow)tabRow.style.display=noEvent?'none':'';
   const hint=document.querySelector('#s-vote .hint');if(hint)hint.style.display=noEvent?'none':'';
   // メトリクス（残り票数）は隠さない ＝ イベントが無くても繰り越し込みの残り票数を見せる
   const metrics=document.querySelector('#s-vote .metrics');if(metrics)metrics.style.display='';
-  if(noEvent){const gj=document.getElementById('g-japan'),go=document.getElementById('g-osaka');if(gj)gj.style.display='none';if(go)go.style.display='none';}
 }
 // 投票者画面の上部イベントタブ（ONイベントが複数のときだけ表示）
 function renderEventTabs(){
@@ -2065,7 +2043,7 @@ function switchEvent(evId){
   sentLocked={...evV};
   ls(sentKey,{...sentLocked});
   submitted=false;
-  applyEvUI();renderEventTabs();buildGrids();switchTab('japan');updUI();startCd();
+  applyEvUI();renderEventTabs();buildGrids();updUI();startCd();
 }
 
 // 投票確認・送信
