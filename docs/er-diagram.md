@@ -10,9 +10,9 @@
 
 | 置き場所 | 中身 | 正（マスター）か |
 |---|---|---|
-| Googleスプレッドシート（GAS経由） | 会員・イベント・モデル・投票記録・プラン付与履歴 | **正** |
+| Googleスプレッドシート（GAS経由） | 会員・イベント・モデル・投票記録・プラン付与履歴・暗証番号（ハッシュ） | **正** |
 | 各端末のlocalStorage | 上記のコピー（キャッシュ）＋推し・ログイン状態・管理PW | コピー（推しだけは端末にしか無い） |
-| Firebase Authentication | メールリンクでログインしたメールアドレス | ログイン確認のみ（会員データとはつながっていない） |
+| Firebase Authentication | 【旧方式】メールリンクでログインしたメールアドレス。2026-10 から新規ログインは暗証番号方式（GAS）に移行。既にログイン済みの端末だけが使う | ログイン確認のみ（会員データとはつながっていない） |
 
 ```mermaid
 erDiagram
@@ -94,6 +94,7 @@ erDiagram
 | MODEL | `モデル` | `{japan:[…], osaka:[…]}` を**JSON1本**で分割保存 | `saveModels`（全体上書き） | `getModels` |
 | VOTE | `投票_<evId>`（**イベントごとに1シート**） | 1行目=タイトル、2行目=見出し、3行目〜データ（A〜L列） | `saveVote`（追記のみ） | `getResults` / `getTermPlans` / `getOshi` |
 | GRANT | `プラン付与履歴` | 1行1付与（A〜D列）。`nick\|plan\|term` の重複は記録しない | `recordGrants` | `getGrants` |
+| PIN | `暗証番号` | 1行1会員（A〜E列：メールアドレス／ニックネーム／salt／ハッシュ／更新時刻）。暗証番号そのものは保存しない。シートは初回に自動作成 | `setPin` | `pinLogin`・`verifyVoterToken_` |
 | PLAN | （シート無し） | コード内定数 `PLANS`（HTML）／`PLAN_VOTES`（GAS） | ― | ― |
 | TERM | （シート無し） | 文字列 `YYYY年M月期` | ― | ― |
 | （未使用） | `投票データ` | 定数 `SHEET_VOTES` だけ定義。現在どこからも使われていない | ― | ― |

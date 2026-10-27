@@ -20,6 +20,18 @@ const ADMIN_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const ADMIN_MAX_FAIL = 5;
 const ADMIN_LOCK_SEC = 15 * 60;
 
+// ── 暗証番号ログイン（2026-10 追加。Firebaseの確認メールは1日5通までのため置き換え） ──
+// 確認コードの差出人。GASを動かすGoogleアカウントのGmailに「他のアドレスから送信」で登録しておくこと
+const SENDER_ADDR = 'info@reason.holdings';
+const SENDER_NAME = 'iito members';
+const SHEET_PINS  = '暗証番号';                       // メール／ニックネーム／salt／ハッシュ／更新時刻（暗証番号そのものは保存しない）
+const VOTER_TOKEN_TTL_MS = 90 * 24 * 60 * 60 * 1000;  // ログインの有効期間（HTMLの SESSION_TTL と合わせる）
+const CODE_TTL_SEC   = 10 * 60;  // 確認コードの有効時間
+const CODE_MAX_TRY   = 5;        // 確認コードの入力ミスの上限（超えたらコードは無効）
+const CODE_SEND_MAX  = 3;        // 同じメールアドレスへ1時間に送れる確認コードの数
+const PIN_MAX_FAIL   = 5;        // 暗証番号を5回間違えたら
+const PIN_LOCK_SEC   = 15 * 60;  //   15分ロック
+
 // プランごとの基本持ち票（HTML側の PLANS と必ず一致させること）
 const PLAN_VOTES = {
   supporter: 12,
@@ -59,8 +71,8 @@ function doGet(e) {
 }
 
 // doPost / doGet 共通のアクション振り分け
-//  ・だれでも使える：ping / getEvents / getModels / checkMember / adminLogin
-//  ・投票者本人（Firebaseのログイン証明 idToken が必要）：me / saveVote
+//  ・だれでも使える：ping / getEvents / getModels / checkMember / adminLogin / requestPinCode / setPin / pinLogin
+//  ・投票者本人（暗証番号ログインの sessionToken、または旧方式のFirebaseの idToken が必要）：me / saveVote
 //  ・管理者（adminLogin で受け取った adminToken が必要）：それ以外すべて
 function handleAction(action, data) {
   // だれでも使える
@@ -68,6 +80,9 @@ function handleAction(action, data) {
   if (action === 'getEvents')   return getEvents();
   if (action === 'getModels')   return getModels();
   if (action === 'checkMember') return checkMember(data);
+  if (action === 'requestPinCode') return requestPinCode(data);
+  if (action === 'setPin')      return setPin(data);
+  if (action === 'pinLogin')    return pinLogin(data);
   if (action === 'adminLogin')  return adminLogin(data);
   // 投票者本人
   if (action === 'me')          return getMe(data);
@@ -126,12 +141,13 @@ function findMember_(nick) {
   return null;
 }
 
-// 投票者本人の確認：idToken のメールと、会員データのメールが一致するか
+// 投票者本人の確認：ログイン証明（sessionToken / idToken）のメールと、会員データのメールが一致するか
 //  返り値: { member } または { error }
 function authVoter_(data) {
   const m = findMember_(data.nick);
   if (!m) return { error: 'not_member' };
-  const email = verifyIdToken_(data.idToken);
+  // 暗証番号ログインの証明を優先。無ければ旧方式（Firebaseのメールリンク）の証明で確かめる
+  const email = data.sessionToken ? verifyVoterToken_(data.sessionToken) : verifyIdToken_(data.idToken);
   if (!email) return { error: 'auth_required' };
   if (!m.email || m.email !== email) return { error: 'email_mismatch' };
   return { member: m };
@@ -236,7 +252,7 @@ function changeAdminPw(data) {
 
 // ════════════════════════════════════════
 // 【初回に1回だけエディタから実行】設定の確認
-//  ・外部への問い合わせ（Firebase）の許可を求める画面が出るので「許可」する
+//  ・外部への問い合わせ（Firebase）とメール送信（Gmail）の許可を求める画面が出るので「許可」する
 //  ・実行ログに「すべてOK」と出れば設定完了
 // ════════════════════════════════════════
 function testSetup() {
@@ -248,7 +264,10 @@ function testSetup() {
   const body = res.getContentText();
   const fbOk = body.indexOf('INVALID_ID_TOKEN') >= 0;
   Logger.log(fbOk ? '✓ Firebaseとの接続：OK' : '✗ Firebaseとの接続に失敗：' + body.slice(0, 300));
-  Logger.log(pw && fbOk ? '★ すべてOK' : '★ ✗の項目を確認してください');
+  const aliasOk = GmailApp.getAliases().map(function(a){ return String(a).toLowerCase(); }).indexOf(SENDER_ADDR) >= 0;
+  Logger.log(aliasOk ? '✓ 差出人 ' + SENDER_ADDR + '：Gmailに登録済み' : '✗ 差出人 ' + SENDER_ADDR + ' がGmailの「他のアドレスから送信」に登録されていません');
+  Logger.log('  今日あと送れるメール：' + MailApp.getRemainingDailyQuota() + '通');
+  Logger.log(pw && fbOk && aliasOk ? '★ すべてOK' : '★ ✗の項目を確認してください');
 }
 
 function corsRes(obj) {
@@ -478,9 +497,9 @@ function saveVote(data) {
   if (!isMemberValid(nick)) {
     return { ok: false, error: 'not_member', message: '会員として登録されていません' };
   }
-  // 1.2 本人確認：Firebaseでログインしたメールと、会員データのメールが一致するか
-  //     （移行期間中で idToken が無い＝旧HTMLからの送信 だけは従来どおり通す）
-  if (data.idToken || !isLegacy_()) {
+  // 1.2 本人確認：ログインしたメールと、会員データのメールが一致するか
+  //     （移行期間中でログイン証明が無い＝旧HTMLからの送信 だけは従来どおり通す）
+  if (data.sessionToken || data.idToken || !isLegacy_()) {
     const a = authVoter_(data);
     if (a.error) return { ok: false, error: a.error, message: '本人確認ができませんでした。もう一度ログインしてください' };
   }
@@ -867,4 +886,178 @@ function grantedVotesInTerm_(nick, term) {
     });
   }
   return sum;
+}
+
+// ════════════════════════════════════════
+// 暗証番号ログイン
+//  ① はじめて／忘れたとき：メールアドレスに6桁の確認コードを送る（requestPinCode）
+//  ② コード＋新しい暗証番号を送ると登録され、そのままログインできる（setPin）
+//  ③ 次回からはメールアドレス＋暗証番号でログイン（pinLogin）
+//  ログインに成功すると sessionToken（署名付き・90日有効）を返す。暗証番号を変えると古いtokenは使えなくなる
+// ════════════════════════════════════════
+function normEmail_(e) { return String(e || '').trim().toLowerCase(); }
+
+// 会員データからメールアドレスで1人分を探す
+function findMemberByEmail_(email) {
+  const target = normEmail_(email);
+  if (!target) return null;
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_MEMBERS);
+  if (!sheet || sheet.getLastRow() <= 1) return null;
+  const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 5).getValues();
+  for (var i = 0; i < rows.length; i++) {
+    if (normEmail_(rows[i][3]) === target && String(rows[i][1]).trim()) {
+      return { mid: String(rows[i][0] || ''), nick: String(rows[i][1]).trim(), plan: String(rows[i][2] || 'supporter').trim(), email: target };
+    }
+  }
+  return null;
+}
+
+// 署名用の秘密の値（初回に自動で作ってスクリプトプロパティに保存。人が設定する必要はない）
+function voterSecret_() {
+  const props = PropertiesService.getScriptProperties();
+  var s = props.getProperty('VOTER_SECRET');
+  if (!s) { s = Utilities.getUuid() + Utilities.getUuid(); props.setProperty('VOTER_SECRET', s); }
+  return s;
+}
+function hmac_(text) {
+  return Utilities.base64EncodeWebSafe(Utilities.computeHmacSha256Signature(String(text), voterSecret_()));
+}
+// キャッシュのキー用（メールアドレスをそのままキーにしない）
+function emailKey_(email) { return hmac_('key|' + normEmail_(email)).slice(0, 40); }
+
+function getPinSheet_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(SHEET_PINS);
+  if (!sh) {
+    sh = ss.insertSheet(SHEET_PINS);
+    sh.appendRow(['メールアドレス', 'ニックネーム', 'salt', 'ハッシュ', '更新時刻']);
+  }
+  return sh;
+}
+// 暗証番号の登録行を探す → { row, salt, hash, ver } または null
+function findPinRow_(email) {
+  const sh = getPinSheet_();
+  if (sh.getLastRow() <= 1) return null;
+  const target = normEmail_(email);
+  const rows = sh.getRange(2, 1, sh.getLastRow() - 1, 5).getValues();
+  for (var i = 0; i < rows.length; i++) {
+    if (normEmail_(rows[i][0]) === target) return { row: i + 2, salt: String(rows[i][2]), hash: String(rows[i][3]), ver: String(rows[i][4]) };
+  }
+  return null;
+}
+// 先頭に文字を付けて保存する（スプレッドシートが数値や数式と取り違えないように）
+function pinHash_(salt, pin) { return 'h' + hmac_('pin|' + salt + '|' + pin); }
+
+// 暗証番号のルール：4〜6桁の数字。0000・1234 のような分かりやすい番号は不可
+function pinProblem_(pin) {
+  if (!/^[0-9]{4,6}$/.test(pin)) return 'pin_format';
+  if (/^(\d)\1+$/.test(pin)) return 'pin_weak';
+  if ('0123456789'.indexOf(pin) >= 0 || '9876543210'.indexOf(pin) >= 0) return 'pin_weak';
+  return '';
+}
+
+// ログイン証明（sessionToken）を作る：メール｜暗証番号の更新時刻｜期限 に署名
+function issueVoterToken_(email, ver) {
+  const payload = normEmail_(email) + '|' + ver + '|' + (Date.now() + VOTER_TOKEN_TTL_MS);
+  return Utilities.base64EncodeWebSafe(payload, Utilities.Charset.UTF_8) + '.' + hmac_('tok|' + payload);
+}
+// ログイン証明を確かめる。正しければメールアドレス、だめなら null
+function verifyVoterToken_(token) {
+  const parts = String(token || '').split('.');
+  if (parts.length !== 2) return null;
+  var payload;
+  try { payload = Utilities.newBlob(Utilities.base64DecodeWebSafe(parts[0])).getDataAsString('UTF-8'); } catch (e) { return null; }
+  if (hmac_('tok|' + payload) !== parts[1]) return null;
+  const f = payload.split('|');
+  if (f.length !== 3 || Number(f[2]) < Date.now()) return null;
+  const pr = findPinRow_(f[0]);
+  if (!pr || pr.ver !== f[1]) return null; // 暗証番号を設定し直したら、古いログインは無効
+  return f[0];
+}
+
+// ① 確認コードを送る。登録の有無は答えない（他人が会員かどうかを調べられないように）
+function requestPinCode(data) {
+  const email = normEmail_(data.email);
+  if (!email || email.indexOf('@') < 0) return { ok: false, error: 'bad_email' };
+  const m = findMemberByEmail_(email);
+  if (!m) return { ok: true };
+  const cache = CacheService.getScriptCache();
+  const key = emailKey_(email);
+  const sent = Number(cache.get('pcs_' + key) || 0);
+  if (sent >= CODE_SEND_MAX) return { ok: false, error: 'too_many' };
+  if (MailApp.getRemainingDailyQuota() < 1) return { ok: false, error: 'mail_quota' };
+  const code = String(parseInt(Utilities.getUuid().replace(/-/g, '').slice(0, 12), 16) % 1000000 + 1000000).slice(1); // 6桁（推測されにくい乱数から作る）
+  cache.put('pc_' + key, JSON.stringify({ h: hmac_('code|' + email + '|' + code), n: 0 }), CODE_TTL_SEC);
+  cache.put('pcs_' + key, String(sent + 1), 60 * 60);
+  try {
+    GmailApp.sendEmail(email, '【iito members】確認コード',
+      m.nick + ' 様\n\n' +
+      'iito members 推しモデル投票の確認コードです。\n\n' +
+      '　確認コード：' + code + '\n\n' +
+      'この番号を投票画面に入力し、暗証番号を設定してください（10分間有効）。\n' +
+      'お心当たりのない場合は、このメールを破棄してください。\n\n' +
+      'iito members 運営',
+      { from: SENDER_ADDR, name: SENDER_NAME });
+  } catch (e) {
+    cache.remove('pc_' + key);
+    console.error('確認コードの送信に失敗', e);
+    return { ok: false, error: 'send_failed' };
+  }
+  return { ok: true };
+}
+
+// ② 確認コードを確かめて暗証番号を登録し、そのままログインする
+function setPin(data) {
+  const email = normEmail_(data.email);
+  const code = String(data.code || '').trim();
+  const pin = String(data.pin || '').trim();
+  const cache = CacheService.getScriptCache();
+  const key = emailKey_(email);
+  const raw = cache.get('pc_' + key);
+  if (!raw) return { ok: false, error: 'code_expired' };
+  const c = JSON.parse(raw);
+  if (c.h !== hmac_('code|' + email + '|' + code)) {
+    c.n++;
+    if (c.n >= CODE_MAX_TRY) { cache.remove('pc_' + key); return { ok: false, error: 'code_expired' }; }
+    cache.put('pc_' + key, JSON.stringify(c), CODE_TTL_SEC);
+    return { ok: false, error: 'wrong_code' };
+  }
+  const bad = pinProblem_(pin);
+  if (bad) return { ok: false, error: bad };
+  const m = findMemberByEmail_(email);
+  if (!m) return { ok: false, error: 'not_member' };
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const sh = getPinSheet_();
+    const salt = Utilities.getUuid();
+    const ver = 'v' + Date.now();
+    const row = [email, m.nick, salt, pinHash_(salt, pin), ver];
+    const pr = findPinRow_(email);
+    if (pr) sh.getRange(pr.row, 1, 1, 5).setValues([row]); else sh.appendRow(row);
+    cache.remove('pc_' + key);
+    cache.remove('pf_' + key);
+    return { ok: true, token: issueVoterToken_(email, ver), nick: m.nick };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// ③ メールアドレス＋暗証番号でログイン
+function pinLogin(data) {
+  const email = normEmail_(data.email);
+  const pin = String(data.pin || '').trim();
+  const cache = CacheService.getScriptCache();
+  const key = emailKey_(email);
+  const fails = Number(cache.get('pf_' + key) || 0);
+  if (fails >= PIN_MAX_FAIL) return { ok: false, error: 'locked', minutes: Math.ceil(PIN_LOCK_SEC / 60) };
+  const m = findMemberByEmail_(email);
+  const pr = m ? findPinRow_(email) : null;
+  if (!m || !pr || pinHash_(pr.salt, pin) !== pr.hash) {
+    cache.put('pf_' + key, String(fails + 1), PIN_LOCK_SEC);
+    if (fails + 1 >= PIN_MAX_FAIL) return { ok: false, error: 'locked', minutes: Math.ceil(PIN_LOCK_SEC / 60) };
+    return { ok: false, error: 'wrong_pin' };
+  }
+  cache.remove('pf_' + key);
+  return { ok: true, token: issueVoterToken_(email, pr.ver), nick: m.nick };
 }

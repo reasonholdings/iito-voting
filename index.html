@@ -96,13 +96,7 @@ html,body{min-height:100vh;background:var(--bg2);font-family:"Zen Maru Gothic","
 .sched-note{text-align:center;font-size:10px;color:var(--sub);margin-top:7px;line-height:1.5;padding:0 8px}
 
 /* サジェスト */
-.sug-wrap{position:relative;margin-bottom:3px}
-.sug-list{position:absolute;left:0;right:0;background:var(--bg);border:1.5px solid #ccc;border-radius:12px;overflow:hidden;margin-top:4px;z-index:50;box-shadow:0 4px 16px rgba(0,0,0,.12);display:none}
-.sug-item{padding:12px 16px;cursor:pointer;font-size:14px;border-bottom:.5px solid var(--bd);display:flex;justify-content:space-between;align-items:center}
-.sug-item:last-child{border-bottom:none}
-.sug-item:active{background:var(--bg2)}
 .plan-pill{font-size:10px;background:var(--ac-l);color:var(--ac-d);padding:2px 9px;border-radius:999px;border:.5px solid var(--ac-m)}
-.nick-box{background:var(--bg2);border:1px solid var(--bd);border-radius:10px;padding:11px 16px;display:none;align-items:center;justify-content:space-between;margin-bottom:3px}
 .chg-lnk{font-size:11px;color:var(--sub);cursor:pointer;text-decoration:underline;white-space:nowrap;margin-left:10px}
 .email-fb{font-size:11px;margin-top:6px;display:none;align-items:center;gap:5px}
 .email-fb.ok{color:var(--gr);display:flex}
@@ -367,44 +361,46 @@ html,body{min-height:100vh;background:var(--bg2);font-family:"Zen Maru Gothic","
       <div class="sched-note">プラン新規加入者は、プラン加入日の翌日12:00からログイン可能です</div>
     </div>
 
-    <!-- NICKNAME -->
-    <span class="field-lbl">NICKNAME</span>
-    <div class="sug-wrap">
-      <input class="inp" id="nick-inp" type="text" placeholder="ニックネームを入力" oninput="onNickInput()" autocomplete="off"/>
-      <div class="sug-list" id="sug-list"></div>
-    </div>
-    <div class="nick-box" id="nick-box">
-      <div>
-        <div style="font-size:15px" id="conf-nick"></div>
-        <div style="font-size:10px;background:var(--ac-l);color:var(--ac-d);padding:2px 10px;border-radius:999px;display:inline-block;border:.5px solid var(--ac-m);margin-top:4px" id="conf-plan"></div>
-      </div>
-      <span class="chg-lnk" onclick="resetNick()">変更</span>
-    </div>
-    <div class="err-msg" id="nick-err"></div>
-
     <!-- EMAIL ADDRESS -->
     <span class="field-lbl">EMAIL ADDRESS</span>
-    <input class="inp" id="email-inp" type="email" placeholder="iito membersに登録しているメールアドレス" oninput="onEmailInput()" autocomplete="email"/>
-    <div class="email-fb" id="email-fb-ok"><i class="ti ti-circle-check" style="font-size:14px"></i>確認できました</div>
-    <div class="email-fb" id="email-fb-er"><i class="ti ti-alert-circle" style="font-size:14px"></i>ニックネームまたはメールアドレスが登録内容と一致しません</div>
+    <input class="inp" id="email-inp" type="email" placeholder="iito membersに登録しているメールアドレス" oninput="onLoginInput()" autocomplete="email"/>
+
+    <!-- PIN -->
+    <span class="field-lbl">PIN（暗証番号）</span>
+    <input class="inp" id="pin-inp" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="4〜6桁の数字" oninput="onLoginInput()" autocomplete="current-password"/>
+    <div class="email-fb" id="email-fb-er"><i class="ti ti-alert-circle" style="font-size:14px"></i><span id="login-err-txt">メールアドレスまたは暗証番号が違います</span></div>
 
     <!-- OSHI MODEL -->
     <span class="field-lbl">OSHI MODEL <span style="font-size:10px;font-weight:400;letter-spacing:0">（複数選択可・任意）</span></span>
     <div class="ms-box" id="oshi-box"></div>
     <div class="pills" id="oshi-pills"></div>
 
-    <button class="btn-gold" id="reg-btn" onclick="doRegister()" disabled>確認メールを送信</button>
+    <button class="btn-gold" id="reg-btn" onclick="doPinLogin()" disabled>ログイン</button>
+    <button class="btn-outline" onclick="openPinSetup()">はじめての方・暗証番号を忘れた方</button>
 
   </div>
 
-  <!-- 確認メール送信済み -->
-  <div id="email-sent-area" style="display:none">
+  <!-- 暗証番号の設定（はじめての方・忘れた方） -->
+  <div id="pin-setup-area" style="display:none">
     <div class="resume-card">
-      <div style="font-size:14px;font-weight:500"><i class="ti ti-mail-check" style="margin-right:6px;color:var(--ac-d)"></i>確認メールを送信しました</div>
-      <div style="font-size:12px;color:var(--sub);margin-top:8px" id="sent-email-addr"></div>
-      <div style="font-size:12px;color:var(--sub);margin-top:8px;line-height:1.6">メール内のリンクをタップすると、この画面に戻ってログインが完了します。届かない場合は迷惑メールフォルダもご確認ください。</div>
+      <div style="font-size:14px;font-weight:500"><i class="ti ti-key" style="margin-right:6px;color:var(--ac-d)"></i>暗証番号の設定</div>
+      <div style="font-size:12px;color:var(--sub);margin-top:8px;line-height:1.6">登録しているメールアドレスに、確認コード（6桁）をお送りします。届いたコードと、これから使う暗証番号（4〜6桁の数字）を入力してください。</div>
     </div>
-    <button class="btn-outline" onclick="backToLoginForm()">戻る</button>
+    <span class="field-lbl">EMAIL ADDRESS</span>
+    <input class="inp" id="ps-email" type="email" placeholder="iito membersに登録しているメールアドレス" autocomplete="email"/>
+    <button class="btn-gold" id="ps-send-btn" onclick="sendPinCode()">確認コードを送る</button>
+    <div id="ps-step2" style="display:none">
+      <div style="font-size:12px;color:var(--sub);margin-top:14px;line-height:1.6">info@reason.holdings から確認コードを送りました（10分間有効）。届かない場合は迷惑メールフォルダや、携帯会社のメールの受信設定をご確認ください。</div>
+      <span class="field-lbl">確認コード（6桁）</span>
+      <input class="inp" id="ps-code" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="メールに書かれた6桁の数字" autocomplete="one-time-code"/>
+      <span class="field-lbl">新しい暗証番号（4〜6桁の数字）</span>
+      <input class="inp" id="ps-pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="0000・1234 などは使えません" autocomplete="new-password"/>
+      <span class="field-lbl">新しい暗証番号（確認のためもう一度）</span>
+      <input class="inp" id="ps-pin2" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="new-password"/>
+      <button class="btn-gold" id="ps-set-btn" onclick="submitPinSetup()">暗証番号を設定してログイン</button>
+    </div>
+    <div class="email-fb" id="ps-err"><i class="ti ti-alert-circle" style="font-size:14px"></i><span id="ps-err-txt"></span></div>
+    <button class="btn-outline" onclick="closePinSetup()">ログイン画面に戻る</button>
   </div>
 </div>
 
@@ -729,6 +725,7 @@ function colsFor(rank){return rank==='all'?4:3;}
 // localStorage キー（v2 = 固定IDバージョン）
 const LS={
   sess:'iito_sess',
+  pinTok:'iito_pin_tok', // 暗証番号ログインの証明（GASが発行、90日有効）
   members:'iito_m',
   votes:'iito_av',
   oshi:'iito_o_v2',
@@ -794,7 +791,15 @@ const actionCodeSettings = {
 };
 // Firebaseがログイン状態を復元し終わるのを待つ（ページを開いた直後は未確定のため）
 const authReady = new Promise(res=>{ const un=auth.onAuthStateChanged(u=>{ un(); res(u); }); });
-// GASに本人であることを示すログイン証明(idToken)を取得。ログインしていなければ null
+// GASに本人であることを示すログイン証明を返す。
+//  暗証番号ログインの証明（sessionToken）を優先し、無ければ旧方式（Firebaseのメールリンク）の idToken。どちらも無ければ null
+async function getVoterAuth(){
+  const t=ls(LS.pinTok);
+  if(t) return {sessionToken:t};
+  const idToken=await getIdTokenSafe();
+  return idToken?{idToken}:null;
+}
+// 【旧方式】Firebaseのログイン証明(idToken)を取得。ログインしていなければ null
 async function getIdTokenSafe(){
   try{ await authReady; const u=auth.currentUser; return u ? await u.getIdToken() : null; }
   catch(e){ console.warn('idToken取得失敗', e); return null; }
@@ -888,12 +893,12 @@ async function pullMembers(){
   }catch(e){ console.warn('getMembers失敗（前回値を使用）', e); }
 }
 // 【投票者用】本人の分だけのデータ（会員情報・全イベントの自分の票・付与履歴・期別プラン）をGASから取得する。
-//  GASはFirebaseのログイン証明で本人か確かめ、他の会員のデータは返さない。
+//  GASはログイン証明（暗証番号ログイン、または旧方式のFirebase）で本人か確かめ、他の会員のデータは返さない。
 //  返り値: { member } または { error:'auth_required'|'not_member'|'email_mismatch'|'network'|... }
 async function pullMe(nick){
-  const idToken = await getIdTokenSafe();
-  if(!idToken) return {error:'auth_required'};
-  const r = await gasPost('me', {nick, idToken});
+  const va = await getVoterAuth();
+  if(!va) return {error:'auth_required'};
+  const r = await gasPost('me', {nick, ...va});
   if(!r) return {error:'network'};
   if(!r.ok||!r.member) return {error:r.error||'error'};
   const n = r.member.nick;
@@ -909,6 +914,7 @@ async function pullMe(nick){
 function loginErrorMessage(err){
   if(err==='not_member') return '会員情報が確認できませんでした。お手数ですが、運営にお問い合わせください。';
   if(err==='email_mismatch') return 'ログインしたメールアドレスが、会員登録のメールアドレスと一致しません。登録しているメールアドレスでログインしてください。';
+  if(err==='auth_required') return 'ログインの有効期限が切れました。メールアドレスと暗証番号で、もう一度ログインしてください。';
   if(err==='network') return '通信に失敗しました。通信環境を確認して、もう一度お試しください。';
   return 'セキュリティ強化のため、お手数ですがもう一度ログインしてください。';
 }
@@ -1730,72 +1736,112 @@ function saveOshi(){oshiMap[curUser.nick]=modalOshi;ls(LS.oshi,oshiMap);renderPi
 // ログイン
 // ════════════════════════════════════════
 function checkRegBtn(){
-  const nick=document.getElementById('nick-inp').value.trim();
   const email=document.getElementById('email-inp').value.trim();
-  document.getElementById('reg-btn').disabled=!(nick&&email.includes('@'));
+  const pin=document.getElementById('pin-inp').value.trim();
+  document.getElementById('reg-btn').disabled=!(email.includes('@')&&/^[0-9]{4,6}$/.test(pin));
+}
+function showLoginErr(msg){
+  document.getElementById('login-err-txt').textContent=msg;
+  document.getElementById('email-fb-er').className='email-fb er';
 }
 function hideLoginErr(){
-  document.getElementById('nick-err').style.display='none';
   document.getElementById('email-fb-er').className='email-fb';
   document.getElementById('email-inp').className='inp';
+  document.getElementById('pin-inp').className='inp';
 }
-// 入力中は判定しない（他の会員の情報を探れないよう、送信ボタンでまとめてGASに確認する）
-function onNickInput(){ selNick=null; hideLoginErr(); checkRegBtn(); }
-function onEmailInput(){ hideLoginErr(); checkRegBtn(); }
+function onLoginInput(){ hideLoginErr(); checkRegBtn(); }
 function resetNick(){
   selNick=null;emailVerified=false;
-  document.getElementById('nick-inp').value='';document.getElementById('email-inp').value='';
-  document.getElementById('nick-box').style.display='none';document.getElementById('sug-list').style.display='none';
+  document.getElementById('email-inp').value='';document.getElementById('pin-inp').value='';
   hideLoginErr();checkRegBtn();
 }
-async function doRegister(){
-  const nick=document.getElementById('nick-inp').value.trim();
+// 暗証番号ログインのエラー表示用の文
+function pinErrorMessage(r){
+  const e=r&&r.error;
+  if(!r) return '通信に失敗しました。通信環境を確認して、もう一度お試しください。';
+  if(e==='locked') return `暗証番号を続けて間違えたため、${r.minutes||15}分間ログインできません。時間をおいてお試しください。`;
+  if(e==='wrong_pin') return 'メールアドレスまたは暗証番号が違います。はじめての方・忘れた方は、下のボタンから暗証番号を設定してください。';
+  if(e==='wrong_code') return '確認コードが違います。メールに書かれた6桁の数字を入力してください。';
+  if(e==='code_expired') return '確認コードの有効期限が切れたか、入力ミスが多すぎました。もう一度「確認コードを送る」を押してください。';
+  if(e==='pin_format') return '暗証番号は4〜6桁の数字にしてください。';
+  if(e==='pin_weak') return '0000・1234 のような分かりやすい番号は使えません。別の番号にしてください。';
+  if(e==='too_many') return '確認コードを続けて送りすぎました。1時間ほどおいてから、もう一度お試しください。';
+  if(e==='mail_quota') return '本日の確認コードの送信数が上限に達しました。お手数ですが、明日もう一度お試しいただくか、運営にお問い合わせください。';
+  if(e==='send_failed') return '確認コードのメールを送れませんでした。お手数ですが、運営にお問い合わせください。';
+  if(e==='bad_email') return 'メールアドレスを正しく入力してください。';
+  if(e==='not_member') return '会員情報が確認できませんでした。お手数ですが、運営にお問い合わせください。';
+  return 'うまくいきませんでした。もう一度お試しください。';
+}
+// GASが発行したログイン証明を保存して、投票画面に入る
+async function finishPinLogin(token,nick){
+  ls(LS.pinTok,token);
+  await completeLoginAfterLink(nick);
+}
+// メールアドレス＋暗証番号でログイン
+async function doPinLogin(){
   const email=document.getElementById('email-inp').value.trim().toLowerCase();
-  if(!nick||!email.includes('@'))return;
-  const regBtn=document.getElementById('reg-btn');
-  const restore=()=>{ if(regBtn){regBtn.textContent='確認メールを送信';} checkRegBtn(); };
-  if(regBtn){regBtn.disabled=true;regBtn.textContent='確認中...';}
-  hideLoginErr();
-  // ニックネームとメールアドレスの組み合わせをGASで確認（どちらが違うかは伝えない）
-  const r=await gasPost('checkMember',{nick,email});
-  if(!r){ alert('通信に失敗しました。通信環境を確認して、もう一度お試しください。'); restore(); return; }
-  if(!r.match){
-    document.getElementById('email-inp').className='inp er';
-    document.getElementById('email-fb-er').className='email-fb er';
-    restore(); return;
+  const pin=document.getElementById('pin-inp').value.trim();
+  if(!email.includes('@')||!/^[0-9]{4,6}$/.test(pin))return;
+  const btn=document.getElementById('reg-btn');
+  btn.disabled=true;btn.textContent='確認中...';hideLoginErr();
+  const r=await gasPost('pinLogin',{email,pin});
+  btn.textContent='ログイン';checkRegBtn();
+  if(!r||!r.ok){
+    if(r&&r.error==='wrong_pin'){document.getElementById('pin-inp').className='inp er';document.getElementById('pin-inp').value='';checkRegBtn();}
+    showLoginErr(pinErrorMessage(r));return;
   }
-  selNick={nick:r.nick}; emailVerified=true;
-  if(regBtn){regBtn.textContent='送信中...';}
-  try{
-    await auth.sendSignInLinkToEmail(email, actionCodeSettings);
-    // 同一端末で戻ってきたときに自動でログイン完了できるよう保存
-    window.localStorage.setItem('iito_pending_email', email);
-    window.localStorage.setItem('iito_pending_nick', r.nick);
-    // 【重要】ログイン画面で選んだ推しも保存する。
-    //  メールリンクを開くとページが再読み込みされ、変数loginOshiは空に戻ってしまう。
-    //  ここで保存しておかないと、ログイン時に選んだ推しが毎回失われる
-    //  （＝投票時に推しが空で記録され、管理画面で「—」になる原因）。
-    try{ window.localStorage.setItem('iito_pending_oshi', JSON.stringify(loginOshi||[])); }catch(e){}
-    showEmailSentNotice(email);
-  }catch(err){
-    alert('確認メールの送信に失敗しました：'+err.message);
-    restore();
-  }
+  document.getElementById('pin-inp').value='';
+  await finishPinLogin(r.token,r.nick);
 }
-function showEmailSentNotice(email){
+// 暗証番号の設定画面（はじめての方・忘れた方）
+function openPinSetup(){
+  document.getElementById('ps-email').value=document.getElementById('email-inp').value.trim();
+  ['ps-code','ps-pin','ps-pin2'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('ps-step2').style.display='none';
+  document.getElementById('ps-send-btn').textContent='確認コードを送る';
+  hidePinSetupErr();
   document.getElementById('login-area').style.display='none';
-  document.getElementById('sent-email-addr').textContent=email+' 宛に送信しました';
-  document.getElementById('email-sent-area').style.display='block';
+  document.getElementById('pin-setup-area').style.display='block';
+  window.scrollTo(0,0);
 }
-function backToLoginForm(){
-  document.getElementById('email-sent-area').style.display='none';
+function closePinSetup(){
+  document.getElementById('pin-setup-area').style.display='none';
   document.getElementById('login-area').style.display='block';
-  const regBtn=document.getElementById('reg-btn');
-  if(regBtn){regBtn.textContent='確認メールを送信';}
-  checkRegBtn();
+}
+function showPinSetupErr(msg){document.getElementById('ps-err-txt').textContent=msg;document.getElementById('ps-err').className='email-fb er';}
+function hidePinSetupErr(){document.getElementById('ps-err').className='email-fb';}
+async function sendPinCode(){
+  const email=document.getElementById('ps-email').value.trim().toLowerCase();
+  if(!email.includes('@')){showPinSetupErr(pinErrorMessage({error:'bad_email'}));return;}
+  const btn=document.getElementById('ps-send-btn');
+  btn.disabled=true;btn.textContent='送信中...';hidePinSetupErr();
+  const r=await gasPost('requestPinCode',{email});
+  btn.disabled=false;btn.textContent='確認コードをもう一度送る';
+  if(!r||!r.ok){showPinSetupErr(pinErrorMessage(r));return;}
+  // 登録の有無は答えない（他人が会員かどうかを調べられないように）。登録があればメールが届く
+  document.getElementById('ps-step2').style.display='block';
+  document.getElementById('ps-code').focus();
+}
+async function submitPinSetup(){
+  const email=document.getElementById('ps-email').value.trim().toLowerCase();
+  const code=document.getElementById('ps-code').value.trim();
+  const pin=document.getElementById('ps-pin').value.trim();
+  const pin2=document.getElementById('ps-pin2').value.trim();
+  if(!/^[0-9]{6}$/.test(code)){showPinSetupErr('確認コードは6桁の数字です。');return;}
+  if(!/^[0-9]{4,6}$/.test(pin)){showPinSetupErr(pinErrorMessage({error:'pin_format'}));return;}
+  if(pin!==pin2){showPinSetupErr('確認のために入力した暗証番号が一致しません。');return;}
+  const btn=document.getElementById('ps-set-btn');
+  btn.disabled=true;btn.textContent='設定中...';hidePinSetupErr();
+  const r=await gasPost('setPin',{email,code,pin});
+  btn.disabled=false;btn.textContent='暗証番号を設定してログイン';
+  if(!r||!r.ok){showPinSetupErr(pinErrorMessage(r));return;}
+  ['ps-code','ps-pin','ps-pin2'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('pin-setup-area').style.display='none';
+  document.getElementById('login-area').style.display='block';
+  await finishPinLogin(r.token,r.nick);
 }
 // メールリンク認証の完了後、実際にログインを完了させる処理
-// （旧doRegisterの本体。selNickの代わりに会員データmを受け取る）
+// （暗証番号ログイン・旧方式のメールリンクの両方から使う。selNickの代わりに会員データmを受け取る）
 async function completeLoginAfterLink(nick){
   showLoading('ログイン中...');
   try{
@@ -1805,7 +1851,7 @@ async function completeLoginAfterLink(nick){
     curEvId=getActEv()?.id||curEvId;
     if(me.error){
       hideLoading();
-      if(me.error!=='network')lsDel(LS.sess);
+      if(me.error!=='network'){lsDel(LS.sess);lsDel(LS.pinTok);}
       alert('ログインできませんでした。\n'+loginErrorMessage(me.error));
       refreshResumeCard();
       return;
@@ -1882,9 +1928,8 @@ async function resumeSession(){
       hideLoading();
       if(me.error==='network'){ alert('ログインできませんでした。\n'+loginErrorMessage(me.error)); refreshResumeCard(); return; }
       // 本人確認ができない（Firebaseのログインが切れた等）→ ログインし直してもらう
-      lsDel(LS.sess); refreshResumeCard();
-      const el=document.getElementById('nick-err');
-      if(el){el.textContent=loginErrorMessage(me.error);el.style.display='block';}
+      lsDel(LS.sess); lsDel(LS.pinTok); refreshResumeCard();
+      showLoginErr(loginErrorMessage(me.error));
       return;
     }
     const m=me.member;
@@ -2009,7 +2054,7 @@ function refreshResumeCard(){
   document.getElementById('login-area').style.display='none';
 }
 function clearResume(){
-  lsDel(LS.sess);curUser=null;loginOshi=[];
+  lsDel(LS.sess);lsDel(LS.pinTok);curUser=null;loginOshi=[];
   document.getElementById('resume-area').style.display='none';
   document.getElementById('login-area').style.display='block';
   buildMsBox('oshi-box',()=>loginOshi,v=>{loginOshi=v;renderPills('oshi-pills',loginOshi,'rmLoginOshi');});
@@ -2020,7 +2065,8 @@ function closeLogoutConfirm(){document.getElementById('logout-modal').classList.
 function logout(){
   document.getElementById('logout-modal').classList.remove('open');
   submitted=false;sentLocked={};
-  lsDel(LS.sess);curUser=null;pending={};selNick=null;emailVerified=false;loginOshi=[];
+  lsDel(LS.sess);lsDel(LS.pinTok);curUser=null;pending={};selNick=null;emailVerified=false;loginOshi=[];
+  try{auth.signOut();}catch(e){} // 旧方式（メールリンク）のログインも解除する
   stopCd();resetNick();
   buildMsBox('oshi-box',()=>loginOshi,v=>{loginOshi=v;renderPills('oshi-pills',loginOshi,'rmLoginOshi');});
   renderPills('oshi-pills',[],null);
@@ -2138,15 +2184,15 @@ async function doSubmit(){
     return;
   }
 
-  // 本人確認用のログイン証明を付ける（GASがFirebaseに問い合わせて本人か確かめる）
-  const idToken=await getIdTokenSafe();
-  if(!idToken){
+  // 本人確認用のログイン証明を付ける（GASが本人か確かめる）
+  const va=await getVoterAuth();
+  if(!va){
     if(okBtn){okBtn.disabled=false;okBtn.textContent=okOrig;}
     if(backBtn)backBtn.disabled=false;
     alert('ログインの有効期限が切れました。\nお手数ですが、一度ログアウトして、もう一度ログインしてください。\n（この票はまだ送信されていません）');
     return;
   }
-  payload.idToken=idToken;
+  Object.assign(payload,va);
 
   let ok=false;let hardError=null;
   for(let attempt=1;attempt<=3&&!ok;attempt++){
