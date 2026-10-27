@@ -113,9 +113,17 @@ html,body{min-height:100vh;background:var(--bg2);font-family:"Zen Maru Gothic","
 .ms-tag{font-size:9px;color:var(--sub);background:var(--bg2);border:.5px solid var(--bd);padding:2px 7px;border-radius:999px}
 
 /* セッション復元カード */
-.first-box{background:var(--ac-l);border:1px solid var(--ac-m);border-radius:12px;padding:12px 14px;margin:12px 0 4px}
-.first-ttl{font-size:13px;font-weight:700;color:var(--ac-d)}
-.first-txt{font-size:12px;color:var(--tx);margin-top:4px;line-height:1.6}
+.new-login-note{font-size:12px;line-height:1.6;color:var(--ac-d);background:var(--ac-l);border:1px solid var(--ac-m);border-radius:12px;padding:10px 14px;margin:0 0 14px}
+.login-tabs{display:flex;gap:8px;margin-bottom:16px}
+.login-tabs button{flex:1 1 0;padding:10px 6px;border-radius:12px;border:1.5px solid var(--bd);background:#fff;color:var(--tx);font-family:inherit;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;-webkit-tap-highlight-color:transparent}
+.login-tabs button b{font-size:14px}
+.login-tabs button span{font-size:11px;color:var(--sub)}
+.login-tabs button.on{background:var(--ac);border-color:var(--ac);color:#fff}
+.login-tabs button.on span{color:#fff;opacity:.9}
+.step-note{font-size:12px;line-height:1.6;color:var(--tx);margin-top:12px}
+.forgot-lnk{text-align:center;font-size:12px;color:var(--ac-d);text-decoration:underline;margin-top:12px;cursor:pointer}
+.pass-nudge{background:var(--ac-l);border:1px solid var(--ac-m);border-radius:12px;padding:12px 14px;margin:0 0 14px;font-size:12px;line-height:1.6;color:var(--tx)}
+.pass-nudge b{color:var(--ac-d);font-size:13px}
 .resume-card{background:var(--bg2);border:1px solid var(--bd);border-radius:12px;padding:14px 16px;margin-bottom:14px}
 
 /* ── 投票画面 ── */
@@ -364,52 +372,53 @@ html,body{min-height:100vh;background:var(--bg2);font-family:"Zen Maru Gothic","
       <div class="sched-note">プラン新規加入者は、プラン加入日の翌日12:00からログイン可能です</div>
     </div>
 
-    <!-- EMAIL ADDRESS -->
+    <!-- ログイン方法の案内（2026-10 から全員パスコード） -->
+    <div class="new-login-note"><i class="ti ti-info-circle" style="font-size:15px;vertical-align:-2px"></i> ログイン方法が新しくなりました。<br>はじめての方は「はじめて」から、パスコードを作ってください（最初の1回だけ）。</div>
+
+    <!-- はじめて／2回目から の切り替え -->
+    <div class="login-tabs" role="tablist">
+      <button type="button" id="lt-first" role="tab" onclick="setLoginTab('first')"><b>はじめて</b><span>パスコードを作る</span></button>
+      <button type="button" id="lt-login" role="tab" onclick="setLoginTab('login')"><b>2回目から</b><span>パスコードでログイン</span></button>
+    </div>
+
+    <!-- EMAIL ADDRESS（共通） -->
     <span class="field-lbl">EMAIL ADDRESS</span>
     <input class="inp" id="email-inp" type="email" placeholder="iito membersに登録しているメールアドレス" oninput="onLoginInput()" autocomplete="email"/>
 
-    <!-- はじめての方：暗証番号をまだ作っていない人は、ここから確認コードを受け取る -->
-    <div class="first-box">
-      <div class="first-ttl"><i class="ti ti-sparkles" style="font-size:14px;vertical-align:-2px"></i> はじめての方・暗証番号を忘れた方</div>
-      <div class="first-txt">上のメールアドレスに確認コードを送ります。コードを入力して、暗証番号を作ってください。</div>
-      <button class="btn-outline" style="margin-top:8px" onclick="openPinSetup(true)">確認コードを受け取る</button>
+    <!-- はじめて：確認コードを受け取り、パスコードを作る -->
+    <div id="tab-first">
+      <div class="step-note">① 上のメールアドレスに、確認コード（6桁）をお送りします。</div>
+      <button class="btn-gold" id="ps-send-btn" onclick="sendPinCode()">確認コードを受け取る</button>
+      <div id="ps-step2" style="display:none">
+        <div class="step-note" style="margin-top:16px">② info@reason.holdings から届いた確認コードと、これから使うパスコードを入力してください（コードは10分間有効）。<br><span style="color:var(--sub)">届かない場合は、迷惑メールフォルダや携帯会社のメールの受信設定をご確認ください。</span></div>
+        <span class="field-lbl">確認コード（6桁）</span>
+        <input class="inp" id="ps-code" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="メールに書かれた6桁の数字" autocomplete="one-time-code"/>
+        <span class="field-lbl">新しいパスコード（4〜6桁の数字）</span>
+        <input class="inp" id="ps-pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="0000・1234 などは使えません" autocomplete="new-password"/>
+        <span class="field-lbl">新しいパスコード（確認のためもう一度）</span>
+        <input class="inp" id="ps-pin2" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="new-password"/>
+      </div>
     </div>
 
-    <!-- PIN -->
-    <span class="field-lbl">PIN（暗証番号をお持ちの方）</span>
-    <input class="inp" id="pin-inp" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="4〜6桁の数字" oninput="onLoginInput()" autocomplete="current-password"/>
-    <div class="email-fb" id="email-fb-er"><i class="ti ti-alert-circle" style="font-size:14px"></i><span id="login-err-txt">メールアドレスまたは暗証番号が違います</span></div>
+    <!-- 2回目から：パスコードでログイン -->
+    <div id="tab-login" style="display:none">
+      <span class="field-lbl">PASSCODE（パスコード）</span>
+      <input class="inp" id="pin-inp" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="作成した4〜6桁の数字" oninput="onLoginInput()" autocomplete="current-password"/>
+    </div>
+
+    <div class="email-fb" id="email-fb-er"><i class="ti ti-alert-circle" style="font-size:14px"></i><span id="login-err-txt"></span></div>
 
     <!-- OSHI MODEL -->
-    <span class="field-lbl">OSHI MODEL <span style="font-size:10px;font-weight:400;letter-spacing:0">（複数選択可・任意）</span></span>
-    <div class="ms-box" id="oshi-box"></div>
-    <div class="pills" id="oshi-pills"></div>
-
-    <button class="btn-gold" id="reg-btn" onclick="doPinLogin()" disabled>ログイン</button>
-
-  </div>
-
-  <!-- 暗証番号の設定（はじめての方・忘れた方） -->
-  <div id="pin-setup-area" style="display:none">
-    <div class="resume-card">
-      <div style="font-size:14px;font-weight:500"><i class="ti ti-key" style="margin-right:6px;color:var(--ac-d)"></i>暗証番号の設定</div>
-      <div style="font-size:12px;color:var(--sub);margin-top:8px;line-height:1.6">登録しているメールアドレスに、確認コード（6桁）をお送りします。届いたコードと、これから使う暗証番号（4〜6桁の数字）を入力してください。</div>
+    <div id="login-oshi">
+      <span class="field-lbl">OSHI MODEL <span style="font-size:10px;font-weight:400;letter-spacing:0">（複数選択可・任意）</span></span>
+      <div class="ms-box" id="oshi-box"></div>
+      <div class="pills" id="oshi-pills"></div>
     </div>
-    <span class="field-lbl">EMAIL ADDRESS</span>
-    <input class="inp" id="ps-email" type="email" placeholder="iito membersに登録しているメールアドレス" autocomplete="email"/>
-    <button class="btn-gold" id="ps-send-btn" onclick="sendPinCode()">確認コードを送る</button>
-    <div id="ps-step2" style="display:none">
-      <div style="font-size:12px;color:var(--sub);margin-top:14px;line-height:1.6">info@reason.holdings から確認コードを送りました（10分間有効）。届かない場合は迷惑メールフォルダや、携帯会社のメールの受信設定をご確認ください。</div>
-      <span class="field-lbl">確認コード（6桁）</span>
-      <input class="inp" id="ps-code" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="メールに書かれた6桁の数字" autocomplete="one-time-code"/>
-      <span class="field-lbl">新しい暗証番号（4〜6桁の数字）</span>
-      <input class="inp" id="ps-pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="0000・1234 などは使えません" autocomplete="new-password"/>
-      <span class="field-lbl">新しい暗証番号（確認のためもう一度）</span>
-      <input class="inp" id="ps-pin2" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="new-password"/>
-      <button class="btn-gold" id="ps-set-btn" onclick="submitPinSetup()">暗証番号を設定してログイン</button>
-    </div>
-    <div class="email-fb" id="ps-err"><i class="ti ti-alert-circle" style="font-size:14px"></i><span id="ps-err-txt"></span></div>
-    <button class="btn-outline" onclick="closePinSetup()">ログイン画面に戻る</button>
+
+    <button class="btn-gold" id="ps-set-btn" style="display:none" onclick="submitPinSetup()">パスコードを作ってログイン</button>
+    <button class="btn-gold" id="reg-btn" style="display:none" onclick="doPinLogin()" disabled>ログイン</button>
+    <div class="forgot-lnk" id="forgot-lnk" style="display:none" onclick="setLoginTab('first')">パスコードを忘れた方は、こちらから作り直せます</div>
+
   </div>
 </div>
 
@@ -450,6 +459,12 @@ html,body{min-height:100vh;background:var(--bg2);font-family:"Zen Maru Gothic","
     <div class="met" id="met-pd"><div class="n" id="m-pd">0</div><div class="l">選択中</div></div>
     <div class="met met-rm"><div class="n" id="m-rm">0</div><div class="l">残り票数</div></div>
   </div>
+  <!-- 旧方式（メールリンク）でログイン中の人に、パスコード作成をお願いする -->
+  <div class="pass-nudge" id="pass-nudge" style="display:none">
+    <b><i class="ti ti-key" style="font-size:14px;vertical-align:-2px"></i> パスコードを作ってください</b><br>
+    ログイン方法が新しくなりました。次回からのログインに使うパスコードを、今のうちに作っておいてください（1分ほどで終わります）。
+    <button class="btn-outline" style="margin-top:8px;background:#fff" onclick="openPassModal()">パスコードを作る</button>
+  </div>
   <div id="term-note" style="display:none;font-size:11px;color:var(--sub);text-align:center;margin:-6px 0 14px;line-height:1.5"></div>
 
   <div class="name-search" id="name-search">
@@ -487,6 +502,29 @@ html,body{min-height:100vh;background:var(--bg2);font-family:"Zen Maru Gothic","
       <div class="m-btns">
         <button class="m-back" onclick="closeLogoutConfirm()">キャンセル</button>
         <button class="m-ok" onclick="logout()">ログアウトする</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- パスコード作成モーダル（投票画面から。旧方式でログイン中の人向け） -->
+  <div class="overlay" id="pass-modal">
+    <div class="mbox">
+      <h3>パスコードを作る</h3>
+      <div class="step-note" id="pm-to"></div>
+      <button class="btn-gold" id="pm-send-btn" onclick="pmSendCode()">確認コードを受け取る</button>
+      <div id="pm-step2" style="display:none">
+        <div class="step-note">届いた確認コード（6桁）と、これから使うパスコードを入力してください（コードは10分間有効）。</div>
+        <span class="field-lbl">確認コード（6桁）</span>
+        <input class="inp" id="pm-code" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="one-time-code"/>
+        <span class="field-lbl">新しいパスコード（4〜6桁の数字）</span>
+        <input class="inp" id="pm-pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="0000・1234 などは使えません" autocomplete="new-password"/>
+        <span class="field-lbl">新しいパスコード（確認のためもう一度）</span>
+        <input class="inp" id="pm-pin2" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="new-password"/>
+      </div>
+      <div class="email-fb" id="pm-err"><i class="ti ti-alert-circle" style="font-size:14px"></i><span id="pm-err-txt"></span></div>
+      <div class="m-btns" style="margin-top:14px">
+        <button class="m-back" onclick="closePassModal()">あとで</button>
+        <button class="m-ok" id="pm-set-btn" style="display:none" onclick="pmSubmit()">作成する</button>
       </div>
     </div>
   </div>
@@ -734,7 +772,7 @@ function colsFor(rank){return rank==='all'?4:3;}
 // localStorage キー（v2 = 固定IDバージョン）
 const LS={
   sess:'iito_sess',
-  pinTok:'iito_pin_tok', // 暗証番号ログインの証明（GASが発行、90日有効）
+  pinTok:'iito_pin_tok', // パスコードログインの証明（GASが発行、90日有効）
   members:'iito_m',
   votes:'iito_av',
   oshi:'iito_o_v2',
@@ -801,7 +839,7 @@ const actionCodeSettings = {
 // Firebaseがログイン状態を復元し終わるのを待つ（ページを開いた直後は未確定のため）
 const authReady = new Promise(res=>{ const un=auth.onAuthStateChanged(u=>{ un(); res(u); }); });
 // GASに本人であることを示すログイン証明を返す。
-//  暗証番号ログインの証明（sessionToken）を優先し、無ければ旧方式（Firebaseのメールリンク）の idToken。どちらも無ければ null
+//  パスコードログインの証明（sessionToken）を優先し、無ければ旧方式（Firebaseのメールリンク）の idToken。どちらも無ければ null
 async function getVoterAuth(){
   const t=ls(LS.pinTok);
   if(t) return {sessionToken:t};
@@ -902,7 +940,7 @@ async function pullMembers(){
   }catch(e){ console.warn('getMembers失敗（前回値を使用）', e); }
 }
 // 【投票者用】本人の分だけのデータ（会員情報・全イベントの自分の票・付与履歴・期別プラン）をGASから取得する。
-//  GASはログイン証明（暗証番号ログイン、または旧方式のFirebase）で本人か確かめ、他の会員のデータは返さない。
+//  GASはログイン証明（パスコードログイン、または旧方式のFirebase）で本人か確かめ、他の会員のデータは返さない。
 //  返り値: { member } または { error:'auth_required'|'not_member'|'email_mismatch'|'network'|... }
 async function pullMe(nick){
   const va = await getVoterAuth();
@@ -923,7 +961,7 @@ async function pullMe(nick){
 function loginErrorMessage(err){
   if(err==='not_member') return '会員情報が確認できませんでした。お手数ですが、運営にお問い合わせください。';
   if(err==='email_mismatch') return 'ログインしたメールアドレスが、会員登録のメールアドレスと一致しません。登録しているメールアドレスでログインしてください。';
-  if(err==='auth_required') return 'ログインの有効期限が切れました。メールアドレスと暗証番号で、もう一度ログインしてください。';
+  if(err==='auth_required') return 'ログインの有効期限が切れました。メールアドレスとパスコードで、もう一度ログインしてください。';
   if(err==='network') return '通信に失敗しました。通信環境を確認して、もう一度お試しください。';
   return 'セキュリティ強化のため、お手数ですがもう一度ログインしてください。';
 }
@@ -1744,6 +1782,26 @@ function saveOshi(){oshiMap[curUser.nick]=modalOshi;ls(LS.oshi,oshiMap);renderPi
 // ════════════════════════════════════════
 // ログイン
 // ════════════════════════════════════════
+// ログイン画面のタブ：'first'＝はじめて（パスコードを作る）／'login'＝2回目から（パスコードでログイン）
+//  この端末でパスコードを作ったことがあれば「2回目から」を最初に開く
+let loginTab='first';
+function setLoginTab(t){
+  loginTab=t;
+  document.getElementById('lt-first').classList.toggle('on',t==='first');
+  document.getElementById('lt-login').classList.toggle('on',t==='login');
+  document.getElementById('lt-first').setAttribute('aria-selected',t==='first'?'true':'false');
+  document.getElementById('lt-login').setAttribute('aria-selected',t==='login'?'true':'false');
+  document.getElementById('tab-first').style.display=t==='first'?'':'none';
+  document.getElementById('tab-login').style.display=t==='login'?'':'none';
+  document.getElementById('reg-btn').style.display=t==='login'?'':'none';
+  document.getElementById('forgot-lnk').style.display=t==='login'?'':'none';
+  // はじめて：確認コードを送ったあとで「パスコードを作ってログイン」と推しの選択を出す
+  const step2=document.getElementById('ps-step2').style.display!=='none';
+  document.getElementById('ps-set-btn').style.display=(t==='first'&&step2)?'':'none';
+  document.getElementById('login-oshi').style.display=(t==='login'||step2)?'':'none';
+  hideLoginErr();checkRegBtn();
+}
+function defaultLoginTab(){ return ls('iito_has_pass')?'login':'first'; }
 function checkRegBtn(){
   const email=document.getElementById('email-inp').value.trim();
   const pin=document.getElementById('pin-inp').value.trim();
@@ -1761,19 +1819,23 @@ function hideLoginErr(){
 function onLoginInput(){ hideLoginErr(); checkRegBtn(); }
 function resetNick(){
   selNick=null;emailVerified=false;
-  document.getElementById('email-inp').value='';document.getElementById('pin-inp').value='';
-  hideLoginErr();checkRegBtn();
+  ['email-inp','pin-inp','ps-code','ps-pin','ps-pin2'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('ps-step2').style.display='none';
+  document.getElementById('ps-send-btn').textContent='確認コードを受け取る';
+  setLoginTab(defaultLoginTab());
 }
-// 暗証番号ログインのエラー表示用の文
+// パスコードまわりのエラー表示用の文
 function pinErrorMessage(r){
   const e=r&&r.error;
   if(!r) return '通信に失敗しました。通信環境を確認して、もう一度お試しください。';
-  if(e==='locked') return `暗証番号を続けて間違えたため、${r.minutes||15}分間ログインできません。時間をおいてお試しください。`;
-  if(e==='wrong_pin') return 'メールアドレスまたは暗証番号が違います。暗証番号をまだ作っていない方・忘れた方は、上の「確認コードを受け取る」を押してください。';
+  if(e==='locked') return `パスコードを続けて間違えたため、${r.minutes||15}分間ログインできません。時間をおいてお試しください。`;
+  if(e==='wrong_pin') return 'メールアドレスまたはパスコードが違います。まだパスコードを作っていない方は「はじめて」から作ってください。';
   if(e==='wrong_code') return '確認コードが違います。メールに書かれた6桁の数字を入力してください。';
-  if(e==='code_expired') return '確認コードの有効期限が切れたか、入力ミスが多すぎました。もう一度「確認コードを送る」を押してください。';
-  if(e==='pin_format') return '暗証番号は4〜6桁の数字にしてください。';
+  if(e==='code_expired') return '確認コードの有効期限が切れたか、入力ミスが多すぎました。もう一度「確認コードを受け取る」を押してください。';
+  if(e==='pin_format') return 'パスコードは4〜6桁の数字にしてください。';
   if(e==='pin_weak') return '0000・1234 のような分かりやすい番号は使えません。別の番号にしてください。';
+  if(e==='pin_mismatch') return '確認のために入力したパスコードが一致しません。';
+  if(e==='code_format') return '確認コードは6桁の数字です。';
   if(e==='too_many') return '確認コードを続けて送りすぎました。1時間ほどおいてから、もう一度お試しください。';
   if(e==='mail_quota') return '本日の確認コードの送信数が上限に達しました。お手数ですが、明日もう一度お試しいただくか、運営にお問い合わせください。';
   if(e==='send_failed') return '確認コードのメールを送れませんでした。お手数ですが、運営にお問い合わせください。';
@@ -1781,12 +1843,19 @@ function pinErrorMessage(r){
   if(e==='not_member') return '会員情報が確認できませんでした。お手数ですが、運営にお問い合わせください。';
   return 'うまくいきませんでした。もう一度お試しください。';
 }
+// 確認コード・パスコードの入力チェック（送る前に画面側で確かめる）
+function passInputProblem(code,pin,pin2){
+  if(!/^[0-9]{6}$/.test(code)) return 'code_format';
+  if(!/^[0-9]{4,6}$/.test(pin)) return 'pin_format';
+  if(pin!==pin2) return 'pin_mismatch';
+  return '';
+}
 // GASが発行したログイン証明を保存して、投票画面に入る
 async function finishPinLogin(token,nick){
-  ls(LS.pinTok,token);
+  ls(LS.pinTok,token);ls('iito_has_pass',1);
   await completeLoginAfterLink(nick);
 }
-// メールアドレス＋暗証番号でログイン
+// 2回目から：メールアドレス＋パスコードでログイン
 async function doPinLogin(){
   const email=document.getElementById('email-inp').value.trim().toLowerCase();
   const pin=document.getElementById('pin-inp').value.trim();
@@ -1802,57 +1871,83 @@ async function doPinLogin(){
   document.getElementById('pin-inp').value='';
   await finishPinLogin(r.token,r.nick);
 }
-// 暗証番号の設定画面（はじめての方・忘れた方）
-// sendNow=true：ログイン画面でメールアドレスが入っていれば、そのまま確認コードを送る
-function openPinSetup(sendNow){
-  document.getElementById('ps-email').value=document.getElementById('email-inp').value.trim();
-  ['ps-code','ps-pin','ps-pin2'].forEach(id=>document.getElementById(id).value='');
-  document.getElementById('ps-step2').style.display='none';
-  document.getElementById('ps-send-btn').textContent='確認コードを送る';
-  hidePinSetupErr();
-  document.getElementById('login-area').style.display='none';
-  document.getElementById('pin-setup-area').style.display='block';
-  window.scrollTo(0,0);
-  if(sendNow&&document.getElementById('ps-email').value.includes('@'))sendPinCode();
-}
-function closePinSetup(){
-  document.getElementById('pin-setup-area').style.display='none';
-  document.getElementById('login-area').style.display='block';
-}
-function showPinSetupErr(msg){document.getElementById('ps-err-txt').textContent=msg;document.getElementById('ps-err').className='email-fb er';}
-function hidePinSetupErr(){document.getElementById('ps-err').className='email-fb';}
+// はじめて：① 確認コードを受け取る
 async function sendPinCode(){
-  const email=document.getElementById('ps-email').value.trim().toLowerCase();
-  if(!email.includes('@')){showPinSetupErr(pinErrorMessage({error:'bad_email'}));return;}
+  const email=document.getElementById('email-inp').value.trim().toLowerCase();
+  if(!email.includes('@')){document.getElementById('email-inp').className='inp er';showLoginErr(pinErrorMessage({error:'bad_email'}));return;}
   const btn=document.getElementById('ps-send-btn');
-  btn.disabled=true;btn.textContent='送信中...';hidePinSetupErr();
+  btn.disabled=true;btn.textContent='送信中...';hideLoginErr();
   const r=await gasPost('requestPinCode',{email});
   btn.disabled=false;btn.textContent='確認コードをもう一度送る';
-  if(!r||!r.ok){showPinSetupErr(pinErrorMessage(r));return;}
+  if(!r||!r.ok){showLoginErr(pinErrorMessage(r));return;}
   // 登録の有無は答えない（他人が会員かどうかを調べられないように）。登録があればメールが届く
   document.getElementById('ps-step2').style.display='block';
+  setLoginTab('first');
   document.getElementById('ps-code').focus();
 }
+// はじめて：② 確認コード＋パスコードを送って作成し、そのままログイン
 async function submitPinSetup(){
-  const email=document.getElementById('ps-email').value.trim().toLowerCase();
+  const email=document.getElementById('email-inp').value.trim().toLowerCase();
   const code=document.getElementById('ps-code').value.trim();
   const pin=document.getElementById('ps-pin').value.trim();
   const pin2=document.getElementById('ps-pin2').value.trim();
-  if(!/^[0-9]{6}$/.test(code)){showPinSetupErr('確認コードは6桁の数字です。');return;}
-  if(!/^[0-9]{4,6}$/.test(pin)){showPinSetupErr(pinErrorMessage({error:'pin_format'}));return;}
-  if(pin!==pin2){showPinSetupErr('確認のために入力した暗証番号が一致しません。');return;}
+  const bad=passInputProblem(code,pin,pin2);
+  if(bad){showLoginErr(pinErrorMessage({error:bad}));return;}
   const btn=document.getElementById('ps-set-btn');
-  btn.disabled=true;btn.textContent='設定中...';hidePinSetupErr();
+  btn.disabled=true;btn.textContent='作成中...';hideLoginErr();
   const r=await gasPost('setPin',{email,code,pin});
-  btn.disabled=false;btn.textContent='暗証番号を設定してログイン';
-  if(!r||!r.ok){showPinSetupErr(pinErrorMessage(r));return;}
+  btn.disabled=false;btn.textContent='パスコードを作ってログイン';
+  if(!r||!r.ok){showLoginErr(pinErrorMessage(r));return;}
   ['ps-code','ps-pin','ps-pin2'].forEach(id=>document.getElementById(id).value='');
-  document.getElementById('pin-setup-area').style.display='none';
-  document.getElementById('login-area').style.display='block';
+  document.getElementById('ps-step2').style.display='none';
   await finishPinLogin(r.token,r.nick);
 }
+// ── 投票画面：旧方式（メールリンク）でログイン中の人に、パスコードを作ってもらう ──
+function updatePassNudge(){
+  const el=document.getElementById('pass-nudge');
+  if(el)el.style.display=(curUser&&!ls(LS.pinTok))?'block':'none';
+}
+function openPassModal(){
+  if(!curUser)return;
+  document.getElementById('pm-to').textContent=(curUser.email?curUser.email+' に':'登録しているメールアドレスに')+'確認コード（6桁）をお送りします。';
+  ['pm-code','pm-pin','pm-pin2'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('pm-step2').style.display='none';
+  document.getElementById('pm-set-btn').style.display='none';
+  document.getElementById('pm-send-btn').style.display='';
+  document.getElementById('pm-send-btn').textContent='確認コードを受け取る';
+  document.getElementById('pm-err').className='email-fb';
+  document.getElementById('pass-modal').classList.add('open');
+}
+function closePassModal(){document.getElementById('pass-modal').classList.remove('open');}
+function pmErr(msg){document.getElementById('pm-err-txt').textContent=msg;document.getElementById('pm-err').className='email-fb er';}
+async function pmSendCode(){
+  const btn=document.getElementById('pm-send-btn');
+  btn.disabled=true;btn.textContent='送信中...';document.getElementById('pm-err').className='email-fb';
+  const r=await gasPost('requestPinCode',{email:curUser.email});
+  btn.disabled=false;btn.textContent='確認コードをもう一度送る';
+  if(!r||!r.ok){pmErr(pinErrorMessage(r));return;}
+  document.getElementById('pm-step2').style.display='block';
+  document.getElementById('pm-set-btn').style.display='';
+  document.getElementById('pm-code').focus();
+}
+async function pmSubmit(){
+  const code=document.getElementById('pm-code').value.trim();
+  const pin=document.getElementById('pm-pin').value.trim();
+  const pin2=document.getElementById('pm-pin2').value.trim();
+  const bad=passInputProblem(code,pin,pin2);
+  if(bad){pmErr(pinErrorMessage({error:bad}));return;}
+  const btn=document.getElementById('pm-set-btn');
+  btn.disabled=true;btn.textContent='作成中...';document.getElementById('pm-err').className='email-fb';
+  const r=await gasPost('setPin',{email:curUser.email,code,pin});
+  btn.disabled=false;btn.textContent='作成する';
+  if(!r||!r.ok){pmErr(pinErrorMessage(r));return;}
+  // 以後はパスコードのログイン証明を使う
+  ls(LS.pinTok,r.token);ls('iito_has_pass',1);
+  closePassModal();updatePassNudge();
+  alert('パスコードを作りました。次回からは「2回目から」で、メールアドレスとパスコードでログインできます。');
+}
 // メールリンク認証の完了後、実際にログインを完了させる処理
-// （暗証番号ログイン・旧方式のメールリンクの両方から使う。selNickの代わりに会員データmを受け取る）
+// （パスコードログイン・旧方式のメールリンクの両方から使う。selNickの代わりに会員データmを受け取る）
 async function completeLoginAfterLink(nick){
   showLoading('ログイン中...');
   try{
@@ -2092,6 +2187,7 @@ function buildVoteScreen(){
   document.getElementById('chip-nm').textContent=curUser.nick;
   document.getElementById('v-badge').textContent=`${PLAN_LBL[curUser.plan]} — ${PLANS[curUser.plan]}票`;
   renderPills('v-oshi-pills',oshiMap[curUser.nick]||[],null);
+  updatePassNudge();
   buildGrids();updUI();
   // 公開中のイベントが無い場合：投票UIは隠すが、残り票数（基本票＋繰り越し）は表示する
   const noEvent=getPublicEvents().length===0;
@@ -3249,6 +3345,8 @@ function resetAllData(){
   ls(LS.models,models);
   // 推しボックス初期描画
   buildMsBox('oshi-box',()=>loginOshi,v=>{loginOshi=v;renderPills('oshi-pills',loginOshi,'rmLoginOshi');});
+  // ログイン画面のタブ（この端末でパスコードを作ったことがあれば「2回目から」）
+  setLoginTab(defaultLoginTab());
   // まずローカルのデータで即バナー表示（体感速度優先）
   applyEvUI();
   // 裏でSheetsから最新のイベント・モデルを取得し、届いたら画面を更新（待たない）

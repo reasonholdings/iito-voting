@@ -994,7 +994,7 @@ function requestPinCode(data) {
       m.nick + ' 様\n\n' +
       'iito members 推しモデル投票の確認コードです。\n\n' +
       '　確認コード：' + code + '\n\n' +
-      'この番号を投票画面に入力し、暗証番号を設定してください（10分間有効）。\n' +
+      'この番号を投票画面に入力し、パスコードを作ってください（10分間有効）。\n' +
       'お心当たりのない場合は、このメールを破棄してください。\n\n' +
       'iito members 運営',
       { from: SENDER_ADDR, name: SENDER_NAME });
