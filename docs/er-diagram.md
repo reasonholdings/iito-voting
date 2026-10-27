@@ -95,6 +95,7 @@ erDiagram
 | VOTE | `投票_<evId>`（**イベントごとに1シート**） | 1行目=タイトル、2行目=見出し、3行目〜データ（A〜L列） | `saveVote`（追記のみ） | `getResults` / `getTermPlans` / `getOshi` |
 | GRANT | `プラン付与履歴` | 1行1付与（A〜D列）。`nick\|plan\|term` の重複は記録しない | `recordGrants` | `getGrants` |
 | PIN | `暗証番号` | 1行1会員（A〜E列：メールアドレス／ニックネーム／salt／ハッシュ／更新時刻）。暗証番号そのものは保存しない。シートは初回に自動作成 | `setPin` | `pinLogin`・`verifyVoterToken_` |
+| NOTICE | `お知らせ` | 1行1件（A〜D列：ID／タイトル／本文／送信時刻）。管理画面から送信・削除。シートは初回に自動作成 | `saveNotice`・`deleteNotice` | `notices`（ログイン中の投票者）・`getNotices`（管理者） |
 | PLAN | （シート無し） | コード内定数 `PLANS`（HTML）／`PLAN_VOTES`（GAS） | ― | ― |
 | TERM | （シート無し） | 文字列 `YYYY年M月期` | ― | ― |
 | （未使用） | `投票データ` | 定数 `SHEET_VOTES` だけ定義。現在どこからも使われていない | ― | ― |
