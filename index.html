@@ -148,12 +148,31 @@ body.has-tabbar .screen{padding-bottom:120px}
 .nt-dt{font-size:11px;color:var(--sub);margin-top:3px}
 .nt-body{font-size:13px;line-height:1.7;margin-top:8px;white-space:pre-wrap;word-break:break-word}
 .nt-empty{text-align:center;font-size:13px;color:var(--sub);padding:28px 12px}
-.mp-row{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:.5px solid var(--bd);font-size:13px}
+/* マイページ：白いカードに影をつけて背景の模様から浮かせ、見出しにはピンクのアイコン */
+.mp-card{background:#fff;border-radius:18px;padding:16px 18px;margin-bottom:14px;box-shadow:0 2px 14px rgba(0,0,0,.07);position:relative;z-index:1}
+.mp-hero{text-align:center;padding-top:20px}
+.mp-av{width:64px;height:64px;border-radius:50%;margin:0 auto 8px;background:var(--ac-l);color:var(--ac-d);font-size:26px;font-weight:700;display:flex;align-items:center;justify-content:center;border:2px solid var(--ac-m)}
+.mp-name{font-size:20px;font-weight:700;color:var(--tx)}
+.mp-stats{display:flex;gap:10px;margin-top:14px}
+.mp-stat{flex:1;background:var(--bg2);border-radius:14px;padding:10px 6px}
+.mp-stat .n{font-size:26px;font-weight:700;color:var(--ac-d);line-height:1.2}
+.mp-stat .l{font-size:11px;color:#555;margin-top:2px}
+.mp-sec{font-size:15px;font-weight:700;color:var(--tx);display:flex;align-items:center;gap:6px}
+.mp-sec .ti{color:var(--ac);font-size:18px}
+.mp-sec-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+.mp-note{font-size:12px;color:#555;line-height:1.6;margin-top:4px}
+.mp-btn-sm{border:1px solid var(--ac-m);background:#fff;color:var(--ac-d);font-family:inherit;font-size:12px;font-weight:700;border-radius:999px;padding:5px 14px;cursor:pointer}
+.mp-chip{font-size:11px;font-weight:700;border-radius:999px;padding:3px 10px}
+.mp-chip.ok{background:var(--gr-l);color:#0A8F5B}
+.mp-chip.ng{background:var(--rd-l);color:#D32F2F}
+.mp-row{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid #F0F0F0;font-size:14px}
 .mp-row:last-child{border-bottom:none}
-.mp-row .k{color:var(--sub);flex:0 0 auto}
-.mp-row .v{text-align:right;word-break:break-all}
-.mv-ev{font-size:13px;font-weight:700;margin:4px 0 6px}
-.mv-total{font-size:12px;color:var(--ac-d);font-weight:700;text-align:right;margin-top:6px}
+.mp-row .k{color:#666;flex:0 0 auto}
+.mp-row .v{text-align:right;word-break:break-all;color:var(--tx);font-weight:500}
+.mv-ev{font-size:13px;font-weight:700;color:var(--ac-d);margin:12px 0 4px}
+.mv-total{font-size:13px;color:var(--ac-d);font-weight:700;text-align:right;margin-top:6px}
+.mp-card .btn-outline{border:1px solid var(--ac-m);color:var(--ac-d);font-weight:700;border-radius:999px}
+.mv-empty{font-size:13px;color:#777;background:var(--bg2);border-radius:12px;padding:12px;text-align:center;margin-top:6px}
 .resume-card{background:var(--bg2);border:1px solid var(--bd);border-radius:12px;padding:14px 16px;margin-bottom:14px}
 
 /* ── 投票画面 ── */
@@ -533,25 +552,52 @@ body.has-tabbar .screen{padding-bottom:120px}
      ②-3  マイページ（投票者）
 ════════════════════════════════════════ -->
 <div class="screen" id="s-mypage">
-  <div class="logo" style="margin-bottom:6px">iito members</div>
   <div class="pg-title"><i class="ti ti-user" style="vertical-align:-2px"></i> マイページ</div>
-  <div class="sc">
-    <div class="sc-title">会員情報</div>
-    <div id="mp-info"></div>
-    <div class="pills" id="mp-oshi" style="margin-top:10px"></div>
-    <button class="btn-outline" onclick="openOshiModal()">推しモデルを変更</button>
+
+  <!-- プロフィール：名前・プラン・残り票数をひと目で -->
+  <div class="mp-card mp-hero">
+    <div class="mp-av" id="mp-av"></div>
+    <div class="mp-name" id="mp-name"></div>
+    <span class="badge" id="mp-plan"></span>
+    <div class="mp-stats">
+      <div class="mp-stat"><div class="n" id="mp-remain">—</div><div class="l">残り票数</div></div>
+      <div class="mp-stat"><div class="n" id="mp-used">—</div><div class="l">投票した票数</div></div>
+    </div>
   </div>
-  <div class="sc">
-    <div class="sc-title">パスコード</div>
-    <div id="mp-pass" style="font-size:13px;line-height:1.7"></div>
-    <button class="btn-outline" id="mp-pass-btn" onclick="openPassModal()">パスコードを作る</button>
-  </div>
-  <div class="sc">
-    <div class="sc-title">あなたの投票</div>
-    <p style="font-size:11px;color:var(--sub);margin:-6px 0 10px;line-height:1.6">開催中のイベントで、だれに何票入れたかを表示します（確定した票だけ。選択中の票は入りません）。</p>
+
+  <!-- あなたの投票 -->
+  <div class="mp-card">
+    <div class="mp-sec"><i class="ti ti-checkbox"></i>あなたの投票</div>
+    <div class="mp-note">開催中のイベントで、確定した票です</div>
     <div id="mp-votes"></div>
   </div>
-  <button class="btn-ghost" onclick="openLogoutConfirm()">ログアウト</button>
+
+  <!-- 推しモデル -->
+  <div class="mp-card">
+    <div class="mp-sec-row">
+      <div class="mp-sec"><i class="ti ti-heart"></i>推しモデル</div>
+      <button class="mp-btn-sm" onclick="openOshiModal()">変更</button>
+    </div>
+    <div class="pills" id="mp-oshi"></div>
+  </div>
+
+  <!-- パスコード -->
+  <div class="mp-card">
+    <div class="mp-sec-row">
+      <div class="mp-sec"><i class="ti ti-key"></i>パスコード</div>
+      <span class="mp-chip" id="mp-pass-chip"></span>
+    </div>
+    <div class="mp-note" id="mp-pass"></div>
+    <button class="btn-gold" id="mp-pass-btn" style="margin-top:10px" onclick="openPassModal()">パスコードを作る</button>
+  </div>
+
+  <!-- 会員情報 -->
+  <div class="mp-card">
+    <div class="mp-sec"><i class="ti ti-id"></i>会員情報</div>
+    <div id="mp-info"></div>
+  </div>
+
+  <button class="btn-ghost" onclick="openLogoutConfirm()"><i class="ti ti-logout" style="vertical-align:-2px"></i> ログアウト</button>
 </div>
 
 <!-- パスコードを作る／変更するモーダル（お知らせ・マイページから） -->
@@ -2111,42 +2157,51 @@ function renderNotices(){
 function renderMypage(){
   if(!curUser)return;
   const m=curUser;
-  const info=document.getElementById('mp-info');info.innerHTML='';
+  // プロフィール
+  document.getElementById('mp-av').textContent=(m.nick||'?').slice(0,1);
+  document.getElementById('mp-name').textContent=m.nick;
+  document.getElementById('mp-plan').textContent=`${PLAN_LBL[m.plan]||m.plan||'—'} ・ 毎月${PLANS[m.plan]??'—'}票`;
   // 残り票数は投票画面の表示（繰り越し・確定済みの票を反映した値）と同じものを出す
-  let remain='';try{updUI();remain=document.getElementById('m-rm').textContent+'票';}catch(e){}
-  [['ニックネーム',m.nick],['会員番号',m.mid||'—'],['プラン',`${PLAN_LBL[m.plan]||m.plan||'—'}（毎月${PLANS[m.plan]??'—'}票）`],['残り票数',remain||'—'],['メールアドレス',m.email||'—']].forEach(([k,v])=>{
+  let remain='—';try{updUI();remain=document.getElementById('m-rm').textContent;}catch(e){}
+  document.getElementById('mp-remain').textContent=remain;
+  // あなたの投票：開催中のイベントごとに、確定した票を表示
+  const vb=document.getElementById('mp-votes');vb.innerHTML='';
+  const evs=getPublicEvents();let used=0;
+  if(!evs.length){const e=document.createElement('div');e.className='mv-empty';e.textContent='開催中のイベントはありません';vb.appendChild(e);}
+  evs.forEach(ev=>{
+    const h=document.createElement('div');h.className='mv-ev';h.textContent=ev.name||'イベント';vb.appendChild(h);
+    const v=(allVotes[ev.id]||{})[m.nick]||{};
+    const rows=Object.entries(v).filter(([,c])=>Number(c)>0).sort((a,b)=>b[1]-a[1]);
+    if(!rows.length){const e=document.createElement('div');e.className='mv-empty';e.textContent='まだ投票していません';vb.appendChild(e);return;}
+    let tot=0;
+    rows.forEach(([mid,c])=>{
+      tot+=Number(c);
+      const r=document.createElement('div');r.className='mp-row';
+      const a=document.createElement('span');a.className='k';a.style.color='var(--tx)';a.textContent=findMod(mid)?.name||mid;
+      const b=document.createElement('span');b.className='v';b.textContent=c+'票';
+      r.appendChild(a);r.appendChild(b);vb.appendChild(r);
+    });
+    used+=tot;
+    const t=document.createElement('div');t.className='mv-total';t.textContent=`合計 ${tot}票`;vb.appendChild(t);
+  });
+  document.getElementById('mp-used').textContent=evs.length?used:'—';
+  // 推しモデル
+  renderPills('mp-oshi',oshiMap[m.nick]||[],null);
+  if(!(oshiMap[m.nick]||[]).length){const o=document.getElementById('mp-oshi');o.innerHTML='<span class="mp-note" style="margin:0">まだ選んでいません</span>';}
+  // パスコード
+  const has=hasPasscode();
+  const chip=document.getElementById('mp-pass-chip');
+  chip.textContent=has?'✓ 作成済み':'未作成';chip.className='mp-chip '+(has?'ok':'ng');
+  document.getElementById('mp-pass').textContent=has?'忘れたときや変えたいときは、ここから変更できます。':'次回からのログインに使うパスコードを作ってください（1分ほどで終わります）。';
+  const pb=document.getElementById('mp-pass-btn');
+  pb.textContent=has?'パスコードを変更する':'パスコードを作る';pb.className=has?'btn-outline':'btn-gold';
+  // 会員情報
+  const info=document.getElementById('mp-info');info.innerHTML='';
+  [['ニックネーム',m.nick],['会員番号',m.mid||'—'],['プラン',`${PLAN_LBL[m.plan]||m.plan||'—'}（毎月${PLANS[m.plan]??'—'}票）`],['メールアドレス',m.email||'—']].forEach(([k,v])=>{
     const r=document.createElement('div');r.className='mp-row';
     const a=document.createElement('span');a.className='k';a.textContent=k;
     const b=document.createElement('span');b.className='v';b.textContent=v;
     r.appendChild(a);r.appendChild(b);info.appendChild(r);
-  });
-  renderPills('mp-oshi',oshiMap[m.nick]||[],null);
-  const has=hasPasscode();
-  document.getElementById('mp-pass').textContent=has?'作成済みです。忘れたときや変えたいときは、下のボタンから変更できます。':'まだ作っていません。次回からのログインに使うパスコードを作ってください。';
-  document.getElementById('mp-pass-btn').textContent=has?'パスコードを変更する':'パスコードを作る';
-  document.getElementById('mp-pass-btn').className=has?'btn-outline':'btn-gold';
-  // あなたの投票：開催中のイベントごとに、確定した票を表示
-  const vb=document.getElementById('mp-votes');vb.innerHTML='';
-  const evs=getPublicEvents();
-  if(!evs.length){vb.innerHTML='<div class="nt-empty" style="padding:12px">開催中のイベントはありません</div>';return;}
-  evs.forEach(ev=>{
-    const wrap=document.createElement('div');wrap.style.marginBottom='12px';
-    const h=document.createElement('div');h.className='mv-ev';h.textContent=ev.name||'イベント';wrap.appendChild(h);
-    const v=(allVotes[ev.id]||{})[m.nick]||{};
-    const rows=Object.entries(v).filter(([,c])=>Number(c)>0).sort((a,b)=>b[1]-a[1]);
-    if(!rows.length){const e=document.createElement('div');e.style.cssText='font-size:12px;color:var(--sub)';e.textContent='まだ投票していません';wrap.appendChild(e);}
-    else{
-      let tot=0;
-      rows.forEach(([mid,c])=>{
-        tot+=Number(c);
-        const r=document.createElement('div');r.className='mp-row';
-        const a=document.createElement('span');a.className='k';a.style.color='var(--tx)';a.textContent=findMod(mid)?.name||mid;
-        const b=document.createElement('span');b.className='v';b.textContent=c+'票';
-        r.appendChild(a);r.appendChild(b);wrap.appendChild(r);
-      });
-      const t=document.createElement('div');t.className='mv-total';t.textContent=`合計 ${tot}票`;wrap.appendChild(t);
-    }
-    vb.appendChild(wrap);
   });
 }
 
