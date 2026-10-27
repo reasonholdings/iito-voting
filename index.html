@@ -140,17 +140,16 @@ body.has-tabbar .screen{padding-bottom:120px}
 .bell-top .red-dot{top:7px;right:8px}
 /* お知らせ・マイページ */
 .pg-title{font-size:18px;font-weight:700;text-align:center;margin:4px 0 16px}
-.nt-card{background:var(--bg);border:.5px solid var(--bd);border-radius:14px;padding:14px 16px;margin-bottom:12px}
+.nt-card{background:#fff;border:1px solid #EFEFF2;border-radius:16px;padding:14px 16px;margin-bottom:12px;box-shadow:0 4px 16px rgba(0,0,0,.08)}
 .nt-card.sys{background:var(--ac-l);border-color:var(--ac-m)}
 .nt-hd{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .nt-ttl{font-size:14px;font-weight:700}
 .nt-new{font-size:9px;font-weight:700;color:#fff;background:#E53935;border-radius:999px;padding:1px 7px}
 .nt-dt{font-size:11px;color:var(--sub);margin-top:3px}
 .nt-body{font-size:13px;line-height:1.7;margin-top:8px;white-space:pre-wrap;word-break:break-word}
-.nt-empty{text-align:center;font-size:13px;color:var(--sub);padding:28px 12px}
-/* マイページ・お知らせ：背景は無地の薄いグレー（模様を隠す）＋白いカード。文字は濃い色、ピンクは要所だけ */
-#s-mypage,#s-notice{background:#F4F4F6;min-height:100vh}
-.mp-card{background:#fff;border-radius:16px;padding:14px 16px;margin-bottom:10px;border:1px solid #ECECEF}
+.nt-empty{text-align:center;font-size:13px;color:#666;padding:28px 12px;background:#fff;border:1px solid #EFEFF2;border-radius:16px;box-shadow:0 4px 16px rgba(0,0,0,.08)}
+/* マイページ・お知らせ：背景はいつものポップな模様のまま。カードは白＋影でくっきり浮かせ、文字は濃い色、ピンクは要所だけ */
+.mp-card{background:#fff;border-radius:16px;padding:14px 16px;margin-bottom:12px;border:1px solid #EFEFF2;box-shadow:0 4px 16px rgba(0,0,0,.08);position:relative;z-index:1}
 .mp-hero{padding:16px}
 .mp-hero-top{display:flex;align-items:center;gap:12px}
 .mp-av{width:52px;height:52px;flex:0 0 52px;border-radius:50%;background:var(--ac);color:#fff;font-size:22px;font-weight:700;display:flex;align-items:center;justify-content:center}
@@ -557,6 +556,7 @@ body.has-tabbar .screen{padding-bottom:120px}
      ②-3  マイページ（投票者）
 ════════════════════════════════════════ -->
 <div class="screen" id="s-mypage">
+  <div class="logo" style="margin-bottom:6px">iito members</div>
   <div class="pg-title"><i class="ti ti-user" style="vertical-align:-2px"></i> マイページ</div>
 
   <!-- プロフィール：名前・プラン・残り票数をひと目で -->
