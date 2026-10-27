@@ -148,31 +148,36 @@ body.has-tabbar .screen{padding-bottom:120px}
 .nt-dt{font-size:11px;color:var(--sub);margin-top:3px}
 .nt-body{font-size:13px;line-height:1.7;margin-top:8px;white-space:pre-wrap;word-break:break-word}
 .nt-empty{text-align:center;font-size:13px;color:var(--sub);padding:28px 12px}
-/* マイページ：白いカードに影をつけて背景の模様から浮かせ、見出しにはピンクのアイコン */
-.mp-card{background:#fff;border-radius:18px;padding:16px 18px;margin-bottom:14px;box-shadow:0 2px 14px rgba(0,0,0,.07);position:relative;z-index:1}
-.mp-hero{text-align:center;padding-top:20px}
-.mp-av{width:64px;height:64px;border-radius:50%;margin:0 auto 8px;background:var(--ac-l);color:var(--ac-d);font-size:26px;font-weight:700;display:flex;align-items:center;justify-content:center;border:2px solid var(--ac-m)}
-.mp-name{font-size:20px;font-weight:700;color:var(--tx)}
-.mp-stats{display:flex;gap:10px;margin-top:14px}
-.mp-stat{flex:1;background:var(--bg2);border-radius:14px;padding:10px 6px}
-.mp-stat .n{font-size:26px;font-weight:700;color:var(--ac-d);line-height:1.2}
-.mp-stat .l{font-size:11px;color:#555;margin-top:2px}
-.mp-sec{font-size:15px;font-weight:700;color:var(--tx);display:flex;align-items:center;gap:6px}
-.mp-sec .ti{color:var(--ac);font-size:18px}
-.mp-sec-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
-.mp-note{font-size:12px;color:#555;line-height:1.6;margin-top:4px}
-.mp-btn-sm{border:1px solid var(--ac-m);background:#fff;color:var(--ac-d);font-family:inherit;font-size:12px;font-weight:700;border-radius:999px;padding:5px 14px;cursor:pointer}
+/* マイページ・お知らせ：背景は無地の薄いグレー（模様を隠す）＋白いカード。文字は濃い色、ピンクは要所だけ */
+#s-mypage,#s-notice{background:#F4F4F6;min-height:100vh}
+.mp-card{background:#fff;border-radius:16px;padding:14px 16px;margin-bottom:10px;border:1px solid #ECECEF}
+.mp-hero{padding:16px}
+.mp-hero-top{display:flex;align-items:center;gap:12px}
+.mp-av{width:52px;height:52px;flex:0 0 52px;border-radius:50%;background:var(--ac);color:#fff;font-size:22px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.mp-name{font-size:19px;font-weight:700;color:#1A1A1A;line-height:1.3}
+.mp-plan{font-size:12px;color:#666;margin-top:2px}
+.mp-stats{display:flex;gap:8px;margin-top:14px}
+.mp-stat{flex:1;background:#F4F4F6;border-radius:12px;padding:10px 6px;text-align:center}
+.mp-stat .n{font-size:28px;font-weight:700;color:#1A1A1A;line-height:1.15}
+.mp-stat.accent .n{color:var(--ac-d)}
+.mp-stat .l{font-size:12px;color:#555;margin-top:2px}
+.mp-sec{font-size:15px;font-weight:700;color:#1A1A1A;display:flex;align-items:center;gap:6px}
+.mp-sec .ti{color:var(--ac-d);font-size:18px}
+.mp-sec-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px}
+.mp-note{font-size:12px;color:#666;line-height:1.6;margin-top:2px}
+.mp-btn-sm{border:1px solid #DADADF;background:#fff;color:#1A1A1A;font-family:inherit;font-size:12px;font-weight:700;border-radius:999px;padding:5px 14px;cursor:pointer}
 .mp-chip{font-size:11px;font-weight:700;border-radius:999px;padding:3px 10px}
-.mp-chip.ok{background:var(--gr-l);color:#0A8F5B}
-.mp-chip.ng{background:var(--rd-l);color:#D32F2F}
-.mp-row{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid #F0F0F0;font-size:14px}
+.mp-chip.ok{background:var(--gr-l);color:#0A7A4E}
+.mp-chip.ng{background:var(--rd-l);color:#C62828}
+.mp-row{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid #F0F0F2;font-size:14px}
 .mp-row:last-child{border-bottom:none}
 .mp-row .k{color:#666;flex:0 0 auto}
-.mp-row .v{text-align:right;word-break:break-all;color:var(--tx);font-weight:500}
-.mv-ev{font-size:13px;font-weight:700;color:var(--ac-d);margin:12px 0 4px}
-.mv-total{font-size:13px;color:var(--ac-d);font-weight:700;text-align:right;margin-top:6px}
-.mp-card .btn-outline{border:1px solid var(--ac-m);color:var(--ac-d);font-weight:700;border-radius:999px}
-.mv-empty{font-size:13px;color:#777;background:var(--bg2);border-radius:12px;padding:12px;text-align:center;margin-top:6px}
+.mp-row .v{text-align:right;word-break:break-all;color:#1A1A1A;font-weight:500}
+.mv-ev{font-size:13px;font-weight:700;color:#1A1A1A;margin:10px 0 2px;padding-left:8px;border-left:3px solid var(--ac)}
+.mv-total{font-size:13px;color:#1A1A1A;font-weight:700;text-align:right;margin-top:6px}
+.mv-empty{font-size:13px;color:#888;padding:6px 0 2px 11px}
+.mp-card .btn-outline{border:1px solid #DADADF;color:#1A1A1A;font-weight:700;border-radius:999px;margin-top:10px}
+.mp-card .btn-gold{border-radius:999px}
 .resume-card{background:var(--bg2);border:1px solid var(--bd);border-radius:12px;padding:14px 16px;margin-bottom:14px}
 
 /* ── 投票画面 ── */
@@ -556,11 +561,12 @@ body.has-tabbar .screen{padding-bottom:120px}
 
   <!-- プロフィール：名前・プラン・残り票数をひと目で -->
   <div class="mp-card mp-hero">
-    <div class="mp-av" id="mp-av"></div>
-    <div class="mp-name" id="mp-name"></div>
-    <span class="badge" id="mp-plan"></span>
+    <div class="mp-hero-top">
+      <div class="mp-av" id="mp-av"></div>
+      <div><div class="mp-name" id="mp-name"></div><div class="mp-plan" id="mp-plan"></div></div>
+    </div>
     <div class="mp-stats">
-      <div class="mp-stat"><div class="n" id="mp-remain">—</div><div class="l">残り票数</div></div>
+      <div class="mp-stat accent"><div class="n" id="mp-remain">—</div><div class="l">残り票数</div></div>
       <div class="mp-stat"><div class="n" id="mp-used">—</div><div class="l">投票した票数</div></div>
     </div>
   </div>
@@ -568,7 +574,7 @@ body.has-tabbar .screen{padding-bottom:120px}
   <!-- あなたの投票 -->
   <div class="mp-card">
     <div class="mp-sec"><i class="ti ti-checkbox"></i>あなたの投票</div>
-    <div class="mp-note">開催中のイベントで、確定した票です</div>
+    <div class="mp-note">開催中のイベントで確定した票です</div>
     <div id="mp-votes"></div>
   </div>
 
@@ -2160,7 +2166,7 @@ function renderMypage(){
   // プロフィール
   document.getElementById('mp-av').textContent=(m.nick||'?').slice(0,1);
   document.getElementById('mp-name').textContent=m.nick;
-  document.getElementById('mp-plan').textContent=`${PLAN_LBL[m.plan]||m.plan||'—'} ・ 毎月${PLANS[m.plan]??'—'}票`;
+  document.getElementById('mp-plan').textContent=`${PLAN_LBL[m.plan]||m.plan||'—'}プラン（毎月${PLANS[m.plan]??'—'}票）`;
   // 残り票数は投票画面の表示（繰り越し・確定済みの票を反映した値）と同じものを出す
   let remain='—';try{updUI();remain=document.getElementById('m-rm').textContent;}catch(e){}
   document.getElementById('mp-remain').textContent=remain;
