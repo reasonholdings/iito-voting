@@ -118,8 +118,9 @@ html,body{min-height:100vh;background:var(--bg2);font-family:"Zen Maru Gothic","
 .login-tabs button{flex:1 1 0;padding:10px 6px;border-radius:12px;border:1.5px solid var(--bd);background:#fff;color:var(--tx);font-family:inherit;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;-webkit-tap-highlight-color:transparent}
 .login-tabs button b{font-size:14px}
 .login-tabs button span{font-size:11px;color:var(--sub)}
-.login-tabs button.on{background:var(--ac);border-color:var(--ac);color:#fff}
-.login-tabs button.on span{color:#fff;opacity:.9}
+/* 選んでいるタブは淡いピンク（目にやさしい色）。#FFE4EE＝背景、#F4A6C0＝枠、#C2185B＝文字 */
+.login-tabs button.on{background:#FFE4EE;border-color:#F4A6C0;color:#C2185B}
+.login-tabs button.on span{color:#C2185B;opacity:.8}
 .step-note{font-size:12px;line-height:1.6;color:var(--tx);margin-top:12px}
 .forgot-lnk{text-align:center;font-size:12px;color:var(--ac-d);text-decoration:underline;margin-top:12px;cursor:pointer}
 /* 投票者向けの下のメニュー（インスタグラム風）：左＝投票、真ん中＝お知らせ、右＝マイページ */
