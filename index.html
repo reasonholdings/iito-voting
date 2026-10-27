@@ -123,8 +123,8 @@ html,body{min-height:100vh;background:var(--bg2);font-family:"Zen Maru Gothic","
 .login-tabs button.on span{color:#C2185B;opacity:.8}
 .step-note{font-size:12px;line-height:1.6;color:var(--tx);margin-top:12px}
 .forgot-lnk{text-align:center;font-size:12px;color:var(--ac-d);text-decoration:underline;margin-top:12px;cursor:pointer}
-/* 投票者向けの下のメニュー（インスタグラム風）：左＝投票、真ん中＝お知らせ、右＝マイページ */
-.tabbar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(12px + env(safe-area-inset-bottom));width:calc(100% - 32px);max-width:420px;display:none;justify-content:space-around;align-items:center;padding:6px;background:rgba(255,255,255,.94);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border:1px solid var(--bd);border-radius:999px;box-shadow:0 6px 24px rgba(0,0,0,.12);z-index:150}
+/* 投票者向けの下のメニュー（インスタグラム風）：左＝投票、真ん中＝お知らせ、右＝マイページ。ブラウザの下のアドレス欄のすぐ上に置く（下の余白2px） */
+.tabbar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(2px + env(safe-area-inset-bottom));width:calc(100% - 32px);max-width:420px;display:none;justify-content:space-around;align-items:center;padding:6px;background:rgba(255,255,255,.94);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border:1px solid var(--bd);border-radius:999px;box-shadow:0 6px 24px rgba(0,0,0,.12);z-index:150}
 .tabbar.show{display:flex}
 .tb-btn{position:relative;flex:1 1 0;height:52px;border:none;background:transparent;border-radius:999px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;color:var(--sub);font-family:inherit;-webkit-tap-highlight-color:transparent}
 .tb-btn .tb-ic{font-size:23px;line-height:1}
