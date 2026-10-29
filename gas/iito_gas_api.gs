@@ -793,11 +793,18 @@ function recordGrants(data) {
   const grants = data.grants || [];
   if (!grants.length) return { ok: true, added: 0 };
   const sh = getGrantSheet_();
-  // 既存の「nick|plan|term」をセットにして重複チェック
+  // 既存の「nick|plan|term」をセットにして重複チェック。あわせて「nick|term」ごとの最上位プランも控える
+  const rank = { supporter: 1, partner: 2, producer: 3 };
   const existing = {};
+  const topRank = {};
+  const noteTop = function(nick, term, plan){ const k = nick + '|' + term; if ((rank[plan] || 0) > (topRank[k] || 0)) topRank[k] = rank[plan] || 0; };
   if (sh.getLastRow() > 1) {
     const rows = sh.getRange(2, 1, sh.getLastRow() - 1, 3).getValues();
-    rows.forEach(function(r){ existing[String(r[0]).trim()+'|'+String(r[1]).trim()+'|'+String(r[2]).trim()] = true; });
+    rows.forEach(function(r){
+      const n = String(r[0]).trim(), p = String(r[1]).trim(), t = String(r[2]).trim();
+      existing[n+'|'+p+'|'+t] = true;
+      noteTop(n, t, p);
+    });
   }
   const now = new Date();
   const toAdd = [];
@@ -808,7 +815,10 @@ function recordGrants(data) {
     if (!nick || !plan || !term) return;
     const key = nick+'|'+plan+'|'+term;
     if (existing[key]) return; // 既に付与済み（月1回ルール）
+    // ダウングレードは付与なし：同じ月にもっと上のプランの付与が既にあれば記録しない
+    if ((topRank[nick + '|' + term] || 0) > (rank[plan] || 0)) return;
     existing[key] = true;
+    noteTop(nick, term, plan);
     toAdd.push([nick, plan, term, now]);
   });
   if (toAdd.length) {
