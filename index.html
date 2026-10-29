@@ -1162,6 +1162,13 @@ async function pullOshi(){
   }catch(e){ console.warn('getOshi失敗（推し列は—表示）', e); }
 }
 // 指定会員が指定termで付与された「プラン票の合計」（プラン変更で積み上がった今月の票）
+// プランの上下（数字が大きいほど上）
+const PLAN_RANK={supporter:1,partner:2,producer:3};
+// その月に、このプランより上のプランの付与が既にあるか（＝今回はダウングレードなので付与しない）
+function isDowngradeGrant(nick,plan,term){
+  const list=(grants[nick]&&grants[nick][term])||[];
+  return list.some(p=>(PLAN_RANK[p]||0)>(PLAN_RANK[plan]||0));
+}
 function grantedTotalFor(nick,term){
   const list=(grants[nick]&&grants[nick][term])||[];
   const counted={};let sum=0;
@@ -3040,7 +3047,12 @@ function applyCsvImport(nm, curTerm, csvTermInfo){
     //  残らず、その月に会員だった証拠が無いため繰越が全く計算されなかった。
     //  → CSVに載っている解約以外の全会員を、判別した対象月のプランで記録する。
     //  ※GAS側で「nick|plan|term が既にあれば二重記録しない」ので、同月に何度読んでも重複しない。
-    const grantsToRecord=nm.map(m=>({nick:m.nick, plan:m.plan, term:curTerm}));
+    //  【ダウングレードは付与なし】同じ月に、もっと上のプランの付与が既にある人は記録しない。
+    //   例）同じ月に プロデューサー → サポーター に下げても、サポーターの12票は足さない（持ち票は150のまま）。
+    //   アップグレード（サポーター → プロデューサー）は、上のプランなので記録する（12＋150）。
+    //   GAS側の recordGrants も同じ判定をする（こちらはGASを入れ替えるまでの保険も兼ねる）。
+    const grantsToRecord=nm.map(m=>({nick:m.nick, plan:m.plan, term:curTerm}))
+      .filter(g=>!isDowngradeGrant(g.nick,g.plan,g.term));
 
     if(!isPastCsv){members=nm;ls(LS.members,members);}
     const resEl=document.getElementById('csv-result');
