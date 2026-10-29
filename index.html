@@ -1948,9 +1948,13 @@ function setLoginTab(t){
   hideLoginErr();checkRegBtn();
 }
 function defaultLoginTab(){ return ls('iito_has_pass')?'login':'first'; }
+// 入力のゆれをそろえる：スマホの日本語入力で入りやすい全角（＠・＿・１２３など）や空白を半角に直す
+//  例）nobu＿fu＠docomo.ne.jp → nobu_fu@docomo.ne.jp、１２３４ → 1234
+function normEmailInput(v){return String(v||'').normalize('NFKC').replace(/[\s\u200B-\u200D\uFEFF]/g,'').toLowerCase();}
+function normDigitsInput(v){return String(v||'').normalize('NFKC').replace(/[\s\u200B-\u200D\uFEFF]/g,'');}
 function checkRegBtn(){
-  const email=document.getElementById('email-inp').value.trim();
-  const pin=document.getElementById('pin-inp').value.trim();
+  const email=normEmailInput(document.getElementById('email-inp').value);
+  const pin=normDigitsInput(document.getElementById('pin-inp').value);
   document.getElementById('reg-btn').disabled=!(email.includes('@')&&/^[0-9]{4,6}$/.test(pin));
 }
 function showLoginErr(msg){
@@ -2003,8 +2007,8 @@ async function finishPinLogin(token,nick){
 }
 // 2回目から：メールアドレス＋パスコードでログイン
 async function doPinLogin(){
-  const email=document.getElementById('email-inp').value.trim().toLowerCase();
-  const pin=document.getElementById('pin-inp').value.trim();
+  const email=normEmailInput(document.getElementById('email-inp').value);
+  const pin=normDigitsInput(document.getElementById('pin-inp').value);
   if(!email.includes('@')||!/^[0-9]{4,6}$/.test(pin))return;
   const btn=document.getElementById('reg-btn');
   btn.disabled=true;btn.textContent='確認中...';hideLoginErr();
@@ -2019,7 +2023,7 @@ async function doPinLogin(){
 }
 // はじめて：① 確認コードを受け取る
 async function sendPinCode(){
-  const email=document.getElementById('email-inp').value.trim().toLowerCase();
+  const email=normEmailInput(document.getElementById('email-inp').value);
   if(!email.includes('@')){document.getElementById('email-inp').className='inp er';showLoginErr(pinErrorMessage({error:'bad_email'}));return;}
   const btn=document.getElementById('ps-send-btn');
   btn.disabled=true;btn.textContent='送信中...';hideLoginErr();
@@ -2033,10 +2037,10 @@ async function sendPinCode(){
 }
 // はじめて：② 確認コード＋パスコードを送って作成し、そのままログイン
 async function submitPinSetup(){
-  const email=document.getElementById('email-inp').value.trim().toLowerCase();
-  const code=document.getElementById('ps-code').value.trim();
-  const pin=document.getElementById('ps-pin').value.trim();
-  const pin2=document.getElementById('ps-pin2').value.trim();
+  const email=normEmailInput(document.getElementById('email-inp').value);
+  const code=normDigitsInput(document.getElementById('ps-code').value);
+  const pin=normDigitsInput(document.getElementById('ps-pin').value);
+  const pin2=normDigitsInput(document.getElementById('ps-pin2').value);
   const bad=passInputProblem(code,pin,pin2);
   if(bad){showLoginErr(pinErrorMessage({error:bad}));return;}
   const btn=document.getElementById('ps-set-btn');
@@ -2077,9 +2081,9 @@ async function pmSendCode(){
   document.getElementById('pm-code').focus();
 }
 async function pmSubmit(){
-  const code=document.getElementById('pm-code').value.trim();
-  const pin=document.getElementById('pm-pin').value.trim();
-  const pin2=document.getElementById('pm-pin2').value.trim();
+  const code=normDigitsInput(document.getElementById('pm-code').value);
+  const pin=normDigitsInput(document.getElementById('pm-pin').value);
+  const pin2=normDigitsInput(document.getElementById('pm-pin2').value);
   const bad=passInputProblem(code,pin,pin2);
   if(bad){pmErr(pinErrorMessage({error:bad}));return;}
   const btn=document.getElementById('pm-set-btn');

@@ -898,7 +898,8 @@ function grantedVotesInTerm_(nick, term) {
 //  ③ 次回からはメールアドレス＋暗証番号でログイン（pinLogin）
 //  ログインに成功すると sessionToken（署名付き・90日有効）を返す。暗証番号を変えると古いtokenは使えなくなる
 // ════════════════════════════════════════
-function normEmail_(e) { return String(e || '').trim().toLowerCase(); }
+// 全角（＠・＿など）や空白のゆれをそろえる。会員データ側（CSV）と入力側の両方に同じ処理をかける
+function normEmail_(e) { return String(e || '').normalize('NFKC').replace(/[\s\u200B-\u200D\uFEFF]/g, '').toLowerCase(); }
 
 // 会員データからメールアドレスで1人分を探す
 function findMemberByEmail_(email) {
