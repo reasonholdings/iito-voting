@@ -7,7 +7,6 @@ const SHEET_MEMBERS = '会員データ';
 const SHEET_EVENTS  = 'イベント';
 const SHEET_MODELS  = 'モデル';
 const SHEET_GRANTS  = 'プラン付与履歴'; // その月に付与済みのプランを記録
-const SHEET_NOTICES = 'お知らせ';       // 運営から投票者へのお知らせ（ID／タイトル／本文／送信時刻）
 const SECRET_KEY    = 'iito2026secret'; // HTMLと合わせること
 
 // ── 本人確認・管理者確認（2026-09 セキュリティ強化） ──
@@ -73,7 +72,7 @@ function doGet(e) {
 
 // doPost / doGet 共通のアクション振り分け
 //  ・だれでも使える：ping / getEvents / getModels / checkMember / adminLogin / requestPinCode / setPin / pinLogin
-//  ・投票者本人（パスコードログインの sessionToken、または旧方式のFirebaseの idToken が必要）：me / saveVote / notices
+//  ・投票者本人（パスコードログインの sessionToken、または旧方式のFirebaseの idToken が必要）：me / saveVote
 //  ・管理者（adminLogin で受け取った adminToken が必要）：それ以外すべて
 function handleAction(action, data) {
   // だれでも使える
@@ -88,13 +87,11 @@ function handleAction(action, data) {
   // 投票者本人
   if (action === 'me')          return getMe(data);
   if (action === 'saveVote')    return saveVote(data);
-  if (action === 'notices')     return getNoticesForVoter(data);
   // 管理者
   const ADMIN_ACTIONS = {
     getResults: getResults, getTermPlans: getTermPlans, saveMembers: saveMembers, getMembers: getMembers,
     saveEvents: saveEvents, saveModels: saveModels, recordGrants: recordGrants, getGrants: getGrants,
-    getOshi: getOshi, changeAdminPw: changeAdminPw, adminLogout: adminLogout,
-    getNotices: getNoticesAdmin, saveNotice: saveNotice, deleteNotice: deleteNotice
+    getOshi: getOshi, changeAdminPw: changeAdminPw, adminLogout: adminLogout
   };
   if (ADMIN_ACTIONS[action]) {
     if (!isLegacy_() && !isAdmin_(data)) return { ok: false, error: 'admin_required' };
@@ -1074,73 +1071,4 @@ function pinLogin(data) {
   }
   cache.remove('pf_' + key);
   return { ok: true, token: issueVoterToken_(email, pr.ver), nick: m.nick };
-}
-
-// ════════════════════════════════════════
-// お知らせ（運営 → 投票者）
-//  管理画面から送ったお知らせを「お知らせ」シートに保存し、ログイン中の投票者にだけ返す
-// ════════════════════════════════════════
-const NOTICE_MAX_TITLE = 60;
-const NOTICE_MAX_BODY  = 1000;
-const NOTICE_LIST_MAX  = 50;   // 投票者に返す件数（新しい順）
-
-function getNoticeSheet_() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sh = ss.getSheetByName(SHEET_NOTICES);
-  if (!sh) {
-    sh = ss.insertSheet(SHEET_NOTICES);
-    sh.appendRow(['ID', 'タイトル', '本文', '送信時刻']);
-  }
-  return sh;
-}
-// 保存時に付けた先頭の ' が残っていたら外す
-function unq_(v) { return String(v == null ? '' : v).replace(/^'/, ''); }
-// 新しい順のお知らせ一覧
-function listNotices_() {
-  const sh = getNoticeSheet_();
-  if (sh.getLastRow() <= 1) return [];
-  return sh.getRange(2, 1, sh.getLastRow() - 1, 4).getValues()
-    .filter(function(r){ return String(r[0]).trim(); })
-    .map(function(r){ return { id: String(r[0]).trim(), title: unq_(r[1]), body: unq_(r[2]), ts: Number(String(r[3]).replace(/^t/, '')) || 0 }; })
-    .sort(function(a, b){ return b.ts - a.ts; });
-}
-// 投票者用：ログイン中の本人だけが読める
-function getNoticesForVoter(data) {
-  const a = authVoter_(data);
-  if (a.error) return { ok: false, error: a.error };
-  return { ok: true, notices: listNotices_().slice(0, NOTICE_LIST_MAX) };
-}
-// 管理者用
-function getNoticesAdmin() { return { ok: true, notices: listNotices_() }; }
-function saveNotice(data) {
-  const title = String(data.title || '').trim().slice(0, NOTICE_MAX_TITLE);
-  const body  = String(data.body || '').trim().slice(0, NOTICE_MAX_BODY);
-  if (!title || !body) return { ok: false, error: 'empty' };
-  const lock = LockService.getScriptLock();
-  lock.waitLock(10000);
-  try {
-    const id = 'n' + Utilities.getUuid().replace(/-/g, '').slice(0, 12);
-    // 先頭に文字を付けて保存（スプレッドシートが数値や数式と取り違えないように）
-    getNoticeSheet_().appendRow([id, "'" + title, "'" + body, 't' + Date.now()]);
-    return { ok: true, id: id };
-  } finally {
-    lock.releaseLock();
-  }
-}
-function deleteNotice(data) {
-  const id = String(data.id || '').trim();
-  if (!id) return { ok: false, error: 'no_id' };
-  const lock = LockService.getScriptLock();
-  lock.waitLock(10000);
-  try {
-    const sh = getNoticeSheet_();
-    if (sh.getLastRow() <= 1) return { ok: true };
-    const ids = sh.getRange(2, 1, sh.getLastRow() - 1, 1).getValues();
-    for (var i = ids.length - 1; i >= 0; i--) {
-      if (String(ids[i][0]).trim() === id) sh.deleteRow(i + 2);
-    }
-    return { ok: true };
-  } finally {
-    lock.releaseLock();
-  }
 }
