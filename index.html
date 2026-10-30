@@ -123,7 +123,7 @@ html,body{min-height:100vh;background:var(--bg2);font-family:"Zen Maru Gothic","
 .login-tabs button.on span{color:#C2185B;opacity:.8}
 .step-note{font-size:12px;line-height:1.6;color:var(--tx);margin-top:12px}
 .forgot-lnk{text-align:center;font-size:12px;color:var(--ac-d);text-decoration:underline;margin-top:12px;cursor:pointer}
-/* 投票者向けの下のメニュー（インスタグラム風）：左＝投票、真ん中＝お知らせ、右＝マイページ。ブラウザの下のアドレス欄のすぐ上に置く（下の余白2px） */
+/* 投票者向けの下のメニュー（インスタグラム風）：左＝投票、右＝マイページ。ブラウザの下のアドレス欄のすぐ上に置く（下の余白2px） */
 .tabbar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(2px + env(safe-area-inset-bottom));width:calc(100% - 32px);max-width:420px;display:none;justify-content:space-around;align-items:center;padding:6px;background:rgba(255,255,255,.94);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border:1px solid var(--bd);border-radius:999px;box-shadow:0 6px 24px rgba(0,0,0,.12);z-index:150}
 .tabbar.show{display:flex}
 .tb-btn{position:relative;flex:1 1 0;height:52px;border:none;background:transparent;border-radius:999px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;color:var(--sub);font-family:inherit;-webkit-tap-highlight-color:transparent}
@@ -131,7 +131,7 @@ html,body{min-height:100vh;background:var(--bg2);font-family:"Zen Maru Gothic","
 .tb-btn .tb-lb{font-size:10px}
 .tb-btn.on{background:var(--ac-l);color:var(--ac-d);font-weight:700}
 body.has-tabbar .screen{padding-bottom:120px}
-/* 赤い点（未読のお知らせがあるとき） */
+/* 赤い点（パスコードをまだ作っていないとき、マイページに出す） */
 .red-dot{position:absolute;width:9px;height:9px;border-radius:50%;background:#E53935;border:2px solid #fff;display:none}
 .red-dot.show{display:block}
 .tb-btn .red-dot{top:8px;left:calc(50% + 6px)}
@@ -479,7 +479,6 @@ body.has-tabbar .screen{padding-bottom:120px}
      ②  投票画面
 ════════════════════════════════════════ -->
 <div class="screen" id="s-vote">
-  <button type="button" class="bell-top" id="bell-top" aria-label="お知らせ" onclick="goTab('notice')"><i class="ti ti-bell"></i><span class="red-dot" id="bell-dot"></span></button>
   <div class="page-hd">
     <div class="logo">iito members</div>
     <div class="user-chip">
@@ -544,15 +543,6 @@ body.has-tabbar .screen{padding-bottom:120px}
 </div>
 
 <!-- ════════════════════════════════════════
-     ②-2  お知らせ（投票者）
-════════════════════════════════════════ -->
-<div class="screen" id="s-notice">
-  <div class="logo" style="margin-bottom:6px">iito members</div>
-  <div class="pg-title"><i class="ti ti-bell" style="vertical-align:-2px"></i> お知らせ</div>
-  <div id="nt-list"></div>
-</div>
-
-<!-- ════════════════════════════════════════
      ②-3  マイページ（投票者）
 ════════════════════════════════════════ -->
 <div class="screen" id="s-mypage">
@@ -606,7 +596,7 @@ body.has-tabbar .screen{padding-bottom:120px}
   <button class="btn-ghost" onclick="openLogoutConfirm()"><i class="ti ti-logout" style="vertical-align:-2px"></i> ログアウト</button>
 </div>
 
-<!-- パスコードを作る／変更するモーダル（お知らせ・マイページから） -->
+<!-- パスコードを作る／変更するモーダル（マイページから） -->
 <div class="overlay" id="pass-modal">
     <div class="mbox">
       <h3 id="pm-title">パスコードを作る</h3>
@@ -653,11 +643,10 @@ body.has-tabbar .screen{padding-bottom:120px}
     </div>
 </div>
 
-<!-- 投票者向けの下のメニュー（投票・お知らせ・マイページの画面でだけ表示） -->
+<!-- 投票者向けの下のメニュー（投票・マイページの画面でだけ表示） -->
 <nav class="tabbar" id="tabbar" aria-label="メニュー">
   <button type="button" class="tb-btn" id="tb-vote" onclick="goTab('vote')"><span class="tb-ic">🗳️</span><span class="tb-lb">投票</span></button>
-  <button type="button" class="tb-btn" id="tb-notice" onclick="goTab('notice')"><i class="ti ti-bell tb-ic"></i><span class="tb-lb">お知らせ</span><span class="red-dot" id="tb-dot"></span></button>
-  <button type="button" class="tb-btn" id="tb-mypage" onclick="goTab('mypage')"><i class="ti ti-user tb-ic"></i><span class="tb-lb">マイページ</span></button>
+  <button type="button" class="tb-btn" id="tb-mypage" onclick="goTab('mypage')"><i class="ti ti-user tb-ic"></i><span class="tb-lb">マイページ</span><span class="red-dot" id="tb-dot"></span></button>
 </nav>
 
 <!-- ════════════════════════════════════════
@@ -713,7 +702,6 @@ body.has-tabbar .screen{padding-bottom:120px}
     <button class="atab" onclick="switchATab('carry')">繰越</button>
     <button class="atab" onclick="switchATab('model')">モデル管理</button>
     <button class="atab" onclick="switchATab('result')">集計</button>
-    <button class="atab" onclick="switchATab('notice')">お知らせ</button>
     <button class="atab" onclick="switchATab('setting')">設定</button>
   </div>
 
@@ -825,25 +813,6 @@ body.has-tabbar .screen{padding-bottom:120px}
   </div>
 
   <!-- 設定 -->
-  <!-- お知らせ（投票者へのメッセージ） -->
-  <div class="apanel" id="ap-notice">
-    <div class="sc">
-      <div class="sc-title">お知らせを送る</div>
-      <p style="font-size:12px;color:var(--sub);margin-bottom:12px;line-height:1.6">送ったお知らせは、ログインしている投票者全員の「お知らせ」に届き、ベルに赤い点がつきます。</p>
-      <span class="field-lbl" style="margin-top:0">タイトル（60文字まで）</span>
-      <input class="inp" id="an-title" maxlength="60" placeholder="例：ログイン方法が新しくなりました" style="font-size:13px"/>
-      <span class="field-lbl">本文（1000文字まで）</span>
-      <textarea class="inp" id="an-body" maxlength="1000" rows="6" placeholder="お知らせの内容" style="font-size:13px;resize:vertical;line-height:1.6"></textarea>
-      <div id="an-msg" style="font-size:12px;margin-top:8px;display:none"></div>
-      <button class="btn-gold" id="an-send" onclick="sendAdmNotice()">送信する</button>
-    </div>
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-      <p style="font-size:14px;font-weight:500">送ったお知らせ</p>
-      <button class="btn-sm-out" onclick="loadAdmNotices()"><i class="ti ti-refresh" style="font-size:12px;vertical-align:-1px"></i> 更新</button>
-    </div>
-    <div id="an-list"></div>
-  </div>
-
   <div class="apanel" id="ap-setting">
     <div class="sc">
       <div class="sc-title">管理者ログイン</div>
@@ -947,13 +916,13 @@ function lsDel(k){try{localStorage.removeItem(k);}catch(e){}}
 function pad(n){return String(n).padStart(2,'0');}
 function genId(){return Date.now().toString(36)+Math.random().toString(36).slice(2,5);}
 function SS(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active');window.scrollTo(0,0);updateTabbar(id);}
-// 下のメニューは、投票者がログインしているときの「投票・お知らせ・マイページ」の画面だけに出す
-const TAB_SCREENS={'s-vote':'vote','s-notice':'notice','s-mypage':'mypage'};
+// 下のメニューは、投票者がログインしているときの「投票・マイページ」の画面だけに出す
+const TAB_SCREENS={'s-vote':'vote','s-mypage':'mypage'};
 function updateTabbar(id){
   const t=TAB_SCREENS[id];const show=!!(t&&curUser);
   const bar=document.getElementById('tabbar');if(!bar)return;
   bar.classList.toggle('show',show);document.body.classList.toggle('has-tabbar',show);
-  ['vote','notice','mypage'].forEach(k=>{const b=document.getElementById('tb-'+k);if(b){b.classList.toggle('on',k===t);b.setAttribute('aria-current',k===t?'page':'false');}});
+  ['vote','mypage'].forEach(k=>{const b=document.getElementById('tb-'+k);if(b){b.classList.toggle('on',k===t);b.setAttribute('aria-current',k===t?'page':'false');}});
 }
 // 読み込み中オーバーレイの表示/非表示
 function showLoading(msg){const ov=document.getElementById('load-ov');const t=document.getElementById('load-txt');if(t)t.textContent=msg||'読み込み中...';if(ov)ov.classList.add('show');}
@@ -2059,7 +2028,7 @@ async function submitPinSetup(){
   document.getElementById('ps-step2').style.display='none';
   await finishPinLogin(r.token,r.nick);
 }
-// ── パスコードを作る／変更する（お知らせ・マイページから。登録メールアドレス宛てに確認コードを送る） ──
+// ── パスコードを作る／変更する（マイページから。登録メールアドレス宛てに確認コードを送る） ──
 function hasPasscode(){ return !!ls(LS.pinTok); }
 function openPassModal(){
   if(!curUser)return;
@@ -2103,73 +2072,20 @@ async function pmSubmit(){
   ls(LS.pinTok,r.token);ls('iito_has_pass',1);
   closePassModal();updateBadges();
   if(document.getElementById('s-mypage').classList.contains('active'))renderMypage();
-  if(document.getElementById('s-notice').classList.contains('active'))renderNotices();
   alert(change?'パスコードを変更しました。次回からは新しいパスコードでログインしてください。':'パスコードを作りました。次回からは「2回目から」で、メールアドレスとパスコードでログインできます。');
 }
 // ════════════════════════════════════════
-// 投票者の下のメニュー・お知らせ・マイページ
+// 投票者の下のメニュー（投票・マイページ）
 // ════════════════════════════════════════
 function goTab(t){
   if(!curUser)return;
   if(t==='vote'){SS('s-vote');return;}
-  if(t==='notice'){renderNotices();SS('s-notice');fetchNotices(true);return;}
   if(t==='mypage'){renderMypage();SS('s-mypage');return;}
 }
-// 運営からのお知らせ（GASから取得。ログイン中の本人だけが読める）
-let notices=[],noticesAt=0;
-async function fetchNotices(force){
-  if(!curUser)return;
-  if(!force&&Date.now()-noticesAt<60*1000)return; // 1分以内なら取り直さない
-  const va=await getVoterAuth();if(!va)return;
-  const nick=curUser.nick;
-  const r=await gasPost('notices',{nick,...va});
-  if(!curUser||curUser.nick!==nick)return;
-  if(r&&r.ok&&Array.isArray(r.notices)){notices=r.notices;noticesAt=Date.now();}
-  updateBadges();
-  if(document.getElementById('s-notice').classList.contains('active'))renderNotices();
-}
-function seenKey(){return 'iito_notice_seen_'+(curUser?curUser.nick:'');}
-function seenIds(){const v=ls(seenKey());return Array.isArray(v)?v:[];}
-// 未読の数：運営のお知らせのうち未読のもの＋（パスコード未作成なら）「パスコードを作ってください」
-function unreadCount(){
-  if(!curUser)return 0;
-  const seen=seenIds();
-  return notices.filter(n=>!seen.includes(n.id)).length+(hasPasscode()?0:1);
-}
+// パスコードをまだ作っていない人には、マイページに赤い点を出して作成をうながす
 function updateBadges(){
-  const on=unreadCount()>0;
-  ['bell-dot','tb-dot'].forEach(id=>{const el=document.getElementById(id);if(el)el.classList.toggle('show',on);});
-}
-function fmtNoticeDate(ts){
-  if(!ts)return '';
-  const d=new Date(ts);const p=n=>String(n).padStart(2,'0');
-  return `${d.getFullYear()}.${p(d.getMonth()+1)}.${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
-}
-function renderNotices(){
-  const box=document.getElementById('nt-list');if(!box||!curUser)return;
-  box.innerHTML='';
-  const seen=seenIds();
-  // パスコードをまだ作っていない人へのお知らせ（作るまで消えない）
-  if(!hasPasscode()){
-    const c=document.createElement('div');c.className='nt-card sys';
-    c.innerHTML='<div class="nt-hd"><span class="nt-ttl"><i class="ti ti-key" style="vertical-align:-2px"></i> パスコードを作ってください</span><span class="nt-new">NEW</span></div>'+
-      '<div class="nt-body">ログイン方法が新しくなりました。次回からのログインに使うパスコードを、今のうちに作っておいてください（1分ほどで終わります）。</div>';
-    const b=document.createElement('button');b.className='btn-gold';b.style.marginTop='10px';b.textContent='パスコードを作る';b.onclick=openPassModal;
-    c.appendChild(b);box.appendChild(c);
-  }
-  notices.forEach(n=>{
-    const c=document.createElement('div');c.className='nt-card';
-    const hd=document.createElement('div');hd.className='nt-hd';
-    const t=document.createElement('span');t.className='nt-ttl';t.textContent=n.title;hd.appendChild(t);
-    if(!seen.includes(n.id)){const nw=document.createElement('span');nw.className='nt-new';nw.textContent='NEW';hd.appendChild(nw);}
-    const dt=document.createElement('div');dt.className='nt-dt';dt.textContent=fmtNoticeDate(n.ts);
-    const bd=document.createElement('div');bd.className='nt-body';bd.textContent=n.body; // 文字として表示（HTMLとしては扱わない）
-    c.appendChild(hd);c.appendChild(dt);c.appendChild(bd);box.appendChild(c);
-  });
-  if(!box.children.length){box.innerHTML='<div class="nt-empty">お知らせはまだありません</div>';}
-  // 表示したお知らせは既読にする（NEWの印は今回だけ見える）
-  const ids=[...new Set([...seen,...notices.map(n=>n.id)])];
-  ls(seenKey(),ids);updateBadges();
+  const on=!!curUser&&!hasPasscode();
+  const el=document.getElementById('tb-dot');if(el)el.classList.toggle('show',on);
 }
 function renderMypage(){
   if(!curUser)return;
@@ -2222,50 +2138,6 @@ function renderMypage(){
   });
 }
 
-// ── 管理画面：お知らせの送信・一覧・削除 ──
-function admNoticeMsg(text,ok){const el=document.getElementById('an-msg');el.textContent=text;el.style.color=ok?'var(--gr)':'var(--rd)';el.style.display='block';}
-function admNoticeErr(r){
-  if(r&&r.error==='unknown action')return 'GASの更新（デプロイ）がまだのため、お知らせを使えません。GASを最新版に入れ替えてください。';
-  if(r&&r.error==='empty')return 'タイトルと本文を入力してください。';
-  return '送信に失敗しました。通信環境を確認して、もう一度お試しください。';
-}
-async function loadAdmNotices(){
-  const box=document.getElementById('an-list');if(!box)return;
-  box.innerHTML='<div class="nt-empty" style="padding:12px">読み込み中...</div>';
-  const r=await gasPost('getNotices');
-  box.innerHTML='';
-  if(!r||!r.ok){const e=document.createElement('div');e.className='nt-empty';e.style.padding='12px';e.textContent=admNoticeErr(r);box.appendChild(e);return;}
-  if(!r.notices.length){box.innerHTML='<div class="nt-empty" style="padding:12px">まだ送ったお知らせはありません</div>';return;}
-  r.notices.forEach(n=>{
-    const c=document.createElement('div');c.className='nt-card';
-    const hd=document.createElement('div');hd.className='nt-hd';hd.style.justifyContent='space-between';
-    const t=document.createElement('span');t.className='nt-ttl';t.textContent=n.title;
-    const del=document.createElement('button');del.className='btn-ghost-sm';del.textContent='削除';del.onclick=()=>delAdmNotice(n.id,n.title);
-    hd.appendChild(t);hd.appendChild(del);
-    const dt=document.createElement('div');dt.className='nt-dt';dt.textContent=fmtNoticeDate(n.ts);
-    const bd=document.createElement('div');bd.className='nt-body';bd.textContent=n.body;
-    c.appendChild(hd);c.appendChild(dt);c.appendChild(bd);box.appendChild(c);
-  });
-}
-async function sendAdmNotice(){
-  const title=document.getElementById('an-title').value.trim();
-  const body=document.getElementById('an-body').value.trim();
-  if(!title||!body){admNoticeMsg('タイトルと本文を入力してください。',false);return;}
-  if(!confirm(`このお知らせを投票者全員に送ります。よろしいですか？\n\n「${title}」`))return;
-  const btn=document.getElementById('an-send');btn.disabled=true;btn.textContent='送信中...';
-  const r=await gasPostBig('saveNotice',{title,body});
-  btn.disabled=false;btn.textContent='送信する';
-  if(!r||!r.ok){admNoticeMsg(admNoticeErr(r),false);return;}
-  document.getElementById('an-title').value='';document.getElementById('an-body').value='';
-  admNoticeMsg('送信しました。投票者の「お知らせ」に表示されます。',true);
-  loadAdmNotices();
-}
-async function delAdmNotice(id,title){
-  if(!confirm(`お知らせ「${title}」を削除しますか？\n投票者の画面からも消えます。`))return;
-  const r=await gasPost('deleteNotice',{id});
-  if(!r||!r.ok){alert(admNoticeErr(r));return;}
-  loadAdmNotices();
-}
 // メールリンク認証の完了後、実際にログインを完了させる処理
 // （パスコードログイン・旧方式のメールリンクの両方から使う。selNickの代わりに会員データmを受け取る）
 async function completeLoginAfterLink(nick){
@@ -2491,7 +2363,7 @@ function closeLogoutConfirm(){document.getElementById('logout-modal').classList.
 function logout(){
   document.getElementById('logout-modal').classList.remove('open');
   submitted=false;sentLocked={};
-  lsDel(LS.sess);lsDel(LS.pinTok);curUser=null;pending={};selNick=null;emailVerified=false;loginOshi=[];notices=[];noticesAt=0;
+  lsDel(LS.sess);lsDel(LS.pinTok);curUser=null;pending={};selNick=null;emailVerified=false;loginOshi=[];
   document.getElementById('logout-modal').classList.remove('open');
   try{auth.signOut();}catch(e){} // 旧方式（メールリンク）のログインも解除する
   stopCd();resetNick();
@@ -2508,7 +2380,7 @@ function buildVoteScreen(){
   document.getElementById('chip-nm').textContent=curUser.nick;
   document.getElementById('v-badge').textContent=`${PLAN_LBL[curUser.plan]} — ${PLANS[curUser.plan]}票`;
   renderPills('v-oshi-pills',oshiMap[curUser.nick]||[],null);
-  updateBadges();fetchNotices();
+  updateBadges();
   buildGrids();updUI();
   // 公開中のイベントが無い場合：投票UIは隠すが、残り票数（基本票＋繰り越し）は表示する
   const noEvent=getPublicEvents().length===0;
@@ -2765,14 +2637,13 @@ function exitAdmin(){
   if(curUser){SS('s-vote');}else{SS('s-login');refreshResumeCard();}
 }
 function switchATab(tab){
-  document.querySelectorAll('.atab').forEach((b,i)=>{const ts=['event','member','carry','model','result','notice','setting'];b.classList.toggle('on',ts[i]===tab);});
+  document.querySelectorAll('.atab').forEach((b,i)=>{const ts=['event','member','carry','model','result','setting'];b.classList.toggle('on',ts[i]===tab);});
   document.querySelectorAll('.apanel').forEach(p=>p.classList.remove('active'));
   document.getElementById('ap-'+tab).classList.add('active');
   if(tab==='result')renderResult();
   if(tab==='member')renderMember();
   if(tab==='carry')renderCarry();
   if(tab==='model')renderMcGrids();
-  if(tab==='notice')loadAdmNotices();
 }
 
 // イベント管理
