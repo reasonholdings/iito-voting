@@ -662,12 +662,12 @@ function saveMembers(data) {
   let sheet = ss.getSheetByName(SHEET_MEMBERS);
   if (!sheet) { sheet = ss.insertSheet(SHEET_MEMBERS); }
   sheet.clearContents();
-  sheet.appendRow(['会員番号', 'ニックネーム', 'プラン', 'メールアドレス', 'ユーザーID']);
-  sheet.getRange(1, 1, 1, 5).setFontWeight('bold').setBackground('#C9A84C').setFontColor('#ffffff');
+  sheet.appendRow(['会員番号', 'ニックネーム', 'プラン', 'メールアドレス', 'ユーザーID', '最終決済日']);
+  sheet.getRange(1, 1, 1, 6).setFontWeight('bold').setBackground('#C9A84C').setFontColor('#ffffff');
   sheet.setFrozenRows(1);
   const members = data.members || [];
   members.forEach(function(m){
-    sheet.appendRow([m.mid || '', m.nick || '', m.plan || '', m.email || '', m.uid || '']);
+    sheet.appendRow([m.mid || '', m.nick || '', m.plan || '', m.email || '', m.uid || '', m.paidAt ? "'" + m.paidAt : '']); // 決済日は文字のまま保存（日付に変換させない）
   });
   return { ok: true, saved: members.length };
 }
@@ -679,7 +679,7 @@ function getMembers() {
   if (!sheet || sheet.getLastRow() <= 1) {
     return { ok: true, members: [] };
   }
-  const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 5).getValues();
+  const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 6).getValues();
   const members = rows
     .filter(function(r){ return r[1]; })
     .map(function(r){ return {
@@ -687,7 +687,8 @@ function getMembers() {
       nick:  r[1] || '',
       plan:  r[2] || 'supporter',
       email: r[3] || '',
-      uid:   r[4] || ''
+      uid:   r[4] || '',
+      paidAt: r[5] instanceof Date ? Utilities.formatDate(r[5], 'Asia/Tokyo', 'yyyy-MM-dd') : String(r[5] || '') // 最終決済日（会員資格の期限の計算に使う）
     }; });
   return { ok: true, members };
 }
