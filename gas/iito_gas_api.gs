@@ -7,6 +7,7 @@ const SHEET_MEMBERS = '会員データ';
 const SHEET_EVENTS  = 'イベント';
 const SHEET_MODELS  = 'モデル';
 const SHEET_GRANTS  = 'プラン付与履歴'; // その月に付与済みのプランを記録
+const SHEET_PAYMENTS = '決済履歴';      // 読み込んだ決済CSVの行をすべてためる（会員リストはここから計算する）
 const SECRET_KEY    = 'iito2026secret'; // HTMLと合わせること
 
 // ── 本人確認・管理者確認（2026-09 セキュリティ強化） ──
@@ -91,7 +92,8 @@ function handleAction(action, data) {
   const ADMIN_ACTIONS = {
     getResults: getResults, getTermPlans: getTermPlans, saveMembers: saveMembers, getMembers: getMembers,
     saveEvents: saveEvents, saveModels: saveModels, recordGrants: recordGrants, getGrants: getGrants,
-    getOshi: getOshi, changeAdminPw: changeAdminPw, adminLogout: adminLogout
+    getOshi: getOshi, changeAdminPw: changeAdminPw, adminLogout: adminLogout,
+    appendPayments: appendPayments, getPayments: getPayments
   };
   if (ADMIN_ACTIONS[action]) {
     if (!isLegacy_() && !isAdmin_(data)) return { ok: false, error: 'admin_required' };
@@ -657,19 +659,85 @@ function getTermPlans() {
 }
 
 // 会員データを保存
+//  ・同時に2回保存されても行が重なって重複しないよう、ロックをかけて一度に書き込む
+//  ・同じ会員（会員番号、無ければニックネーム）が重ねて送られても1行にする
 function saveMembers(data) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let sheet = ss.getSheetByName(SHEET_MEMBERS);
+    if (!sheet) { sheet = ss.insertSheet(SHEET_MEMBERS); }
+    const seen = {};
+    const rows = [];
+    (data.members || []).forEach(function(m){
+      const key = m.mid ? 'm:' + m.mid : 'n:' + m.nick;
+      if (!m.nick || seen[key]) return;
+      seen[key] = true;
+      rows.push([m.mid || '', m.nick || '', m.plan || '', m.email || '', m.uid || '', m.paidAt ? "'" + m.paidAt : '']); // 決済日は文字のまま保存（日付に変換させない）
+    });
+    sheet.clearContents();
+    sheet.getRange(1, 1, 1, 6).setValues([['会員番号', 'ニックネーム', 'プラン', 'メールアドレス', 'ユーザーID', '最終決済日']])
+      .setFontWeight('bold').setBackground('#C9A84C').setFontColor('#ffffff');
+    sheet.setFrozenRows(1);
+    if (rows.length) sheet.getRange(2, 1, rows.length, 6).setValues(rows);
+    return { ok: true, saved: rows.length };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// ════════════════════════════════════════
+// 決済履歴：読み込んだ決済CSVの行を、重複を除いてすべてためる
+//  会員リストは、この履歴全体から「最後の決済日から1か月」などのルールで計算する（画面側 planFromHistory）
+//  列: 会員番号 / ニックネーム / プラン / メールアドレス / ユーザーID / タイプ / 決済日時 / 取り込み日時
+// ════════════════════════════════════════
+function getPaySheet_() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let sheet = ss.getSheetByName(SHEET_MEMBERS);
-  if (!sheet) { sheet = ss.insertSheet(SHEET_MEMBERS); }
-  sheet.clearContents();
-  sheet.appendRow(['会員番号', 'ニックネーム', 'プラン', 'メールアドレス', 'ユーザーID', '最終決済日']);
-  sheet.getRange(1, 1, 1, 6).setFontWeight('bold').setBackground('#C9A84C').setFontColor('#ffffff');
-  sheet.setFrozenRows(1);
-  const members = data.members || [];
-  members.forEach(function(m){
-    sheet.appendRow([m.mid || '', m.nick || '', m.plan || '', m.email || '', m.uid || '', m.paidAt ? "'" + m.paidAt : '']); // 決済日は文字のまま保存（日付に変換させない）
+  let sh = ss.getSheetByName(SHEET_PAYMENTS);
+  if (!sh) {
+    sh = ss.insertSheet(SHEET_PAYMENTS);
+    sh.getRange(1, 1, 1, 8).setValues([['会員番号', 'ニックネーム', 'プラン', 'メールアドレス', 'ユーザーID', 'タイプ', '決済日時', '取り込み日時']]);
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+function payKey_(r) { return [r.mid, r.nick, r.plan, r.type, r.at].map(function(v){ return String(v || '').trim(); }).join('|'); }
+function appendPayments(data) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const sh = getPaySheet_();
+    const seen = {};
+    if (sh.getLastRow() > 1) {
+      sh.getRange(2, 1, sh.getLastRow() - 1, 7).getValues().forEach(function(r){
+        seen[payKey_({ mid: r[0], nick: r[1], plan: r[2], type: r[5], at: r[6] })] = true;
+      });
+    }
+    const now = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd HH:mm');
+    const toAdd = [];
+    (data.rows || []).forEach(function(r){
+      if (!r || !r.nick) return;
+      const k = payKey_(r);
+      if (seen[k]) return;
+      seen[k] = true;
+      toAdd.push([r.mid || '', r.nick, r.plan || '', r.email || '', r.uid || '', r.type || '', r.at ? "'" + r.at : '', "'" + now]);
+    });
+    if (toAdd.length) sh.getRange(sh.getLastRow() + 1, 1, toAdd.length, 8).setValues(toAdd);
+    return { ok: true, added: toAdd.length, total: sh.getLastRow() - 1 };
+  } finally {
+    lock.releaseLock();
+  }
+}
+function getPayments() {
+  const sh = getPaySheet_();
+  if (sh.getLastRow() <= 1) return { ok: true, rows: [] };
+  const rows = sh.getRange(2, 1, sh.getLastRow() - 1, 7).getValues().map(function(r){
+    return { mid: String(r[0] || ''), nick: String(r[1] || ''), plan: String(r[2] || ''), email: String(r[3] || ''),
+             uid: String(r[4] || ''), type: String(r[5] || ''),
+             at: r[6] instanceof Date ? Utilities.formatDate(r[6], 'Asia/Tokyo', 'yyyy-MM-dd HH:mm') : String(r[6] || '') };
   });
-  return { ok: true, saved: members.length };
+  return { ok: true, rows: rows };
 }
 
 // 会員データを取得
