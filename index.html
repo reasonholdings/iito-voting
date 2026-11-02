@@ -2907,11 +2907,14 @@ function planMemberUpdate(cur, nm, cancels, range){
   const slack=RENEW_SLACK_DAYS*86400000;
   if(range&&range.min&&range.max){
     for(let i=out.length-1;i>=0;i--){
-      const m=out[i];if(touched.has(m.nick))continue;
+      // CSVに載っている人も、最新の決済日で判定する（例：9/20の決済しか無く、10/23までに更新が無い人は外す）
+      const m=out[i];
       const paid=ymdTime(m.paidAt);
       let isExpired=false;
+      // 決済日が分からない人（移行前のデータや、GASを入れ替える前に保存された人）は、更新なしでは外さない。
+      //  その人がCSVより新しく入会している場合（例：11月に入会した人が、10月分のCSVに載っていない）に、誤って外してしまうため。
+      //  解約の行が来たときは外れる。次にその人が載ったCSVを読み込めば、決済日が入って通常のルールになる。
       if(paid){const due=addOneMonth(paid);isExpired=due>=range.min&&due+slack<=range.max;}
-      else{isExpired=(range.max-range.min)>=(31+RENEW_SLACK_DAYS)*86400000;} // 決済日が分からない人：1か月以上の期間のCSVに1回も出てこなければ外す
       if(isExpired){expired.push(m);out.splice(i,1);}
     }
   }
