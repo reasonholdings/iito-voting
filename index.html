@@ -373,6 +373,10 @@ body.has-tabbar .screen{padding-bottom:120px}
         <select class="inp" id="csv-term-m" style="font-size:13px" onchange="updCsvTermWarn()"></select>
       </div>
       <p id="csv-term-warn" style="font-size:12px;color:var(--rd);margin-bottom:12px;line-height:1.6;display:none"></p>
+      <label id="csv-replace-wrap" style="display:none;font-size:12px;line-height:1.6;margin:-4px 0 14px;align-items:flex-start;gap:8px;cursor:pointer">
+        <input type="checkbox" id="csv-replace" style="margin-top:3px;width:18px;height:18px;flex-shrink:0">
+        <span>会員リストを<b>丸ごと入れ替える</b>（CSVに載っていない人は会員から外れ、投票できなくなります）</span>
+      </label>
       <div class="m-btns">
         <button class="m-back" onclick="cancelCsvTerm()">キャンセル</button>
         <button class="m-ok" onclick="confirmCsvTerm()">この月で登録</button>
@@ -2876,8 +2880,22 @@ function openCsvTermModal(nm, det){
   }else{
     info.innerHTML=`${nm.length}名（解約除く）を読み込みました。<br><span style="color:var(--rd)">決済日から月を判定できませんでした。</span>月を選んでください。`;
   }
+  document.getElementById('csv-replace').checked=false; // 入れ替えは毎回、明示的に選んだときだけ
   updCsvTermWarn();
   document.getElementById('csv-term-modal').classList.add('open');
+}
+// 【会員が一度に消える事故の防止】CSVの人数が、今の会員リストより大きく減るか
+//  月の初めの決済CSVには、更新日が来た一部の人しか載らない。それで丸ごと入れ替えると、
+//  載っていない人が全員「会員ではない」扱いになり、投票もログインもできなくなる（2026-11-02 に発生）。
+function isShrinkCsv(nm){return members.length>=10&&nm.length<members.length*0.8;}
+// 追加・更新だけ（誰も削除しない）：CSVに載っている人はプランなどを最新にし、新しい人は加える
+function mergeMembers(cur,nm){
+  const out=cur.map(m=>({...m}));
+  nm.forEach(n=>{
+    const i=out.findIndex(m=>(n.mid&&m.mid&&String(m.mid)===String(n.mid))||m.nick===n.nick);
+    if(i>=0)out[i]={...out[i],...n};else out.push(n);
+  });
+  return out;
 }
 function selCsvTerm(){
   return `${document.getElementById('csv-term-y').value}年${document.getElementById('csv-term-m').value}月期`;
@@ -2887,12 +2905,18 @@ function updCsvTermWarn(){
   const w=document.getElementById('csv-term-warn');
   const t=selCsvTerm(), latest=latestGrantTerm();
   let msg='';
-  if(latest&&termRank(t)<termRank(latest)){
+  const past=!!(latest&&termRank(t)<termRank(latest));
+  const shrink=!past&&csvPending&&isShrinkCsv(csvPending.nm);
+  if(past){
     msg=`⚠️ 最新は ${latest} です。過去の月のため、<b>会員リストは更新せず</b>、プラン付与履歴だけを記録します。`;
   }else if(termRank(t)>termRank(todayTermId())){
     msg=`⚠️ ${t} は未来の月です。月をもう一度確認してください。`;
   }
+  if(shrink){
+    msg+=(msg?'<br>':'')+`⚠️ このCSVは <b>${csvPending.nm.length}人</b>で、今の会員リスト（<b>${members.length}人</b>）より大幅に少ないです。月の初めなどで、一部の人しか載っていない可能性があります。<br>このまま登録すると、<b>CSVに載っている人の追加・プラン更新だけ</b>を行い、<b>誰も削除しません</b>。`;
+  }
   w.innerHTML=msg;w.style.display=msg?'block':'none';
+  document.getElementById('csv-replace-wrap').style.display=shrink?'flex':'none';
 }
 function cancelCsvTerm(){
   csvPending=null;
@@ -2902,12 +2926,20 @@ function cancelCsvTerm(){
 }
 function confirmCsvTerm(){
   if(!csvPending)return;
-  const {nm, det}=csvPending;csvPending=null;
+  const {nm, det}=csvPending;
+  const term=selCsvTerm();
+  const past=!!(latestGrantTerm()&&termRank(term)<termRank(latestGrantTerm()));
+  let mode='replace';
+  if(!past&&isShrinkCsv(nm)){
+    if(!document.getElementById('csv-replace').checked)mode='merge';
+    else if(!confirm(`会員リストを ${members.length}人 → ${nm.length}人 に入れ替えます。\nCSVに載っていない ${members.length-nm.length}人ほどは、投票もログインもできなくなります。\n本当に入れ替えますか？`))return;
+  }
+  csvPending=null;
   document.getElementById('csv-term-modal').classList.remove('open');
-  applyCsvImport(nm, selCsvTerm(), det);
+  applyCsvImport(nm, term, det, mode);
 }
 // 確認画面で決まった月(curTerm)で、会員リストの更新と付与履歴の記録を行う
-function applyCsvImport(nm, curTerm, csvTermInfo){
+function applyCsvImport(nm, curTerm, csvTermInfo, mode){
     // 【C案】過去月のCSVでは会員リストを上書きしない（付与履歴だけ記録する）。
     //  最新月のCSVを読んだあとに過去月のCSVを読むと、会員リストが古い状態に戻ってしまうため。
     const latestTerm=latestGrantTerm();
@@ -2925,13 +2957,16 @@ function applyCsvImport(nm, curTerm, csvTermInfo){
     const grantsToRecord=nm.map(m=>({nick:m.nick, plan:m.plan, term:curTerm}))
       .filter(g=>!isDowngradeGrant(g.nick,g.plan,g.term));
 
-    if(!isPastCsv){members=nm;ls(LS.members,members);}
+    const isMerge=!isPastCsv&&mode==='merge';
+    if(!isPastCsv){members=isMerge?mergeMembers(members,nm):nm;ls(LS.members,members);}
     const resEl=document.getElementById('csv-result');
     // 対象月を明示（自動判別）。判別できた月と件数を出し、想定と違えば気づけるようにする。
     const picked=(csvTermInfo&&csvTermInfo.term===curTerm)?'自動判定':'手動で選択';
     const termMsg=` <span style="color:var(--ac-d);font-size:11px;font-weight:700">／ 対象月：${curTerm}</span> <span style="color:var(--sub);font-size:10px">（${picked}）</span>`;
     if(isPastCsv){
       resEl.innerHTML=`<i class="ti ti-info-circle" style="color:var(--bl)"></i> 過去月のCSVのため、会員リストは更新していません（最新：${latestTerm}のまま${members.length}名）${termMsg}`;
+    }else if(isMerge){
+      resEl.innerHTML=`<i class="ti ti-circle-check" style="color:var(--gr)"></i> ${nm.length}名を追加・更新しました（誰も削除していません。会員は${members.length}名）${termMsg}`;
     }else{
       resEl.innerHTML=`<i class="ti ti-circle-check" style="color:var(--gr)"></i> ${members.length}名を読み込みました（解約除く・メールアドレス含む）${termMsg}`;
     }
