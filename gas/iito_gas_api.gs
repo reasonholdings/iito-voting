@@ -426,11 +426,34 @@ function getNickPlanInTerm(nick, termId) {
   return best;
 }
 
+// このニックネームの「期ごとの使用票」と「期ごとの投票時プラン（上限が大きい方）」を、投票シートを1回読むだけで集める
+function usedAndPlanByTermForNick_(nick) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const rank = { supporter: 1, partner: 2, producer: 3 };
+  const used = {}, plan = {};
+  ss.getSheets().forEach(function(sh){
+    if (sh.getName().indexOf('投票_') !== 0) return;
+    if (sh.getLastRow() <= 2) return;
+    sh.getRange(3, 1, sh.getLastRow() - 2, 12).getValues().forEach(function(r){
+      if (String(r[4]).trim() !== String(nick).trim()) return;
+      const t = String(r[11]).trim();
+      if (!t) return;
+      used[t] = (used[t] || 0) + (Number(r[10]) || 0);
+      const p = String(r[5]).trim();
+      if (p && (!plan[t] || (rank[p] || 0) > (rank[plan[t]] || 0))) plan[t] = p;
+    });
+  });
+  return { used: used, plan: plan };
+}
+
 // GAS側で「持ち票上限」を計算する（クライアントのlimitを信用しない）
-//  新仕様：今月の付与合計（プラン変更で積み上がった票）＋ 前月繰越
+//  持ち票 ＝ 今月の付与合計 ＋ 前月の残り ＋ 前々月の残り
 //   - 今月付与合計 = プラン付与履歴から計算（サポーター12+パートナー40+... の合計）
 //     履歴が無い場合は、現在のプランの基本票を最低保証とする（新規加入・移行期の安全策）
-//   - 前月繰越 = 前月に「持っていた上限 − 使った票」の残り
+//   - 票は「古い繰越から先に」使う（消費順序：前々月の残り → 前月の残り → その月の付与）。2026-11-09 ルールどおりに修正
+//     修正前は月ごとに (付与 − 使用) を別々に足していたため、繰越から使った票が翌月にもう一度数えられていた
+//   - 前月に会員でなければ繰越は0。前々月の残りは、前々月と前月の両方で会員だったときだけ使える
+//   - 画面側の calcCarryBreakdown と同じ計算
 // curTermId: 今回投票する期。curPlan: 今回のプラン（会員データの現プラン）
 function calcServerLimit(nick, curTermId, curPlan) {
   const curBase = (curPlan && PLAN_VOTES[curPlan] != null) ? PLAN_VOTES[curPlan] : DEFAULT_PLAN_VOTES;
@@ -441,28 +464,27 @@ function calcServerLimit(nick, curTermId, curPlan) {
   // 履歴が無い/現プランがまだ記録されていない場合は、現プランの基本票を最低保証
   if (grantedThis < curBase) grantedThis = curBase;
 
-  // ② 前月・前々月繰越（直前2期分・連続会員が条件）
-  //  ・前月繰越：直前期に会員なら (前月付与 − 前月使用)
-  //  ・前々月繰越：前々期「と」前月の両方に会員（連続）なら (前々月付与 − 前々月使用)
-  //    間の月に退会して会員記録が途切れると、前々月分は繰り越さない。
+  // ② 繰越：前月から、連続して会員だった期を古い方へさかのぼり、1か月ずつ「残り」を計算する
   //  会員実績の判定＝ 付与履歴のある期（未投票でも会員）∪ 投票記録のある期（移行期の救済）。
   const terms = listMemberTermsForNick(nick);
   const memberIn = function(t){ return terms.indexOf(t) >= 0; };
-  const carryOfTerm = function(t){
-    var g = grantedVotesInTerm_(nick, t);
-    var u = usedVotesInTerm(nick, t);
-    if (g === 0) {
-      if (u > 0) { const p = getNickPlanInTerm(nick, t); g = (p && PLAN_VOTES[p] != null) ? PLAN_VOTES[p] : 0; }
-      else { g = 0; }
-    }
-    return Math.max(0, g - u);
-  };
   const prev1 = prevTermIdOfGAS(curTermId);            // 前月
   const prev2 = prev1 ? prevTermIdOfGAS(prev1) : '';   // 前々月
-  var carry = 0;
-  const inPrev1 = prev1 && memberIn(prev1);
-  if (inPrev1) carry += carryOfTerm(prev1);
-  if (inPrev1 && prev2 && memberIn(prev2)) carry += carryOfTerm(prev2); // 連続会員のときだけ前々月も
+  if (!prev1 || !memberIn(prev1)) return grantedThis;  // 前月に会員でなければ繰越なし
+  const chain = [];
+  for (var t = prev1; t && memberIn(t) && chain.length < 120; t = prevTermIdOfGAS(t)) chain.unshift(t);
+  const up = usedAndPlanByTermForNick_(nick);
+  const left = {};
+  chain.forEach(function(t, i){
+    var g = grantedVotesInTerm_(nick, t);
+    if (!g) { const p = up.plan[t]; g = (p && PLAN_VOTES[p] != null) ? PLAN_VOTES[p] : 0; } // 付与履歴が無い月は投票時のプランで代用
+    left[t] = g;
+    var u = up.used[t] || 0;
+    // その月に使える財布（古い順）：前々月の残り → 前月の残り → その月の付与
+    chain.slice(Math.max(0, i - 2), i + 1).forEach(function(w){ const x = Math.min(left[w], u); left[w] -= x; u -= x; });
+  });
+  var carry = left[prev1] || 0;
+  if (prev2 && chain.indexOf(prev2) >= 0) carry += left[prev2] || 0;
   return grantedThis + carry;
 }
 

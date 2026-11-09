@@ -1305,11 +1305,10 @@ function usedInTerm(termId){
   });
   return sum;
 }
-// 直前期の「使い残し」だけを繰り越す（前々期分は消滅）
-// 仕様: 繰り越せるのは直前期1期分のみ。前々期の繰り越しは次期へ持ち越せない。
-// プラン変更対応: 前期の持ち票は「前期に実際に使っていたプラン」で計算する
+// 繰越のルール（calcCarryBreakdown）：前月・前々月の残りを持ち越せる（3か月以上前の分は消える）
+// プラン変更対応: 前の月の残りは「その月に付与されたプラン」で計算する
 //   （例：前月プロデューサー150で95使用→余り55。今月パートナーでも55が繰り越される）
-// 消費順序: 繰り越し分 → 基本票の順で使われる（GAS上限チェックと合わせること）
+// 消費順序: 繰り越し分（古い月から）→ 基本票の順で使われる（GASの calcServerLimit と同じ計算）
 // 今月（現在の期）にプラン変更で積み上がった付与合計。履歴が無ければ現プランの基本票を最低保証
 function getGrantedThisTerm(){
   const curTerm=getCurTermId();
@@ -1319,55 +1318,43 @@ function getGrantedThisTerm(){
   if(g<base)g=base; // 履歴が無い/未記録なら現プランの基本票を保証
   return g;
 }
-// 【繰越の中核ロジック】直前2期分（前月＋前々月）の使い残しを合算して返す。
-//  ・前月繰越：直前期に会員なら (前月付与 − 前月使用)
-//  ・前々月繰越：前々期「と」前月の両方に会員（＝連続して会員）なら (前々月付与 − 前々月使用)
-//    連続が途切れる（間の月に退会＝会員記録が無い）と、前々月分は消滅する。
-//  引数で会員判定・付与・使用の取得関数を渡し、投票者/管理画面/サーバーで同じ計算を共有する。
+// 【繰越の中核ロジック】票は「古い繰越から先に」使う（2026-11-09 ルールどおりに修正）。
+//  ・使える票＝その月の付与 ＋ 前月の残り ＋ 前々月の残り（3か月以上前の分は消える）
+//  ・その月に使った票は、前々月の残り → 前月の残り → その月の付与 の順に減らす（消費順序：繰越 → 基本票）
+//  ・前月に会員でなければ繰越は0。前々月の残りは、前々月と前月の両方で会員だったときだけ使える
+//  修正前は「前月の(付与−使用)」を月ごとに別々に足していたため、繰越から使った票が翌月にもう一度数えられていた。
+//  連続して会員だった期を古い順に1か月ずつたどり、各月の「残り」を計算する。サーバー(calcServerLimit)と同じ計算。
 //  memberInTerm(term)=その期に会員だったか, grantedIn(term)=その期の付与合計, usedIn(term)=その期の使用票
-function calcCarryOverGeneric(curTerm, memberInTerm, grantedIn, usedIn, planOfTerm){
-  if(!curTerm||String(curTerm).startsWith('__solo_'))return 0;
-  const prev1=prevTermIdOf(curTerm);      // 前月
-  const prev2=prev1?prevTermIdOf(prev1):''; // 前々月
-  let carry=0;
-  // 前月分（直前期に会員であること）
-  const inPrev1=prev1&&memberInTerm(prev1);
-  if(inPrev1){
-    let base=grantedIn(prev1);
-    const used=usedIn(prev1);
-    if(base===0){ const p=planOfTerm(prev1); base=PLANS[p]||0; if(base===0&&used===0)base=0; }
-    carry+=Math.max(0,base-used);
-  }
-  // 前々月分（前々期と前月の両方に会員＝連続していること）
-  if(inPrev1 && prev2 && memberInTerm(prev2)){
-    let base=grantedIn(prev2);
-    const used=usedIn(prev2);
-    if(base===0){ const p=planOfTerm(prev2); base=PLANS[p]||0; if(base===0&&used===0)base=0; }
-    carry+=Math.max(0,base-used);
-  }
-  return carry;
-}
-// 【繰越の内訳版】前月分・前々月分を個別に返す（管理画面の繰越情報表示用）。
-//  calcCarryOverGeneric と同じ判定・同じ計算。合算せず内訳で返すだけ。
+//  返り値の prevNBase=その月の付与, prevNUsed=その月の付与から使われた票（翌月以降に繰越として使われた分も含む）, prevN=残り
 function calcCarryBreakdown(curTerm, memberInTerm, grantedIn, usedIn, planOfTerm){
   const res={prev1Term:'',prev1:0,prev1Base:0,prev1Used:0,prev2Term:'',prev2:0,prev2Base:0,prev2Used:0,total:0};
   if(!curTerm||String(curTerm).startsWith('__solo_'))return res;
-  const prev1=prevTermIdOf(curTerm);
-  const prev2=prev1?prevTermIdOf(prev1):'';
+  const prev1=prevTermIdOf(curTerm);      // 前月
+  const prev2=prev1?prevTermIdOf(prev1):''; // 前々月
   res.prev1Term=prev1; res.prev2Term=prev2;
-  const inPrev1=prev1&&memberInTerm(prev1);
-  if(inPrev1){
-    let base=grantedIn(prev1); const used=usedIn(prev1);
-    if(base===0){ const p=planOfTerm(prev1); base=PLANS[p]||0; }
-    res.prev1Base=base; res.prev1Used=used; res.prev1=Math.max(0,base-used);
-  }
-  if(inPrev1 && prev2 && memberInTerm(prev2)){
-    let base=grantedIn(prev2); const used=usedIn(prev2);
-    if(base===0){ const p=planOfTerm(prev2); base=PLANS[p]||0; }
-    res.prev2Base=base; res.prev2Used=used; res.prev2=Math.max(0,base-used);
+  if(!prev1||!memberInTerm(prev1))return res; // 前月に会員でなければ繰越なし
+  // 前月から、連続して会員だった期を古い方へさかのぼる（途切れた月より前の票は残っていない）
+  const chain=[];
+  for(let t=prev1;t&&memberInTerm(t)&&chain.length<120;t=prevTermIdOf(t))chain.unshift(t);
+  const grant={},left={};
+  chain.forEach((t,i)=>{
+    let g=grantedIn(t);
+    if(!g){const p=planOfTerm(t);g=PLANS[p]||0;} // 付与履歴が無い月は、その月に投票したときのプランで代用
+    grant[t]=g;left[t]=g;
+    let u=usedIn(t);
+    // その月に使える財布（古い順）：前々月の残り → 前月の残り → その月の付与
+    chain.slice(Math.max(0,i-2),i+1).forEach(w=>{const x=Math.min(left[w],u);left[w]-=x;u-=x;});
+  });
+  res.prev1Base=grant[prev1]; res.prev1=left[prev1]; res.prev1Used=grant[prev1]-left[prev1];
+  if(prev2&&chain.includes(prev2)){
+    res.prev2Base=grant[prev2]; res.prev2=left[prev2]; res.prev2Used=grant[prev2]-left[prev2];
   }
   res.total=res.prev1+res.prev2;
   return res;
+}
+// 繰越の合計（calcCarryBreakdown と同じ計算）
+function calcCarryOverGeneric(curTerm, memberInTerm, grantedIn, usedIn, planOfTerm){
+  return calcCarryBreakdown(curTerm, memberInTerm, grantedIn, usedIn, planOfTerm).total;
 }
 function getCarryOver(){
   const curTerm=getCurTermId();
@@ -3129,15 +3116,15 @@ function renderCarry(){
     if(carryOnlyFilter&&(v.carry||0)<=0)return;
     shown++;
     const b=v.breakdown||{};
-    // 各月のセルを「付与/使用/繰越」をラベル付きで見やすく表示。非会員の月は「—」。
+    // 各月のセルを「付与/使った/残り」で表示（使った＝その月の付与から使われた票。翌月以降に繰越として使われた分も含む）。非会員の月は「—」。
     const cellFor=(term,base,used,carry)=>{
       const mo=(String(term).match(/年(\d+)月期/)||[])[1];
       if(!base&&!used)return `<span style="color:var(--sub)">—</span>`;
       return `<div style="font-size:10px;line-height:1.5;text-align:left;display:inline-block">`
         +(mo?`<div style="font-size:9px;color:var(--sub);font-weight:600">${mo}月</div>`:'')
         +`<div>付与 <b>${base}</b></div>`
-        +`<div>使用 ${used}</div>`
-        +`<div>繰越 <b style="color:var(--ac-d)">${carry}</b></div>`
+        +`<div>使った ${used}</div>`
+        +`<div>残り <b style="color:var(--ac-d)">${carry}</b></div>`
         +`</div>`;
     };
     const p2cell=cellFor(b.prev2Term,b.prev2Base,b.prev2Used,b.prev2);
@@ -3172,7 +3159,7 @@ function toggleCarryOnly(){
 }
 // 繰越情報をCSV出力
 function exportCarryCSV(){
-  const rows=[['会員番号','ニックネーム','プラン','今月の期','前々月','前々月持ち票','前々月使用','前々月繰越','前月','前月持ち票','前月使用','前月繰越','繰越合計','今月持ち票','今月使用','残り']];
+  const rows=[['会員番号','ニックネーム','プラン','今月の期','前々月','前々月付与','前々月付与から使用','前々月の残り','前月','前月付与','前月付与から使用','前月の残り','繰越合計','今月持ち票','今月使用','残り']];
   members.map(m=>({m,v:calcMemberVotes(m)})).filter(x=>x.v).sort((a,b)=>(b.v.carry||0)-(a.v.carry||0)).forEach(({m,v})=>{
     const b=v.breakdown||{};
     rows.push([m.mid||'',m.nick,PLAN_LBL[m.plan]||m.plan,v.curTerm||'',
