@@ -270,6 +270,53 @@ body.has-tabbar .screen{padding-bottom:120px}
 .atab{padding:9px 16px;font-size:12px;color:var(--sub);background:transparent;border:none;border-bottom:2.5px solid transparent;cursor:pointer;margin-bottom:-1.5px;white-space:nowrap;flex-shrink:0}
 .atab.on{color:var(--ac-d);border-bottom-color:var(--ac);font-weight:500}
 .apanel{display:none}.apanel.active{display:block}
+/* ── 管理画面：パソコン版（幅1024px以上）。携帯は今のまま ── */
+.atab-ic{display:none}
+.pc-only{display:none}
+.rk-cell{display:flex;align-items:center;gap:12px}
+.rk-bar{display:none}
+@media (min-width:1024px){
+  body.in-admin .app-wrap{max-width:1360px}
+  #s-admin.active{display:grid;grid-template-columns:210px minmax(0,1fr);column-gap:32px;align-items:start;padding:28px 36px 64px}
+  #s-admin .adm-hd{grid-column:1/-1;margin-bottom:22px}
+  #s-admin .adm-tabs{grid-column:1;grid-row:2;flex-direction:column;gap:4px;border-bottom:none;border-right:1.5px solid var(--bd);margin:0;padding-right:16px;overflow:visible;position:sticky;top:20px}
+  #s-admin .atab{display:flex;align-items:center;gap:10px;width:100%;padding:11px 14px;font-size:14px;text-align:left;border-bottom:none;border-radius:10px;margin:0}
+  #s-admin .atab:hover{background:var(--bg2)}
+  #s-admin .atab.on{background:var(--ac-l);color:var(--ac-d);font-weight:600}
+  #s-admin .atab-ic{display:inline-block;font-size:18px}
+  #s-admin .apanel{grid-column:2;grid-row:2;min-width:0}
+  #s-admin .pc-only{display:block}
+  /* 会員管理：CSV読み込みと数字を横並び */
+  #ap-member.active{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);column-gap:20px}
+  #ap-member>*{grid-column:1/-1}
+  #ap-member>.sc{grid-column:1}
+  #ap-member>.met3{grid-column:2;align-self:start;margin-bottom:16px}
+  #s-admin .met3c{display:flex;flex-direction:column;justify-content:center;padding:16px 8px}
+  #s-admin .met3c .n{font-size:34px}
+  #s-admin .met3c .l{font-size:12px}
+  /* 表：大きめの文字、見出し固定、行のハイライト */
+  #s-admin .apanel>div[style*="overflow-x"]{max-height:72vh;overflow:auto;border:1px solid var(--bd);border-radius:12px;background:var(--bg)}
+  #s-admin .tbl{font-size:13px}
+  #s-admin .tbl th{position:sticky;top:0;z-index:1;background:var(--bg2);font-size:11.5px;font-weight:600;padding:10px 12px}
+  #s-admin .tbl td{padding:10px 12px}
+  #s-admin .tbl tbody tr:nth-child(even) td{background:rgba(0,0,0,.015)}
+  #s-admin .tbl tbody tr:hover td{background:var(--ac-l)}
+  #s-admin .tbl-filter{max-width:420px;font-size:13px;margin-bottom:12px}
+  /* イベント：2列のカード */
+  #ev-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+  #ev-list .ev-card{margin-bottom:0}
+  /* モデル：列を増やす */
+  #s-admin .mc-grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+  /* 集計：得票の棒グラフと上位3位 */
+  #s-admin .rk-bar{display:block;flex:1;max-width:420px;height:10px;background:var(--bg2);border-radius:999px;overflow:hidden}
+  #s-admin .rk-bar i{display:block;height:100%;background:var(--ac);border-radius:999px}
+  #s-admin .rk-cell span{min-width:48px;text-align:right;font-variant-numeric:tabular-nums}
+  #s-admin tr.rk-top td{font-weight:600}
+  #ap-result #result-ev-sel{max-width:520px}
+  /* 設定：読みやすい幅 */
+  #ap-setting{max-width:600px}
+}
+
 .sc{background:var(--bg);border:.5px solid var(--bd);border-radius:14px;padding:16px;margin-bottom:16px}
 .sc-title{font-size:14px;font-weight:500;margin-bottom:12px}
 .upload-area{border:2px dashed #ccc;border-radius:12px;padding:18px;text-align:center;cursor:pointer;transition:background .15s}
@@ -698,12 +745,12 @@ body.has-tabbar .screen{padding-bottom:120px}
   </div>
 
   <div class="adm-tabs">
-    <button class="atab on" onclick="switchATab('event')">イベント</button>
-    <button class="atab" onclick="switchATab('member')">会員管理</button>
-    <button class="atab" onclick="switchATab('carry')">繰越</button>
-    <button class="atab" onclick="switchATab('model')">モデル管理</button>
-    <button class="atab" onclick="switchATab('result')">集計</button>
-    <button class="atab" onclick="switchATab('setting')">設定</button>
+    <button class="atab on" onclick="switchATab('event')"><i class="ti ti-calendar-event atab-ic"></i><span>イベント</span></button>
+    <button class="atab" onclick="switchATab('member')"><i class="ti ti-users atab-ic"></i><span>会員管理</span></button>
+    <button class="atab" onclick="switchATab('carry')"><i class="ti ti-arrow-forward-up atab-ic"></i><span>繰越</span></button>
+    <button class="atab" onclick="switchATab('model')"><i class="ti ti-user-star atab-ic"></i><span>モデル管理</span></button>
+    <button class="atab" onclick="switchATab('result')"><i class="ti ti-chart-bar atab-ic"></i><span>集計</span></button>
+    <button class="atab" onclick="switchATab('setting')"><i class="ti ti-settings atab-ic"></i><span>設定</span></button>
   </div>
 
   <!-- イベント管理 -->
@@ -742,6 +789,7 @@ body.has-tabbar .screen{padding-bottom:120px}
         <button class="btn-sm-out" onclick="exportCSV()"><i class="ti ti-download" style="font-size:12px;vertical-align:-1px"></i> CSV出力</button>
       </div>
     </div>
+    <input class="inp pc-only tbl-filter" id="mem-filter" type="search" placeholder="ニックネーム・会員番号・プランで絞り込み" oninput="applyRowFilter('a-tbody','mem-filter')"/>
     <div style="overflow-x:auto">
       <table class="tbl">
         <thead><tr><th>会員番号</th><th>ニックネーム</th><th>プラン(上限)</th><th>次の更新日</th><th>推しモデル</th><th>使用票数</th><th>状態</th><th>変更</th></tr></thead>
@@ -763,7 +811,8 @@ body.has-tabbar .screen{padding-bottom:120px}
         <button class="btn-sm-out" onclick="exportCarryCSV()"><i class="ti ti-download" style="font-size:12px;vertical-align:-1px"></i> 繰越CSV</button>
       </div>
     </div>
-    <p style="font-size:11px;color:var(--sub);margin:8px 0 10px;line-height:1.6">前月・前々月の使い残しが今月に繰り越されます（連続して会員だった人のみ・最大2ヶ月分）。各月の欄は「付与（その月の持ち票）／使用（その月に使った票）／繰越（今月へ持ち越す残り）」を表示。「今月持ち票」＝今月のプラン票＋繰越合計。</p>
+    <p style="font-size:11px;color:var(--sub);margin:8px 0 10px;line-height:1.6">前月・前々月の使い残しが今月に繰り越されます（連続して会員だった人のみ・最大2ヶ月分）。票は古い繰越から先に使います（前々月の残り → 前月の残り → 今月の付与）。各月の欄は「付与（その月にもらった票）／使った（その月の付与から使われた票）／残り（今月へ持ち越す票）」を表示。「今月持ち票」＝今月のプラン票＋繰越合計。</p>
+    <input class="inp pc-only tbl-filter" id="carry-filter" type="search" placeholder="ニックネーム・会員番号で絞り込み" oninput="applyRowFilter('carry-tbody','carry-filter')"/>
     <div style="overflow-x:auto">
       <table class="tbl">
         <thead><tr><th>会員番号</th><th>ニックネーム</th><th>プラン</th><th>前々月の繰越</th><th>前月の繰越</th><th>繰越合計</th><th>今月<br>持ち票</th><th>今月<br>使用</th><th>残り</th></tr></thead>
@@ -916,7 +965,7 @@ function ls(k,v){try{if(v===undefined)return JSON.parse(localStorage.getItem(k))
 function lsDel(k){try{localStorage.removeItem(k);}catch(e){}}
 function pad(n){return String(n).padStart(2,'0');}
 function genId(){return Date.now().toString(36)+Math.random().toString(36).slice(2,5);}
-function SS(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active');window.scrollTo(0,0);updateTabbar(id);}
+function SS(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active');document.body.classList.toggle('in-admin',id==='s-admin');window.scrollTo(0,0);updateTabbar(id);}
 // 下のメニューは、投票者がログインしているときの「投票・マイページ」の画面だけに出す
 const TAB_SCREENS={'s-vote':'vote','s-mypage':'mypage'};
 function updateTabbar(id){
@@ -2634,6 +2683,12 @@ function switchATab(tab){
   if(tab==='model')renderMcGrids();
 }
 
+// 【パソコン版】表の行をキーワードで絞り込む（ニックネーム・会員番号など、行の文字に含まれるかで判定）
+function applyRowFilter(tbodyId,inputId){
+  const q=(document.getElementById(inputId)?.value||'').trim().toLowerCase();
+  document.querySelectorAll('#'+tbodyId+' > tr').forEach(tr=>{tr.style.display=(!q||tr.textContent.toLowerCase().includes(q))?'':'none';});
+}
+
 // イベント管理
 function renderEvList(){
   const el=document.getElementById('ev-list');el.innerHTML='';
@@ -2913,7 +2968,11 @@ function planFromHistory(cur, rows){
     const paidAt=lp._t?ymdOf(lp._t):'';
     if(lp._t&&addOneMonth(lp._t)+slack<=maxT){status.set(key,'expired');return;}
     status.set(key,'active');
-    result.push({mid:lp.mid||'',nick:lp.nick,plan:PLAN_RANK[lp.plan]?lp.plan:(PLAN_MAP[lp.plan]||'supporter'),email:lp.email||'',uid:lp.uid||'',paidAt});
+    // 会員番号・ユーザーIDが無い行（新しい形式のCSV）でも、過去の行や今の会員リストから引き継ぐ
+    const lem=String(lp.email||'').toLowerCase();
+    const curM=(cur||[]).find(m=>(lp.mid&&String(m.mid)===String(lp.mid))||(lem&&String(m.email||'').toLowerCase()===lem));
+    const pick=f=>{for(let i=g.length-1;i>=0;i--){if(g[i][f])return g[i][f];}return (curM&&curM[f])||'';};
+    result.push({mid:pick('mid'),nick:lp.nick,plan:PLAN_RANK[lp.plan]?lp.plan:(PLAN_MAP[lp.plan]||'supporter'),email:lp.email||'',uid:pick('uid'),paidAt});
   });
   const keyOfMember=m=>{
     if(m.mid&&groups.has('m:'+m.mid))return 'm:'+m.mid;
@@ -3467,9 +3526,10 @@ function _renderResultLocal(){
   const scores={};allMod().forEach(m=>scores[m.id]=0);
   Object.values(ev).forEach(v=>Object.entries(v).forEach(([mid,c])=>{if(scores[mid]!==undefined)scores[mid]+=Number(c)||0;}));
   const rb=document.getElementById('rank-body');rb.innerHTML='';
+  const maxScore=Math.max(1,...Object.values(scores));
   Object.entries(scores).sort((a,b)=>b[1]-a[1]).forEach(([mid,score],idx)=>{
     const m=findMod(mid);const grp=models.japan.find(x=>x.id===mid)?'JAPAN':'OSAKA';
-    const tr=document.createElement('tr');tr.innerHTML=`<td>${idx+1}</td><td>${m?.name||mid}</td><td>iito ${grp}</td><td style="font-weight:500">${score}</td>`;rb.appendChild(tr);
+    const tr=document.createElement('tr');tr.innerHTML=`<td>${idx+1}</td><td>${m?.name||mid}</td><td>iito ${grp}</td><td style="font-weight:500"><div class="rk-cell"><span>${score}</span><div class="rk-bar"><i style="width:${Math.round(score/maxScore*100)}%"></i></div></div></td>`;tr.classList.toggle('rk-top',idx<3&&score>0);rb.appendChild(tr);
   });
 }
 
@@ -3697,6 +3757,9 @@ function resetAllData(){
   }
   window.addEventListener('hashchange',checkAdminHash);
 })();
+// 表を描き直したあとも、パソコン版の絞り込みを保つ
+{const _rm=renderMember;renderMember=function(){_rm.apply(this,arguments);applyRowFilter('a-tbody','mem-filter');};
+ const _rc=renderCarry;renderCarry=function(){_rc.apply(this,arguments);applyRowFilter('carry-tbody','carry-filter');};}
 </script>
 </body>
 </html>
