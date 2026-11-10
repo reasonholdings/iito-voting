@@ -2870,7 +2870,7 @@ function loadCSV(input){
          email:idx.email>=0?cols[idx.email]?.trim()||'':'',uid:idx.uid>=0?cols[idx.uid]?.trim()||'':'',
          type:idx.type>=0?(cols[idx.type]?.trim()||''):'',at:isNaN(t0)?'':ymdhmOf(t0)});}
       const em=(idx.email>=0?cols[idx.email]?.trim()||'':'').toLowerCase();
-      const key=colMid(cols,nick)||(em?'e:'+em:'')||(idx.uid>=0?cols[idx.uid]?.trim():'')||nick;
+      const key=(em?'e:'+em:'')||colMid(cols,nick)||(idx.uid>=0?cols[idx.uid]?.trim():'')||nick;
       const dateStr=idx.date>=0?(cols[idx.date]?.trim()||''):'';
       const t=new Date(dateStr).getTime();
       const dnum=isNaN(t)?0:t; // 日付が無い/不正なら0（＝出現順で後勝ちにフォールバック）
@@ -2950,9 +2950,10 @@ function planFromHistory(cur, rows){
   const groups=new Map();
   (rows||[]).forEach((r,i)=>{
     if(!r||!r.nick)return;
-    // 同じ人の見分け：会員番号 → メールアドレス（変更しない運用）→ ユーザーID → ニックネーム
+    // 同じ人の見分け：メールアドレス（変更しない運用）→ 会員番号 → ユーザーID → ニックネーム
+    //  会員番号は古い形式のCSVにしか無く、行によって有ったり無かったりするため、メールアドレスを先に使う
     const em=String(r.email||'').trim().toLowerCase();
-    const key=r.mid?'m:'+r.mid:(em?'e:'+em:(r.uid?'u:'+r.uid:'n:'+r.nick));
+    const key=em?'e:'+em:(r.mid?'m:'+r.mid:(r.uid?'u:'+r.uid:'n:'+r.nick));
     if(!groups.has(key))groups.set(key,[]);
     groups.get(key).push({...r,_t:atTime(r.at),_i:i});
   });
@@ -2975,9 +2976,9 @@ function planFromHistory(cur, rows){
     result.push({mid:pick('mid'),nick:lp.nick,plan:PLAN_RANK[lp.plan]?lp.plan:(PLAN_MAP[lp.plan]||'supporter'),email:lp.email||'',uid:pick('uid'),paidAt});
   });
   const keyOfMember=m=>{
-    if(m.mid&&groups.has('m:'+m.mid))return 'm:'+m.mid;
     const mem=String(m.email||'').trim().toLowerCase();
     if(mem&&groups.has('e:'+mem))return 'e:'+mem;
+    if(m.mid&&groups.has('m:'+m.mid))return 'm:'+m.mid;
     if(m.uid&&groups.has('u:'+m.uid))return 'u:'+m.uid;
     if(groups.has('n:'+m.nick))return 'n:'+m.nick;
     for(const [k,g] of groups){if(g.some(r=>r.nick===m.nick))return k;}
