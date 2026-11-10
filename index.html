@@ -2795,6 +2795,14 @@ function loadCSV(input){
     //   - 最新の行が「解約」の人は会員から除外する（解約行だけスキップでは、過去の新規行が残り解約者が会員化してしまう）
     //   - プランも最新のものを採用する（アップグレードが正しく反映される）
     //   ※決済日列が無い旧CSV（1人1行）では、キーごとに1行しか無いのでそのまま最新＝その行になり、従来通り動く。
+    // 会員番号の列が無いCSV（2026-11 以降の書き出し）でも同じ人として扱えるよう、
+    // 今の会員リストから「ユーザーID → メールアドレス → ニックネーム」の順で会員番号を補う。
+    // （決済履歴は会員番号で人をまとめるため、空のままだと同じ人が別人扱いになる）
+    const midOf=(uid,email,nick)=>{
+      const m=(uid&&members.find(x=>x.uid&&x.uid===uid))||(email&&members.find(x=>x.email&&x.email.toLowerCase()===email.toLowerCase()))||members.find(x=>x.nick===nick);
+      return m&&m.mid?String(m.mid):'';
+    };
+    const colMid=(cols,nick)=>(idx.mid>=0?cols[idx.mid]?.trim():'')||midOf(idx.uid>=0?cols[idx.uid]?.trim():'',idx.email>=0?cols[idx.email]?.trim():'',nick);
     const groups={};       // key -> {row, date} のうち最新
     const keyOrder=[];     // 会員番号順の安定した並びを保つため
     const payRows=[];      // 決済履歴としてためる全行（会員リストは履歴全体から計算する）
@@ -2803,10 +2811,10 @@ function loadCSV(input){
       const nick=cols[idx.nick]?.trim();
       if(!nick)return;
       {const ds0=idx.date>=0?(cols[idx.date]?.trim()||''):'';const t0=new Date(ds0).getTime();
-       payRows.push({mid:idx.mid>=0?cols[idx.mid]?.trim()||'':'',nick,plan:PLAN_MAP[cols[idx.plan]?.trim()]||cols[idx.plan]?.trim()||'',
+       payRows.push({mid:colMid(cols,nick),nick,plan:PLAN_MAP[cols[idx.plan]?.trim()]||cols[idx.plan]?.trim()||'',
          email:idx.email>=0?cols[idx.email]?.trim()||'':'',uid:idx.uid>=0?cols[idx.uid]?.trim()||'':'',
          type:idx.type>=0?(cols[idx.type]?.trim()||''):'',at:isNaN(t0)?'':ymdhmOf(t0)});}
-      const key=(idx.mid>=0?cols[idx.mid]?.trim():'')||(idx.uid>=0?cols[idx.uid]?.trim():'')||nick;
+      const key=colMid(cols,nick)||(idx.uid>=0?cols[idx.uid]?.trim():'')||nick;
       const dateStr=idx.date>=0?(cols[idx.date]?.trim()||''):'';
       const t=new Date(dateStr).getTime();
       const dnum=isNaN(t)?0:t; // 日付が無い/不正なら0（＝出現順で後勝ちにフォールバック）
@@ -2820,7 +2828,7 @@ function loadCSV(input){
       const {cols,dnum}=groups[key];
       const type=idx.type>=0?(cols[idx.type]?.trim()||''):'';
       const nick=cols[idx.nick]?.trim();
-      const mid=idx.mid>=0?cols[idx.mid]?.trim()||'':'';
+      const mid=colMid(cols,nick);
       if(type==='解約'){cancels.push({nick,mid,at:dnum});return;} // 最新状態が解約 → 会員から外す（1か月を待たずに反映）
       const pj=cols[idx.plan]?.trim();
       if(!nick||!pj)return;
