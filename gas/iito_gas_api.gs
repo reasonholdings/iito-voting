@@ -93,7 +93,8 @@ function handleAction(action, data) {
     getResults: getResults, getTermPlans: getTermPlans, saveMembers: saveMembers, getMembers: getMembers,
     saveEvents: saveEvents, saveModels: saveModels, recordGrants: recordGrants, getGrants: getGrants,
     getOshi: getOshi, changeAdminPw: changeAdminPw, adminLogout: adminLogout,
-    appendPayments: appendPayments, getPayments: getPayments
+    appendPayments: appendPayments, getPayments: getPayments,
+    getFanOverrides: getFanOverrides, saveFanOverride: saveFanOverride
   };
   if (ADMIN_ACTIONS[action]) {
     if (!isLegacy_() && !isAdmin_(data)) return { ok: false, error: 'admin_required' };
@@ -714,6 +715,54 @@ function saveMembers(data) {
 //  会員リストは、この履歴全体から「最後の決済日から1か月」などのルールで計算する（画面側 planFromHistory）
 //  列: 会員番号 / ニックネーム / プラン / メールアドレス / ユーザーID / タイプ / 決済日時 / 取り込み日時
 // ════════════════════════════════════════
+// ── 推しの手入力（ファン分析で「わからない」人に、管理者が推しを入力する） ──
+//  シート「推し手入力」：ニックネーム／推し／更新日時。管理者だけが読み書きする
+const SHEET_FAN = '推し手入力';
+function getFanSheet_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sh = ss.getSheetByName(SHEET_FAN);
+  if (!sh) {
+    sh = ss.insertSheet(SHEET_FAN);
+    sh.getRange(1, 1, 1, 3).setValues([['ニックネーム', '推し', '更新日時']]);
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+function readFanOverrides_(sh) {
+  const out = {};
+  if (sh.getLastRow() > 1) {
+    sh.getRange(2, 1, sh.getLastRow() - 1, 2).getValues().forEach(function(r){
+      const n = String(r[0] || '').trim(), f = String(r[1] || '').trim();
+      if (n && f) out[n] = f;
+    });
+  }
+  return out;
+}
+function getFanOverrides() {
+  return { ok: true, overrides: readFanOverrides_(getFanSheet_()) };
+}
+// data: { nick, fan }（fan が空なら、その人の手入力を消す）
+function saveFanOverride(data) {
+  const nick = String(data.nick || '').trim();
+  const fan = String(data.fan || '').trim().slice(0, 60);
+  if (!nick) return { ok: false, error: 'no_nick' };
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const sh = getFanSheet_();
+    const last = sh.getLastRow();
+    var row = 0;
+    if (last > 1) {
+      const names = sh.getRange(2, 1, last - 1, 1).getValues();
+      for (var i = 0; i < names.length; i++) { if (String(names[i][0]).trim() === nick) { row = i + 2; break; } }
+    }
+    if (!fan) { if (row) sh.deleteRow(row); }
+    else if (row) sh.getRange(row, 2, 1, 2).setValues([[fan, new Date()]]);
+    else sh.appendRow([nick, fan, new Date()]);
+    return { ok: true, overrides: readFanOverrides_(sh) };
+  } finally { lock.releaseLock(); }
+}
+
 function getPaySheet_() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sh = ss.getSheetByName(SHEET_PAYMENTS);
