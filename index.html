@@ -879,7 +879,19 @@ body.has-tabbar .screen{padding-bottom:120px}
         <button class="btn-sm-out" onclick="exportFanCSV()"><i class="ti ti-download" style="font-size:12px;vertical-align:-1px"></i> 会員別CSV</button>
       </div>
     </div>
-    <p style="font-size:11px;color:var(--sub);margin:8px 0 12px;line-height:1.6">これまでの全イベントで一番多く票を入れたモデルを「推し（ファン）」とします（同じ票数なら、登録している推しを優先）。「繰越票」は前月・前々月から持ち越している票、「今使える票」は今月の持ち票から今月使った分を引いた残りです。会員リストに載っている人だけを数えます。</p>
+    <p style="font-size:11px;color:var(--sub);margin:8px 0 12px;line-height:1.6">これまでの全イベントで一番多く票を入れたモデルを「推し（ファン）」とします（アプリでの投票と、読み込んだ投票券の購入を合わせて数えます。同じ票数なら、登録している推しを優先）。「繰越票」は前月・前々月から持ち越している票、「今使える票」は今月の持ち票から今月使った分を引いた残りです。会員リストに載っている人だけを数えます。</p>
+    <div class="sc" style="margin-bottom:14px">
+      <div class="sc-title" style="margin-bottom:6px">投票券の購入履歴CSV（FaveConnect）</div>
+      <p style="font-size:11px;color:var(--sub);margin:0 0 10px;line-height:1.6">FaveConnect の商品購入履歴CSV（「商品名」が【…】モデル名 の投票券）を読み込むと、誰がどのモデルの投票券を買ったかも合わせて推しを判定します。複数のファイルをまとめて選べます。同じ行を2回読み込んでも二重には数えません。<b>読み込んだ内容はこの端末の中だけで集計し、サーバーには送りません。</b>名前・住所・電話番号・生年月日は読み込みません。</p>
+      <div class="upload-area" onclick="document.getElementById('ticket-inp').click()" style="padding:12px">
+        <p style="font-size:13px;color:var(--sub)"><i class="ti ti-file-text" style="font-size:16px;vertical-align:-3px"></i> クリックして購入履歴CSVを選択</p>
+      </div>
+      <input type="file" id="ticket-inp" accept=".csv" multiple style="display:none" onchange="loadTicketCSV(this)"/>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px">
+        <span id="ticket-status" style="font-size:12px;color:var(--sub)"></span>
+        <button class="btn-sm-out" id="ticket-clear" style="display:none" onclick="clearTicketData()">読み込んだ購入履歴を消す</button>
+      </div>
+    </div>
     <div class="met3">
       <div class="met3c"><div class="n" id="fan-m-carry">0</div><div class="l">繰越票の合計</div></div>
       <div class="met3c"><div class="n" id="fan-m-rem">0</div><div class="l">今使える票の合計</div></div>
@@ -892,6 +904,16 @@ body.has-tabbar .screen{padding-bottom:120px}
         <tbody id="fan-model-body"></tbody>
       </table>
     </div>
+    <div id="ticket-section" style="display:none;margin-bottom:18px">
+      <p style="font-size:14px;font-weight:500;margin:0 0 4px">投票券の購入から見たファン（会員以外も含む）</p>
+      <p style="font-size:11px;color:var(--sub);margin:0 0 8px" id="ticket-range"></p>
+      <div style="overflow-x:auto">
+        <table class="tbl">
+          <thead><tr><th>モデル</th><th>ファン</th><th>うち会員</th><th>投票券の票数</th><th>投票券を多く買ったファン</th></tr></thead>
+          <tbody id="ticket-model-body"></tbody>
+        </table>
+      </div>
+    </div>
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px">
       <p style="font-size:14px;font-weight:500;margin:0">会員別（繰越の多い順）</p>
       <button class="btn-sm-out" id="fan-clear" style="display:none" onclick="setFanFilter('')">絞り込みを解除</button>
@@ -899,7 +921,7 @@ body.has-tabbar .screen{padding-bottom:120px}
     <input class="inp tbl-filter" id="fan-filter" type="search" placeholder="ニックネーム・モデル名で絞り込み" style="font-size:13px;margin-bottom:10px" oninput="applyRowFilter('fan-member-body','fan-filter');document.getElementById('fan-clear').style.display=this.value?'':'none'"/>
     <div style="overflow-x:auto">
       <table class="tbl">
-        <thead><tr><th>ニックネーム</th><th>推し（ファン）</th><th>プラン</th><th>繰越票</th><th>今使える票</th><th>これまでの投票数</th></tr></thead>
+        <thead><tr><th>ニックネーム</th><th>推し（ファン）</th><th>プラン</th><th>繰越票</th><th>今使える票</th><th>アプリでの投票</th><th>投票券</th></tr></thead>
         <tbody id="fan-member-body"></tbody>
       </table>
     </div>
@@ -2733,20 +2755,22 @@ function switchATab(tab){
 const FAN_NONE='（まだ投票していない）';
 // これまでの全イベントで一番多く票を入れたモデル名（同票なら登録している推しを優先、それも無ければ名前順）
 function fanOf(nick){
-  const sum={};
-  Object.values(allVotes||{}).forEach(ev=>{const v=(ev||{})[nick];if(!v)return;Object.entries(v).forEach(([mid,c])=>{sum[mid]=(sum[mid]||0)+(Number(c)||0);});});
-  const ids=Object.keys(sum).filter(id=>sum[id]>0);
-  const total=ids.reduce((a,id)=>a+sum[id],0);
-  if(!ids.length)return {fan:FAN_NONE,total:0};
-  const max=Math.max(...ids.map(id=>sum[id]));
-  const tops=ids.filter(id=>sum[id]===max).map(id=>findMod(id)?.name||id);
+  // モデル名ごとに合計（アプリでの投票＋投票券の購入）
+  const sum={};let app=0,ticket=0;
+  Object.values(allVotes||{}).forEach(ev=>{const v=(ev||{})[nick];if(!v)return;Object.entries(v).forEach(([mid,c])=>{const n=findMod(mid)?.name||mid,x=Number(c)||0;sum[n]=(sum[n]||0)+x;app+=x;});});
+  const t=(ticketData.people||{})[nick];
+  if(t)Object.entries(t).forEach(([n,x])=>{sum[n]=(sum[n]||0)+x;ticket+=x;});
+  const names=Object.keys(sum).filter(n=>sum[n]>0);
+  if(!names.length)return {fan:FAN_NONE,total:0,app:0,ticket:0};
+  const max=Math.max(...names.map(n=>sum[n]));
+  const tops=names.filter(n=>sum[n]===max);
   const declared=String(oshiNamesFromServer[nick]||'').split('／');
   const fan=declared.find(n=>tops.includes(n))||tops.sort()[0];
-  return {fan,total};
+  return {fan,total:app+ticket,app,ticket};
 }
 function buildFanRows(){
   return members.map(m=>{const v=calcMemberVotes(m)||{};const f=fanOf(m.nick);
-    return {nick:m.nick,mid:m.mid||'',plan:m.plan,fan:f.fan,total:f.total,carry:v.carry||0,remaining:v.remaining||0,curTerm:v.curTerm||''};});
+    return {nick:m.nick,mid:m.mid||'',plan:m.plan,fan:f.fan,total:f.total,app:f.app,ticket:f.ticket,carry:v.carry||0,remaining:v.remaining||0,curTerm:v.curTerm||''};});
 }
 let fanRowsCache=[];
 async function renderFanTab(sync){
@@ -2775,10 +2799,11 @@ async function renderFanTab(sync){
     const ub=document.getElementById('fan-member-body');ub.innerHTML='';
     rows.slice().sort((a,b)=>b.carry-a.carry||b.remaining-a.remaining).forEach(r=>{
       const tr=document.createElement('tr');
-      tr.innerHTML=`<td>${esc(r.nick)}</td><td>${esc(r.fan)}</td><td style="font-size:11px">${PLAN_LBL[r.plan]||r.plan}</td><td><b>${r.carry}</b></td><td>${r.remaining}</td><td>${r.total}</td>`;
+      tr.innerHTML=`<td>${esc(r.nick)}</td><td>${esc(r.fan)}</td><td style="font-size:11px">${PLAN_LBL[r.plan]||r.plan}</td><td><b>${r.carry}</b></td><td>${r.remaining}</td><td>${r.app}</td><td>${r.ticket}</td>`;
       ub.appendChild(tr);
     });
     applyRowFilter('fan-member-body','fan-filter');
+    renderTicketSection(esc);
   };
   draw();
   if(sync&&GAS_URL){try{await syncAllEventVotes();draw();}catch(e){console.warn('ファン分析の更新に失敗',e);}}
@@ -2787,10 +2812,78 @@ function setFanFilter(v){const i=document.getElementById('fan-filter');if(!i)ret
 function exportFanCSV(){
   const rows=(fanRowsCache.length?fanRowsCache:buildFanRows()).slice().sort((a,b)=>b.carry-a.carry);
   if(!rows.length){alert('会員データがありません。');return;}
-  const out=[['会員番号','ニックネーム','推し（ファン）','プラン','繰越票','今使える票','これまでの投票数','期']].concat(rows.map(r=>[r.mid,r.nick,r.fan,PLAN_LBL[r.plan]||r.plan,r.carry,r.remaining,r.total,r.curTerm]));
+  const out=[['会員番号','ニックネーム','推し（ファン）','プラン','繰越票','今使える票','アプリでの投票','投票券','期']].concat(rows.map(r=>[r.mid,r.nick,r.fan,PLAN_LBL[r.plan]||r.plan,r.carry,r.remaining,r.app,r.ticket,r.curTerm]));
   const csv=out.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(',')).join('\n');
   const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='ファン別の票_'+new Date().toISOString().slice(0,10)+'.csv';a.click();
+}
+
+// ── 投票券の購入履歴CSV（FaveConnect の商品購入履歴） ──
+//  ・「商品名」の【…】のあとをモデル名、票数＝購入数×（「○票分」があればその数、無ければ1）とする
+//  ・人は、メールアドレスが会員リストにあればその会員のニックネーム、無ければCSVのニックネームでまとめる
+//  ・この端末の中だけで集計し、サーバーには送らない。名前・住所・電話番号・生年月日は読まない
+//  ・同じ行（決済日・メール・商品名・購入数・金額）は1回だけ数える（行の目印だけを保存し、メールは保存しない）
+const LS_TICKET='iito_fan_tickets';
+let ticketData=(()=>{try{return JSON.parse(localStorage.getItem(LS_TICKET)||'null')||{}}catch(e){return {}}})();
+function saveTicketData(){try{localStorage.setItem(LS_TICKET,JSON.stringify(ticketData));}catch(e){console.warn('購入履歴の保存に失敗',e);}}
+function rowMark(s){let h=5381;for(let i=0;i<s.length;i++)h=((h<<5)+h+s.charCodeAt(i))|0;return (h>>>0).toString(36)+s.length.toString(36);}
+async function loadTicketCSV(input){
+  const files=[...(input.files||[])];input.value='';if(!files.length)return;
+  const st=document.getElementById('ticket-status');
+  const td=ticketData&&ticketData.people?ticketData:{people:{},plans:{},marks:{},min:'',max:''};
+  let added=0,skipped=0,bad=0;
+  for(const f of files){
+    const text=(await f.text()).replace(/^\uFEFF/,'');
+    const lines=text.split(/\r?\n/).filter(l=>l.trim());if(lines.length<2){bad++;continue;}
+    const h=parseCSVLine(lines[0]);const col=k=>h.findIndex(x=>x.trim()===k);
+    const ix={item:col('商品名'),qty:col('購入数'),amount:col('合計金額'),date:col('決済日'),email:col('メールアドレス'),nick:col('ニックネーム'),status:col('ステータス'),plan:col('加入中のプラン')};
+    if(ix.item<0||ix.qty<0||ix.nick<0){bad++;continue;}
+    lines.slice(1).forEach(line=>{
+      const c=parseCSVLine(line);const item=(c[ix.item]||'').trim();
+      const m=item.match(/】\s*(.+)$/);if(!m)return;            // 投票券以外の商品は数えない
+      const status=ix.status>=0?(c[ix.status]||''):'';if(/キャンセル|返金|取消/.test(status))return;
+      const qty=parseInt(c[ix.qty])||0;const per=parseInt((item.match(/(\d+)票分/)||[])[1])||1;const votes=qty*per;if(votes<=0)return;
+      const email=ix.email>=0?(c[ix.email]||'').trim().toLowerCase():'';const date=ix.date>=0?(c[ix.date]||'').trim():'';
+      const mark=rowMark([date,email,item,qty,ix.amount>=0?c[ix.amount]:''].join('|'));
+      if(td.marks[mark]){skipped++;return;}td.marks[mark]=1;
+      const mem=email&&members.find(x=>String(x.email||'').toLowerCase()===email);
+      const who=mem?mem.nick:((c[ix.nick]||'').trim()||'（ニックネームなし）');
+      const model=m[1].trim();
+      (td.people[who]=td.people[who]||{})[model]=(td.people[who][model]||0)+votes;
+      if(!mem&&ix.plan>=0)td.plans[who]=(c[ix.plan]||'').trim();
+      if(date){if(!td.min||date<td.min)td.min=date;if(!td.max||date>td.max)td.max=date;}
+      added++;
+    });
+  }
+  td.loadedAt=new Date().toISOString();ticketData=td;saveTicketData();
+  if(st)st.textContent=`${added}件を追加しました`+(skipped?`（すでに読み込み済みの ${skipped}件は数えていません）`:'')+(bad?`／読めなかったファイル ${bad}件（「商品名」「購入数」「ニックネーム」の列が必要です）`:'');
+  renderFanTab(false);
+}
+function clearTicketData(){ticketData={};try{localStorage.removeItem(LS_TICKET);}catch(e){}const st=document.getElementById('ticket-status');if(st)st.textContent='購入履歴を消しました';renderFanTab(false);}
+function renderTicketSection(esc){
+  const sec=document.getElementById('ticket-section');const people=(ticketData&&ticketData.people)||{};
+  const names=Object.keys(people);const clr=document.getElementById('ticket-clear');
+  if(clr)clr.style.display=names.length?'':'none';
+  if(!sec)return;if(!names.length){sec.style.display='none';return;}
+  sec.style.display='';
+  const memberNicks=new Set(members.map(m=>m.nick));
+  const by={};
+  names.forEach(n=>{
+    const t=people[n];const max=Math.max(...Object.values(t));const tops=Object.keys(t).filter(k=>t[k]===max).sort();
+    const declared=String(oshiNamesFromServer[n]||'').split('／');const fan=declared.find(x=>tops.includes(x))||tops[0];
+    const g=by[fan]||(by[fan]={fan,people:[],members:0,votes:0});
+    const v=Object.values(t).reduce((a,b)=>a+b,0);g.people.push({n,v});g.votes+=t[fan]||0;if(memberNicks.has(n))g.members++;
+  });
+  const rows=Object.values(by).sort((a,b)=>b.people.length-a.people.length||b.votes-a.votes);
+  const tb=document.getElementById('ticket-model-body');tb.innerHTML='';
+  rows.forEach(g=>{
+    const top=g.people.sort((a,b)=>b.v-a.v).slice(0,3).map(p=>esc(p.n)+' '+p.v).join('、');
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td style="font-weight:600">${esc(g.fan)}</td><td>${g.people.length}人</td><td>${g.members}人</td><td>${g.votes}</td><td style="font-size:11px;color:var(--sub)">${top}</td>`;
+    tb.appendChild(tr);
+  });
+  const rg=document.getElementById('ticket-range');
+  if(rg)rg.textContent=`購入日 ${String(ticketData.min||'').slice(0,10)}〜${String(ticketData.max||'').slice(0,10)}・${names.length}人（ファンの人数が多い順。票数はその推しモデルの投票券の合計）`;
 }
 
 // 【パソコン版】表の行をキーワードで絞り込む（ニックネーム・会員番号など、行の文字に含まれるかで判定）
