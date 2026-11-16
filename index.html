@@ -275,6 +275,10 @@ body.has-tabbar .screen{padding-bottom:120px}
 .pc-only{display:none}
 .rk-cell{display:flex;align-items:center;gap:12px}
 .rk-bar{display:none}
+.fan-bar{flex:1;min-width:60px;max-width:360px;height:9px;background:var(--bg2);border-radius:999px;overflow:hidden}
+.fan-bar i{display:block;height:100%;background:var(--ac);border-radius:999px}
+#ap-fan .tbl th,#ap-fan #fan-model-body td:nth-child(-n+4),#ap-fan #fan-member-body td:nth-child(n+3){white-space:nowrap}
+@media (max-width:600px){.fan-bar{min-width:36px}}
 @media (min-width:1024px){
   body.in-admin .app-wrap{max-width:1360px}
   #s-admin.active{display:grid;grid-template-columns:210px minmax(0,1fr);column-gap:32px;align-items:start;padding:28px 36px 64px}
@@ -750,6 +754,7 @@ body.has-tabbar .screen{padding-bottom:120px}
     <button class="atab" onclick="switchATab('carry')"><i class="ti ti-arrow-forward-up atab-ic"></i><span>繰越</span></button>
     <button class="atab" onclick="switchATab('model')"><i class="ti ti-user-star atab-ic"></i><span>モデル管理</span></button>
     <button class="atab" onclick="switchATab('result')"><i class="ti ti-chart-bar atab-ic"></i><span>集計</span></button>
+    <button class="atab" onclick="switchATab('fan')"><i class="ti ti-heart atab-ic"></i><span>ファン分析</span></button>
     <button class="atab" onclick="switchATab('setting')"><i class="ti ti-settings atab-ic"></i><span>設定</span></button>
   </div>
 
@@ -858,6 +863,44 @@ body.has-tabbar .screen{padding-bottom:120px}
       <table class="tbl">
         <thead><tr><th>順位</th><th>候補者名</th><th>グループ</th><th>得票数</th></tr></thead>
         <tbody id="rank-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ファン分析（誰のファンが、今どれだけ票を貯めているか） -->
+  <div class="apanel" id="ap-fan">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+      <div>
+        <p style="font-size:14px;font-weight:600;margin:0">ファン分析</p>
+        <p style="font-size:11px;color:var(--sub);margin:3px 0 0" id="fan-note"></p>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
+        <button class="btn-sm-out" onclick="renderFanTab(true)"><i class="ti ti-refresh" style="font-size:12px;vertical-align:-1px"></i> 最新にする</button>
+        <button class="btn-sm-out" onclick="exportFanCSV()"><i class="ti ti-download" style="font-size:12px;vertical-align:-1px"></i> 会員別CSV</button>
+      </div>
+    </div>
+    <p style="font-size:11px;color:var(--sub);margin:8px 0 12px;line-height:1.6">これまでの全イベントで一番多く票を入れたモデルを「推し（ファン）」とします（同じ票数なら、登録している推しを優先）。「繰越票」は前月・前々月から持ち越している票、「今使える票」は今月の持ち票から今月使った分を引いた残りです。会員リストに載っている人だけを数えます。</p>
+    <div class="met3">
+      <div class="met3c"><div class="n" id="fan-m-carry">0</div><div class="l">繰越票の合計</div></div>
+      <div class="met3c"><div class="n" id="fan-m-rem">0</div><div class="l">今使える票の合計</div></div>
+      <div class="met3c"><div class="n" id="fan-m-models">0</div><div class="l">ファンがいるモデル</div></div>
+    </div>
+    <p style="font-size:14px;font-weight:500;margin:0 0 8px">モデル別：ファンが貯めている票（繰越の多い順）</p>
+    <div style="overflow-x:auto;margin-bottom:18px">
+      <table class="tbl">
+        <thead><tr><th>モデル</th><th>ファン</th><th>繰越票</th><th>今使える票</th><th>繰越の多いファン</th></tr></thead>
+        <tbody id="fan-model-body"></tbody>
+      </table>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px">
+      <p style="font-size:14px;font-weight:500;margin:0">会員別（繰越の多い順）</p>
+      <button class="btn-sm-out" id="fan-clear" style="display:none" onclick="setFanFilter('')">絞り込みを解除</button>
+    </div>
+    <input class="inp tbl-filter" id="fan-filter" type="search" placeholder="ニックネーム・モデル名で絞り込み" style="font-size:13px;margin-bottom:10px" oninput="applyRowFilter('fan-member-body','fan-filter');document.getElementById('fan-clear').style.display=this.value?'':'none'"/>
+    <div style="overflow-x:auto">
+      <table class="tbl">
+        <thead><tr><th>ニックネーム</th><th>推し（ファン）</th><th>プラン</th><th>繰越票</th><th>今使える票</th><th>これまでの投票数</th></tr></thead>
+        <tbody id="fan-member-body"></tbody>
       </table>
     </div>
   </div>
@@ -2674,13 +2717,80 @@ function exitAdmin(){
   if(curUser){SS('s-vote');}else{SS('s-login');refreshResumeCard();}
 }
 function switchATab(tab){
-  document.querySelectorAll('.atab').forEach((b,i)=>{const ts=['event','member','carry','model','result','setting'];b.classList.toggle('on',ts[i]===tab);});
+  document.querySelectorAll('.atab').forEach((b,i)=>{const ts=['event','member','carry','model','result','fan','setting'];b.classList.toggle('on',ts[i]===tab);});
   document.querySelectorAll('.apanel').forEach(p=>p.classList.remove('active'));
   document.getElementById('ap-'+tab).classList.add('active');
   if(tab==='result')renderResult();
   if(tab==='member')renderMember();
   if(tab==='carry')renderCarry();
   if(tab==='model')renderMcGrids();
+  if(tab==='fan')renderFanTab(true);
+}
+
+// ════════════════════════════════════════
+// ファン分析：これまでの投票から推しを決め、今の繰越票・使える票をモデル別に集める
+// ════════════════════════════════════════
+const FAN_NONE='（まだ投票していない）';
+// これまでの全イベントで一番多く票を入れたモデル名（同票なら登録している推しを優先、それも無ければ名前順）
+function fanOf(nick){
+  const sum={};
+  Object.values(allVotes||{}).forEach(ev=>{const v=(ev||{})[nick];if(!v)return;Object.entries(v).forEach(([mid,c])=>{sum[mid]=(sum[mid]||0)+(Number(c)||0);});});
+  const ids=Object.keys(sum).filter(id=>sum[id]>0);
+  const total=ids.reduce((a,id)=>a+sum[id],0);
+  if(!ids.length)return {fan:FAN_NONE,total:0};
+  const max=Math.max(...ids.map(id=>sum[id]));
+  const tops=ids.filter(id=>sum[id]===max).map(id=>findMod(id)?.name||id);
+  const declared=String(oshiNamesFromServer[nick]||'').split('／');
+  const fan=declared.find(n=>tops.includes(n))||tops.sort()[0];
+  return {fan,total};
+}
+function buildFanRows(){
+  return members.map(m=>{const v=calcMemberVotes(m)||{};const f=fanOf(m.nick);
+    return {nick:m.nick,mid:m.mid||'',plan:m.plan,fan:f.fan,total:f.total,carry:v.carry||0,remaining:v.remaining||0,curTerm:v.curTerm||''};});
+}
+let fanRowsCache=[];
+async function renderFanTab(sync){
+  const draw=()=>{
+    const rows=buildFanRows();fanRowsCache=rows;
+    const term=(rows[0]&&rows[0].curTerm)||todayTermId();
+    const note=document.getElementById('fan-note');if(note)note.textContent=term+' 時点・会員 '+rows.length+'名';
+    const byModel={};
+    rows.forEach(r=>{const g=byModel[r.fan]||(byModel[r.fan]={fan:r.fan,people:[],carry:0,remaining:0});g.people.push(r);g.carry+=r.carry;g.remaining+=r.remaining;});
+    const groups=Object.values(byModel).sort((a,b)=>(a.fan===FAN_NONE)-(b.fan===FAN_NONE)||b.carry-a.carry||b.remaining-a.remaining);
+    const maxCarry=Math.max(1,...groups.map(g=>g.carry));
+    document.getElementById('fan-m-carry').textContent=rows.reduce((a,r)=>a+r.carry,0).toLocaleString();
+    document.getElementById('fan-m-rem').textContent=rows.reduce((a,r)=>a+r.remaining,0).toLocaleString();
+    document.getElementById('fan-m-models').textContent=groups.filter(g=>g.fan!==FAN_NONE).length;
+    const esc=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const mb=document.getElementById('fan-model-body');mb.innerHTML='';
+    groups.forEach(g=>{
+      const top=g.people.filter(p=>p.carry>0).sort((a,b)=>b.carry-a.carry).slice(0,3).map(p=>esc(p.nick)+' '+p.carry).join('、')||'—';
+      const tr=document.createElement('tr');tr.style.cursor='pointer';tr.title='この推しの会員だけを下の表に表示';
+      tr.onclick=()=>setFanFilter(g.fan);
+      tr.innerHTML=`<td style="font-weight:600">${esc(g.fan)}</td><td>${g.people.length}人</td>`+
+        `<td><div class="rk-cell"><span>${g.carry}</span><div class="fan-bar"><i style="width:${Math.round(g.carry/maxCarry*100)}%"></i></div></div></td>`+
+        `<td>${g.remaining}</td><td style="font-size:11px;color:var(--sub)">${top}</td>`;
+      mb.appendChild(tr);
+    });
+    const ub=document.getElementById('fan-member-body');ub.innerHTML='';
+    rows.slice().sort((a,b)=>b.carry-a.carry||b.remaining-a.remaining).forEach(r=>{
+      const tr=document.createElement('tr');
+      tr.innerHTML=`<td>${esc(r.nick)}</td><td>${esc(r.fan)}</td><td style="font-size:11px">${PLAN_LBL[r.plan]||r.plan}</td><td><b>${r.carry}</b></td><td>${r.remaining}</td><td>${r.total}</td>`;
+      ub.appendChild(tr);
+    });
+    applyRowFilter('fan-member-body','fan-filter');
+  };
+  draw();
+  if(sync&&GAS_URL){try{await syncAllEventVotes();draw();}catch(e){console.warn('ファン分析の更新に失敗',e);}}
+}
+function setFanFilter(v){const i=document.getElementById('fan-filter');if(!i)return;i.value=v;applyRowFilter('fan-member-body','fan-filter');document.getElementById('fan-clear').style.display=v?'':'none';}
+function exportFanCSV(){
+  const rows=(fanRowsCache.length?fanRowsCache:buildFanRows()).slice().sort((a,b)=>b.carry-a.carry);
+  if(!rows.length){alert('会員データがありません。');return;}
+  const out=[['会員番号','ニックネーム','推し（ファン）','プラン','繰越票','今使える票','これまでの投票数','期']].concat(rows.map(r=>[r.mid,r.nick,r.fan,PLAN_LBL[r.plan]||r.plan,r.carry,r.remaining,r.total,r.curTerm]));
+  const csv=out.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(',')).join('\n');
+  const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='ファン別の票_'+new Date().toISOString().slice(0,10)+'.csv';a.click();
 }
 
 // 【パソコン版】表の行をキーワードで絞り込む（ニックネーム・会員番号など、行の文字に含まれるかで判定）
