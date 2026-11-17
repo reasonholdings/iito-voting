@@ -1019,8 +1019,11 @@ const MASTER_MODELS={
 // ════════════════════════════════════════
 // ユーティリティ
 // ════════════════════════════════════════
-function ls(k,v){try{if(v===undefined)return JSON.parse(localStorage.getItem(k));localStorage.setItem(k,JSON.stringify(v));}catch(e){return null;}}
-function lsDel(k){try{localStorage.removeItem(k);}catch(e){}}
+// 【テストモード】URLに ?demo=1 を付けると、仮のイベントとテストアカウントで投票画面を試せる。
+//  サーバー（GAS）には一切書き込まない。端末に残す値も「demo_」付きの別の名前にして、本番のログイン状態と混ざらないようにする。
+const DEMO=/[?&]demo=1(&|$)/.test(location.search);
+function ls(k,v){const kk=DEMO?'demo_'+k:k;try{if(v===undefined)return JSON.parse(localStorage.getItem(kk));localStorage.setItem(kk,JSON.stringify(v));}catch(e){return null;}}
+function lsDel(k){try{localStorage.removeItem(DEMO?'demo_'+k:k);}catch(e){}}
 function pad(n){return String(n).padStart(2,'0');}
 function genId(){return Date.now().toString(36)+Math.random().toString(36).slice(2,5);}
 function SS(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active');document.body.classList.toggle('in-admin',id==='s-admin');window.scrollTo(0,0);updateTabbar(id);}
@@ -1089,7 +1092,51 @@ function checkAdminRequired(json){
     SS('s-admin-login');
   }
 }
+// ── テストモードのサーバー役（ブラウザの中だけで動く。本番のスプレッドシートには何も書かない） ──
+//  ・テストアカウント：ニックネーム「テスト会員」、プロデューサー。前月・前々月の票は使っていない（繰越 300票）
+//  ・イベント：今日の1日前に開始、7日後に締切の「【テスト】UI確認用イベント」（今月の期）
+//  ・ログイン：メールアドレスとパスコードは何でもよい（確認コードも何でもよい）
+//  ・モデル一覧だけは本番から読む（見た目を本番と同じにするため。読むだけ）
+const DEMO_NICK='テスト会員';
+function demoTerm(offset){const d=new Date();d.setDate(1);d.setMonth(d.getMonth()+offset);return `${d.getFullYear()}年${d.getMonth()+1}月期`;}
+function demoEvent(){
+  const ymd=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  const st=new Date();st.setDate(st.getDate()-1);const en=new Date();en.setDate(en.getDate()+7);
+  return {id:'demo-event',name:'【テスト】UI確認用イベント',termId:demoTerm(0),active:true,perModelCap:0,
+    startDate:ymd(st),startTime:'12:00',endDate:ymd(en),endTime:'21:59',showEndDate:ymd(en),showEndTime:'23:59',img:''};
+}
+function demoGas(action,payload){
+  const votes=ls('demo_votes')||{};
+  const ok=o=>Promise.resolve(Object.assign({ok:true},o||{}));
+  switch(action){
+    case 'getEvents': return ok({events:[demoEvent()]});
+    case 'pinLogin': case 'setPin': return ok({token:'demo-token',nick:DEMO_NICK});
+    case 'requestPinCode': return ok();
+    case 'me': {
+      const g={};g[demoTerm(0)]=['producer'];g[demoTerm(-1)]=['producer'];g[demoTerm(-2)]=['producer'];
+      return ok({member:{nick:DEMO_NICK,mid:'0',plan:'producer',email:'test@example.com'},votes:votes,grants:g,termPlans:{}});
+    }
+    case 'saveVote': {
+      const ev=payload.evId||'demo-event';const mine=votes[ev]||(votes[ev]={});
+      Object.entries(payload.votes||{}).forEach(([mid,v])=>{mine[mid]=(mine[mid]||0)+(Number(v&&v.count)||0);});
+      ls('demo_votes',votes);return ok({saved:Object.keys(payload.votes||{}).length});
+    }
+    case 'getResults': return ok({votes:{}});
+    default: return ok();
+  }
+}
+function showDemoBanner(){
+  if(!DEMO||document.getElementById('demo-banner'))return;
+  const b=document.createElement('div');b.id='demo-banner';
+  b.innerHTML='<b>テストモード</b>：投票は保存されません（本番のデータには影響しません）。メール・パスコードは何でもOK（例 test@example.com／1234）。<a href="#" id="demo-reset">テストの票を消す</a>';
+  b.style.cssText='position:sticky;top:0;z-index:300;background:#FFF4E5;border-bottom:1px solid #F0A020;color:#7A4A00;font-size:12px;line-height:1.5;padding:8px 14px;text-align:center';
+  document.body.insertBefore(b,document.body.firstChild);
+  document.getElementById('demo-reset').onclick=e=>{e.preventDefault();lsDel('demo_votes');Object.keys(allVotes).forEach(k=>{if(allVotes[k])delete allVotes[k][DEMO_NICK];});ls(LS.votes,allVotes);location.reload();};
+}
+if(DEMO){if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',showDemoBanner);else showDemoBanner();}
+
 async function gasPost(action, payload={}){
+  if(DEMO&&action!=='getModels') return demoGas(action,payload);
   if(!GAS_URL) return null;
   try{
     const body = JSON.stringify({ key:GAS_KEY, action, adminToken:admToken()||undefined, ...payload });
@@ -1106,6 +1153,7 @@ async function gasPost(action, payload={}){
 
 // 大きなデータ（画像込みモデルなど）を送るときはPOSTを使う（GETのURL長制限を回避）
 async function gasPostBig(action, payload={}){
+  if(DEMO) return demoGas(action,payload);
   if(!GAS_URL) return null;
   try{
     const body = JSON.stringify({ key:GAS_KEY, action, adminToken:admToken()||undefined, ...payload });
@@ -3946,6 +3994,7 @@ function resetAllData(){
 
   // ハッシュ変更時（URL手動変更など）にも管理画面判定
   function checkAdminHash(){
+    if(DEMO)return; // テストモードでは管理画面を開かない
     if(isAdminUrl()){
       if(isAdmLoggedIn()){enterAdmin();}
       else{SS('s-admin-login');}
