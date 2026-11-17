@@ -535,13 +535,12 @@ body.has-tabbar .screen{padding-bottom:120px}
 <div class="screen" id="s-vote">
   <div class="page-hd">
     <div class="logo">iito members</div>
-    <div class="user-chip">
-      <div class="user-av" id="chip-av"></div>
-      <span style="font-size:12px" id="chip-nm"></span>
+    <!-- 名前・推し・プランはマイページで確認できるため、投票画面では表示しない（2026-11-17）。プログラムが参照するので要素は残して隠す -->
+    <div style="display:none" aria-hidden="true">
+      <div class="user-chip"><div class="user-av" id="chip-av"></div><span id="chip-nm"></span></div>
+      <div class="pills" id="v-oshi-pills"></div>
+      <span class="badge" id="v-badge"></span>
     </div>
-    <div class="pills" id="v-oshi-pills" style="justify-content:center;margin-bottom:4px"></div>
-    <span class="oshi-edit" onclick="openOshiModal()"><i class="ti ti-edit" style="font-size:11px;vertical-align:-1px"></i> 推しを変更</span>
-    <span class="badge" id="v-badge"></span>
   </div>
 
   <div class="ev-tabs" id="ev-tabs" style="display:none;gap:8px;margin-bottom:12px;flex-wrap:wrap;justify-content:center"></div>
