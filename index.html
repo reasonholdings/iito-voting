@@ -781,6 +781,10 @@ body.has-tabbar .screen{padding-bottom:120px}
       </div>
       <input type="file" id="csv-inp" accept=".csv" style="display:none" onchange="loadCSV(this)"/>
       <div id="csv-result" style="font-size:12px;color:var(--sub);margin-top:10px"></div>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px">
+        <button class="btn-sm-out" onclick="recomputeGrants()"><i class="ti ti-calculator" style="font-size:12px;vertical-align:-1px"></i> 付与を決済履歴から計算し直す</button>
+        <span id="regrant-result" style="font-size:11px;color:var(--sub)">CSVを読み込まなくても、ためた決済履歴から毎月の付与を記録し直します（足りない分だけ追加）</span>
+      </div>
       <div id="grant-gap-warn" style="display:none;margin-top:10px;padding:10px 12px;border-radius:8px;background:#FFF4E5;border:1px solid #F0A020;font-size:12px;line-height:1.6;color:#7A4A00"></div>
     </div>
     <div class="met3">
@@ -1289,10 +1293,6 @@ async function pullOshi(){
 // プランの上下（数字が大きいほど上）
 const PLAN_RANK={supporter:1,partner:2,producer:3};
 // その月に、このプランより上のプランの付与が既にあるか（＝今回はダウングレードなので付与しない）
-function isDowngradeGrant(nick,plan,term){
-  const list=(grants[nick]&&grants[nick][term])||[];
-  return list.some(p=>(PLAN_RANK[p]||0)>(PLAN_RANK[plan]||0));
-}
 function grantedTotalFor(nick,term){
   const list=(grants[nick]&&grants[nick][term])||[];
   const counted={};let sum=0;
@@ -3182,6 +3182,57 @@ function nextRenewYmd(m){const t=ymdTime(m&&m.paidAt);return t?ymdOf(addOneMonth
 function ymdhmOf(t){const d=new Date(t);return `${ymdOf(t)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;}
 function atTime(s){const m=String(s||'').match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T](\d{1,2}):(\d{2}))?/);return m?new Date(+m[1],+m[2]-1,+m[3],+(m[4]||0),+(m[5]||0)).getTime():0;}
 function payKeyOf(r){return [r.mid,r.nick,r.plan,r.type,r.at].map(v=>String(v||'').trim()).join('|');}
+// 【票の付与のルール】決済履歴から、月ごとの付与（ニックネーム・プラン・期）を計算する（2026-11-18）
+//  ・毎月1日：その日に会員（最後の決済から1か月以内で、そのあと解約していない）なら、そのときのプランの票
+//  ・その月の新規・継続・アップグレード・ダウングレード・再入会：そのプランの票
+//  ・同じ月に同じプランは1回だけ。解約は付与なし。どのプランにも入っていない月があると、繰越はそこで途切れる
+//  ・履歴が始まる月は、前の月の付与記録から1日時点のプランを推定する（継続ならその行のプラン、それ以外は前の月の一番上のプラン）
+//  ・人は、メールアドレス（無ければ会員番号、ニックネーム）でまとめ、ニックネームは一番新しい行のものを使う
+function grantsFromHistory(rows){
+  const groups=new Map();
+  (rows||[]).forEach(r=>{
+    if(!r||!r.nick)return;const t=atTime(r.at);if(!t)return;
+    const em=String(r.email||'').trim().toLowerCase();const key=em?'e:'+em:(r.mid?'m:'+r.mid:'n:'+r.nick);
+    if(!groups.has(key))groups.set(key,[]);groups.get(key).push({...r,_t:t});
+  });
+  const out=[];const now=new Date();const endKey=now.getFullYear()*12+now.getMonth();
+  groups.forEach(g=>{
+    g.sort((a,b)=>a._t-b._t);
+    const nick=g[g.length-1].nick;
+    const f=new Date(g[0]._t);
+    for(let k=f.getFullYear()*12+f.getMonth();k<=endKey;k++){
+      const y=Math.floor(k/12),mo=k%12;const term=`${y}年${mo+1}月期`;
+      const d1=new Date(y,mo,1).getTime(),d2=new Date(y,mo+1,1).getTime();
+      const set=new Set();
+      const before=g.filter(r=>r._t<d1),inM=g.filter(r=>r._t>=d1&&r._t<d2);
+      if(before.length){
+        const last=before[before.length-1];
+        if(last.type!=='解約'&&PLAN_RANK[last.plan]&&addOneMonth(last._t)>=d1)set.add(last.plan);
+      }else{
+        const pg=((grants[nick]||{})[prevTermIdOf(term)]||[]).filter(p=>PLAN_RANK[p]);
+        if(pg.length&&inM.length&&inM[0].type!=='新規'){
+          set.add(inM[0].type==='継続'&&PLAN_RANK[inM[0].plan]?inM[0].plan:pg.slice().sort((a,b)=>PLAN_RANK[b]-PLAN_RANK[a])[0]);
+        }
+      }
+      inM.forEach(r=>{if(r.type!=='解約'&&PLAN_RANK[r.plan])set.add(r.plan);});
+      set.forEach(p=>out.push({nick,plan:p,term}));
+    }
+  });
+  return out;
+}
+// 管理画面のボタン：ためた決済履歴から付与を計算し直し、足りない分を記録する
+async function recomputeGrants(){
+  const el=document.getElementById('regrant-result');const say=t=>{if(el)el.textContent=t;};
+  say('計算しています...');
+  try{await pullGrants();}catch(e){}
+  const hr=await gasPost('getPayments');
+  if(!hr||!hr.ok||!Array.isArray(hr.rows)){say('決済履歴を読めませんでした（GASが最新版か確認してください）');return;}
+  const add=grantsFromHistory(hr.rows).filter(g=>!((grants[g.nick]||{})[g.term]||[]).includes(g.plan));
+  if(!add.length){say('足りない付与はありませんでした（すべて記録済み）');return;}
+  const r=await gasPostBig('recordGrants',{grants:add});
+  if(r&&r.ok){say(`付与を ${r.added}件 記録しました（${[...new Set(add.map(a=>a.term))].join('・')}）`);try{await pullGrants();}catch(e){}renderMember();}
+  else say('記録できませんでした。もう一度お試しください');
+}
 // 決済履歴（ためた行＋今回の行）全体から会員リストを計算する
 //  ・会員ごと（会員番号、無ければユーザーID、無ければニックネーム）に行を決済日時の順に並べ、最新の行で判断する
 //  ・最新が「解約」なら外す／最新の決済のプランを今のプランにする（アップ・ダウンともすぐ反映）
@@ -3306,8 +3357,9 @@ function confirmCsvTerm(){
   if(!csvPending)return;
   const {nm, det, payRows}=csvPending;
   const term=selCsvTerm();
-  const plan=planFromHistory(members,mergedHistory(csvPending));
-  plan.payRows=payRows;
+  const allRows=mergedHistory(csvPending);
+  const plan=planFromHistory(members,allRows);
+  plan.payRows=payRows;plan.allRows=allRows;
   const out=plan.cancelled.length+plan.expired.length;
   // 一度に多くの人を外すときは、念のためもう一度確かめる
   if(members.length>=10&&out>=Math.max(5,members.length*0.2)&&
@@ -3318,18 +3370,12 @@ function confirmCsvTerm(){
 }
 // 確認画面で決まった月(curTerm)で、会員リストの更新と付与履歴の記録を行う
 function applyCsvImport(nm, curTerm, csvTermInfo, plan){
-    // 【重要修正】その月に会員だった「全員」を、その月の付与履歴として記録する。
-    //  以前は「前回リストと比較して新規・アップグレードした人だけ」を記録していたため、
-    //  ずっと同じプランで継続している人（例：えぼちんがプロデューサー継続）は付与履歴に
-    //  残らず、その月に会員だった証拠が無いため繰越が全く計算されなかった。
-    //  → CSVに載っている解約以外の全会員を、判別した対象月のプランで記録する。
-    //  ※GAS側で「nick|plan|term が既にあれば二重記録しない」ので、同月に何度読んでも重複しない。
-    //  【ダウングレードは付与なし】同じ月に、もっと上のプランの付与が既にある人は記録しない。
-    //   例）同じ月に プロデューサー → サポーター に下げても、サポーターの12票は足さない（持ち票は150のまま）。
-    //   アップグレード（サポーター → プロデューサー）は、上のプランなので記録する（12＋150）。
-    //   GAS側の recordGrants も同じ判定をする（こちらはGASを入れ替えるまでの保険も兼ねる）。
-    const grantsToRecord=nm.map(m=>({nick:m.nick, plan:m.plan, term:curTerm}))
-      .filter(g=>!isDowngradeGrant(g.nick,g.plan,g.term));
+    // 【票の付与】決済履歴の全体から、月ごとの付与を計算して、まだ記録していないものを記録する（2026-11-18 ルールを変更）
+    //  ・毎月1日に会員の人：1日時点のプランの票 ／ その月の新規・継続・アップ・ダウングレード・再入会：そのプランの票
+    //  ・同じ月に同じプランは1回だけ（同じ月に元のプランへ戻っても付与なし。月をまたげば再付与）。ダウングレードでも付与する
+    //  ・月は、CSV全体の月ではなく、行ごとの決済日で決める（grantsFromHistory）
+    const grantsToRecord=grantsFromHistory(plan.allRows||plan.payRows||[])
+      .filter(g=>!((grants[g.nick]||{})[g.term]||[]).includes(g.plan));
 
     // 会員リストは、決済履歴全体から計算したもの（planFromHistory）。過去の月のCSVを読んでも、新しい決済の情報は変わらない
     members=plan.members;ls(LS.members,members);
