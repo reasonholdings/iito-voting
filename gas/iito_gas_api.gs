@@ -951,9 +951,8 @@ function recordGrants(data) {
     const term = String(g.term||'').trim();
     if (!nick || !plan || !term) return;
     const key = nick+'|'+plan+'|'+term;
-    if (existing[key]) return; // 既に付与済み（月1回ルール）
-    // ダウングレードは付与なし：同じ月にもっと上のプランの付与が既にあれば記録しない
-    if ((topRank[nick + '|' + term] || 0) > (rank[plan] || 0)) return;
+    if (existing[key]) return; // 既に付与済み（同じ月に同じプランは1回だけ）
+    // ダウングレードでも付与する（2026-11-18 ルール変更。同じ月にまだもらっていないプランなら記録する）
     existing[key] = true;
     noteTop(nick, term, plan);
     toAdd.push([nick, plan, term, now]);
