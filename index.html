@@ -122,6 +122,8 @@ html,body{min-height:100vh;background:var(--bg2);font-family:"Zen Maru Gothic","
 .login-tabs button.on{background:#FFE4EE;border-color:#F4A6C0;color:#C2185B}
 .login-tabs button.on span{color:#C2185B;opacity:.8}
 .step-note{font-size:12px;line-height:1.6;color:var(--tx);margin-top:12px}
+.legal-lnk{text-align:center;font-size:11px;color:var(--sub);line-height:1.7;margin-top:18px}
+.legal-lnk a{color:var(--sub);text-decoration:underline;margin:0 4px}
 .forgot-lnk{text-align:center;font-size:12px;color:var(--ac-d);text-decoration:underline;margin-top:12px;cursor:pointer}
 /* 投票者向けの下のメニュー（インスタグラム風）：左＝投票、右＝マイページ。ブラウザの下のアドレス欄のすぐ上に置く（下の余白2px） */
 .tabbar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(2px + env(safe-area-inset-bottom));width:calc(100% - 32px);max-width:420px;display:none;justify-content:space-around;align-items:center;padding:6px;background:rgba(255,255,255,.94);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border:1px solid var(--bd);border-radius:999px;box-shadow:0 6px 24px rgba(0,0,0,.12);z-index:150}
@@ -525,6 +527,7 @@ body.has-tabbar .screen{padding-bottom:120px}
     <button class="btn-gold" id="ps-set-btn" style="display:none" onclick="submitPinSetup()">パスコードを作ってログイン</button>
     <button class="btn-gold" id="reg-btn" style="display:none" onclick="doPinLogin()" disabled>ログイン</button>
     <div class="forgot-lnk" id="forgot-lnk" style="display:none" onclick="setLoginTab('first')">パスコードを忘れた方は、こちらから作り直せます</div>
+    <div class="legal-lnk">ログインすると、<a href="terms.html" target="_blank" rel="noopener">利用規約</a>と<a href="privacy.html" target="_blank" rel="noopener">プライバシーポリシー</a>に同意したものとみなします。</div>
 
   </div>
 </div>
@@ -647,6 +650,7 @@ body.has-tabbar .screen{padding-bottom:120px}
   </div>
 
   <button class="btn-ghost" onclick="openLogoutConfirm()"><i class="ti ti-logout" style="vertical-align:-2px"></i> ログアウト</button>
+  <div class="legal-lnk"><a href="terms.html" target="_blank" rel="noopener">利用規約</a>｜<a href="privacy.html" target="_blank" rel="noopener">プライバシーポリシー</a></div>
 </div>
 
 <!-- パスコードを作る／変更するモーダル（マイページから） -->
