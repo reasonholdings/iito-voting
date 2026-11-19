@@ -6,109 +6,143 @@
 <title>プライバシーポリシー｜iito members 推しモデル投票</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-:root{--ac:#FF4E8B;--ac-l:#FFE4EE;--ac-d:#D81B60;--tx:#1A1A1A;--sub:#6A6A6A;--bd:#E8E8E8;--bg:#FFFFFF;--bg2:#FFF7FA}
-body{font-family:'Zen Maru Gothic',sans-serif;background:var(--bg2);color:var(--tx);line-height:1.85;font-size:14px}
-.wrap{max-width:720px;margin:0 auto;padding:24px 16px 64px}
-.top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:18px;font-size:13px}
-.top a{color:var(--ac-d)}
-.logo{font-weight:700;color:var(--ac)}
-h1{font-size:22px;line-height:1.4;margin-bottom:6px}
+:root{--tx:#222;--sub:#5F6670;--hd:#1F2A44;--bd:#DADDE2;--bg:#FFFFFF;--bg2:#F5F6F8;--ln:#1F4E9A;--mk:#D81B60}
+body{font-family:'Noto Sans JP','Hiragino Sans','Hiragino Kaku Gothic ProN','Yu Gothic','Meiryo',sans-serif;background:var(--bg2);color:var(--tx);line-height:1.9;font-size:14px;letter-spacing:.02em;-webkit-text-size-adjust:100%}
+.wrap{max-width:760px;margin:0 auto;padding:24px 16px 64px}
+.top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:20px;font-size:13px}
+.logo{font-weight:700;color:var(--hd);letter-spacing:.04em}
+.logo span{color:var(--mk)}
+h1{font-size:22px;line-height:1.4;color:var(--hd);margin-bottom:4px;font-weight:700}
 .meta{font-size:12px;color:var(--sub);margin-bottom:18px}
-.card{background:var(--bg);border:1px solid #EFEFF2;border-radius:16px;padding:18px 18px 8px;box-shadow:0 4px 16px rgba(0,0,0,.06)}
-.lead{background:var(--ac-l);border-radius:12px;padding:12px 14px;margin-bottom:18px;font-size:13px}
-h2{font-size:16px;margin:20px 0 6px;padding-left:10px;border-left:4px solid var(--ac)}
-h2:first-of-type{margin-top:4px}
+.card{background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:22px 20px 12px}
+.lead{background:var(--bg2);border:1px solid var(--bd);border-radius:6px;padding:12px 14px;margin-bottom:20px;font-size:13px}
+.lead b{color:var(--hd)}
+h2{font-size:15px;font-weight:700;color:var(--hd);margin:26px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--bd)}
 p,li{margin-bottom:8px}
-ol,ul{padding-left:1.4em;margin-bottom:8px}
-ol ol,ul ul{margin-top:6px}
-table{border-collapse:collapse;width:100%;margin:6px 0 12px;font-size:13px}
-th,td{border:1px solid var(--bd);padding:6px 8px;text-align:left;vertical-align:top}
-th{background:var(--bg2);font-weight:500}
-a{color:var(--ac-d)}
+ol,ul{padding-left:1.5em;margin-bottom:8px}
+ol ol,ol ul,ul ul{margin-top:6px}
+ol.paren{list-style:none;padding-left:0;counter-reset:p}
+ol.paren>li{counter-increment:p;padding-left:2.2em;text-indent:-2.2em}
+ol.paren>li::before{content:"（" counter(p) "）";display:inline-block;width:2.2em;text-indent:0}
+.tbl{overflow-x:auto;margin:6px 0 12px}
+table{border-collapse:collapse;width:100%;font-size:13px;line-height:1.7}
+th,td{border:1px solid var(--bd);padding:7px 9px;text-align:left;vertical-align:top}
+th{background:var(--bg2);font-weight:500;color:var(--hd)}
+a{color:var(--ln)}
+.note{font-size:12px;color:var(--sub)}
+.sign{margin-top:22px;padding-top:12px;border-top:1px solid var(--bd);font-size:13px}
 .foot{margin-top:18px;font-size:12px;color:var(--sub);text-align:center}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <div class="top"><span class="logo">iito members</span><a href="./">投票ページへ戻る</a></div>
+  <div class="top"><span class="logo"><span>iito</span> members</span><a href="./">投票ページへ戻る</a></div>
   <h1>プライバシーポリシー</h1>
-  <div class="meta">iito members 推しモデル投票　／　2026年11月19日 制定</div>
+  <div class="meta">iito members 推しモデル投票　／　制定日：2026年11月19日</div>
 
   <div class="card">
-    <div class="lead">投票サービスで、どんな情報を、何のために使い、どう守っているかの説明です。氏名・住所・電話番号・生年月日は、投票サービスでは使いません。パスコードは、そのままの形では保存しません。</div>
+    <div class="lead"><b>主な内容</b><br>・投票サービスでは、氏名・住所・電話番号・生年月日を取り扱いません。<br>・パスコードは、元に戻せない形に変換した値だけを保存します。<br>・ご本人の同意なく、個人情報を第三者に提供することはありません（法令に基づく場合などを除きます）。</div>
 
-    <p>iito members 運営事務局（以下「運営」）は、「iito members 推しモデル投票」（以下「本サービス」）で扱う個人情報を、個人情報の保護に関する法律（以下「個人情報保護法」）などの法令に従って、次のとおり扱います。</p>
+    <p>株式会社リーズン（以下「当社」）は、「iito members 推しモデル投票」（以下「本サービス」）において取り扱う個人情報を、個人情報の保護に関する法律（以下「個人情報保護法」）その他の法令およびガイドラインに従い、以下のとおり適切に取り扱います。</p>
 
-    <h2>1. 集める情報</h2>
-    <table>
-      <tr><th>どこから</th><th>情報</th></tr>
-      <tr><td>ファンクラブ「iito members」の会員情報（運営が会員管理サービスから書き出したもの）</td><td>会員番号、ユーザーID、ニックネーム、メールアドレス、加入プラン、決済日、決済の種類（新規・継続・プラン変更・解約など）</td></tr>
-      <tr><td>会員が本サービスで入力するもの</td><td>メールアドレス、パスコード（※）、推しモデルの登録（任意）</td></tr>
-      <tr><td>本サービスの利用によって記録されるもの</td><td>投票の記録（日時、イベント、投票先のモデル、票数）、票の付与の記録、ログインの記録</td></tr>
-      <tr><td>投票券の購入履歴（運営が販売サービスから書き出したもの）</td><td>購入者を見分ける情報（会員番号・メールアドレスなど）、商品名、数量、購入日時</td></tr>
-      <tr><td>運営が入力するもの</td><td>会員がどのモデルを応援しているかの記録（投票の記録などから分からない場合に限る）</td></tr>
-    </table>
-    <p>※ パスコードは、元に戻せない形に変換した値だけを保存し、パスコードそのものは保存しません。</p>
-    <p>会員情報や購入履歴に含まれる氏名・住所・電話番号・生年月日は、本サービスでは読み込みません。投票券の購入履歴は、運営担当者の端末の中だけで集計し、本サービスのサーバーには保存しません。</p>
+    <h2>1. 事業者の情報</h2>
+    <p>株式会社リーズン<br>
+    福岡オフィス：〒810-0001 福岡県福岡市中央区天神4丁目7-18 永島ビル3F<br>
+    東京オフィス：〒164-0013 東京都中野区弥生町3-1-16 ザ・バロン西新宿203<br>
+    代表者：鶴田 龍司</p>
 
-    <h2>2. 使う目的</h2>
-    <ol>
-      <li>会員であることの確認と、ログイン（確認コードのメール送信を含む）</li>
-      <li>プランに応じた票の付与、持ち票・持ち越しの計算と表示</li>
-      <li>投票の受け付け、集計、結果の発表</li>
-      <li>不正な投票の防止と、不具合の調査・訂正</li>
-      <li>お問い合わせへの対応、本サービスに関する大切なお知らせ</li>
-      <li>投票や投票券の購入の傾向（どの会員がどのモデルを応援しているかなど）の分析と、それを使った企画・イベント・サービスの改善</li>
+    <h2>2. 取得する情報と取得の方法</h2>
+    <div class="tbl"><table>
+      <tr><th>取得の方法</th><th>情報の項目</th></tr>
+      <tr><td>ファンクラブ「iito members」の会員管理サービスから、当社が会員情報を書き出して取得します</td><td>会員番号、ユーザーID、ニックネーム、メールアドレス、加入プラン、決済日、決済の種類（新規加入・継続・プラン変更・解約など）</td></tr>
+      <tr><td>会員ご本人に入力していただきます</td><td>メールアドレス、パスコード（※1）、推しモデルの登録（任意）</td></tr>
+      <tr><td>本サービスの利用にともない記録します</td><td>投票の記録（日時、イベント、投票先のモデル、票数）、票の付与の記録、ログインに関する記録</td></tr>
+      <tr><td>投票券の販売サービスから、当社が購入履歴を書き出して取得します（※2）</td><td>購入者を識別する情報（会員番号・メールアドレスなど）、商品名、数量、購入日時</td></tr>
+      <tr><td>当社の担当者が記録します</td><td>会員が応援しているモデルの記録（投票の記録などから判断できない場合に限ります）</td></tr>
+    </table></div>
+    <p class="note">※1 パスコードは、元に戻せない形に変換した値（ハッシュ値）だけを保存し、パスコードそのものは保存しません。<br>
+    ※2 投票券の購入履歴は、当社担当者の端末内でのみ集計し、本サービスのサーバーには保存しません。<br>
+    会員情報や購入履歴に含まれる氏名・住所・電話番号・生年月日は、本サービスでは読み込まず、取り扱いません。</p>
+
+    <h2>3. 利用目的</h2>
+    <p>当社は、取得した個人情報を、次の目的の範囲内で利用します。</p>
+    <ol class="paren">
+      <li>会員であることの確認、およびログイン（確認コードのメール送信を含みます）のため</li>
+      <li>プランに応じた票の付与、持ち票・持ち越し票の計算と表示のため</li>
+      <li>投票の受付、集計、および結果の発表のため</li>
+      <li>不正な投票の防止、ならびにシステムの不具合の調査および訂正のため</li>
+      <li>お問い合わせへの対応、および本サービスに関する重要なお知らせのため</li>
+      <li>投票や投票券の購入の傾向（どの会員がどのモデルを応援しているかなど）を分析し、企画・イベント・サービスの改善に役立てるため</li>
     </ol>
-    <p>集計結果は、モデルごとの結果として発表します。会員個人の投票の内容を、個人が分かる形で発表することはありません。</p>
+    <p>当社は、利用目的を変更する場合は、変更前の目的と関連性があると合理的に認められる範囲で行い、変更後の目的を本サービスの画面で公表します。</p>
+    <p>集計結果はモデルごとに発表し、会員個人の投票内容を、個人が特定できる形で公表することはありません（会員ご本人の同意がある場合を除きます）。</p>
 
-    <h2>3. 他の会社などへの提供</h2>
-    <p>運営は、次の場合を除いて、会員の同意なく個人情報を第三者に提供しません。</p>
-    <ul>
+    <h2>4. 第三者への提供</h2>
+    <p>当社は、次の場合を除き、あらかじめご本人の同意を得ることなく、個人データを第三者に提供しません。</p>
+    <ol class="paren">
       <li>法令に基づく場合</li>
-      <li>人の生命・身体・財産を守るために必要で、本人の同意を得ることが難しい場合</li>
-      <li>そのほか、個人情報保護法で認められている場合</li>
-    </ul>
+      <li>人の生命、身体または財産の保護のために必要がある場合で、ご本人の同意を得ることが困難なとき</li>
+      <li>国の機関や地方公共団体などが法令の定める事務を行うことに協力する必要がある場合で、ご本人の同意を得ることによりその事務に支障を及ぼすおそれがあるとき</li>
+      <li>その他、個人情報保護法により認められる場合</li>
+    </ol>
 
-    <h2>4. 使っている外部サービスと保存場所</h2>
-    <p>本サービスは、次の外部サービスを使って動いています。情報はこれらのサービスのサーバー（日本国外にあることがあります）に保存・送信されます。</p>
-    <table>
-      <tr><th>サービス</th><th>使い方</th><th>会社（国）</th></tr>
-      <tr><td>Google スプレッドシート、Google Apps Script</td><td>会員・投票・付与の記録の保存と、集計</td><td rowspan="3">Google LLC（アメリカ）</td></tr>
-      <tr><td>Gmail</td><td>確認コードのメール送信</td></tr>
-      <tr><td>Firebase Authentication</td><td>以前のログイン方法（メールのリンクでログイン）</td></tr>
-      <tr><td>GitHub Pages</td><td>投票ページの配信</td><td>GitHub, Inc.（アメリカ）</td></tr>
-    </table>
-    <p>アメリカの個人情報保護の制度については、個人情報保護委員会（<a href="https://www.ppc.go.jp/" target="_blank" rel="noopener">https://www.ppc.go.jp/</a>）が公表している外国の制度の情報をご覧ください。各社は、それぞれのプライバシーポリシーに従って情報を扱います。</p>
-    <p>また、ページの表示のために、Google Fonts と jsDelivr から文字の形やアイコンを読み込みます。その際、お使いの端末のIPアドレスなどがこれらのサービスに送られます。</p>
+    <h2>5. 外部のクラウドサービスの利用と外国での取扱い</h2>
+    <p>本サービスは、次のクラウドサービスを利用して運営しています。これらのサービスの提供事業者は、当社の個人データを取り扱わない契約条件（利用規約等）でサービスを提供しており、当社は個人データをこれらの事業者に提供しているものではありません。ただし、データはこれらの事業者のサーバー（日本国外にある場合があります）に保存されるため、当社は外国において個人データを取り扱うことになります。</p>
+    <div class="tbl"><table>
+      <tr><th>サービス</th><th>用途</th><th>提供事業者（所在国）</th></tr>
+      <tr><td>Google スプレッドシート、Google Apps Script</td><td>会員・投票・付与の記録の保存、集計</td><td>Google LLC（アメリカ合衆国）</td></tr>
+      <tr><td>Gmail</td><td>確認コードのメール送信</td><td>Google LLC（アメリカ合衆国）</td></tr>
+      <tr><td>Firebase Authentication</td><td>以前のログイン方法（メールのリンクによるログイン）</td><td>Google LLC（アメリカ合衆国）</td></tr>
+      <tr><td>GitHub Pages</td><td>本サービスのページの配信</td><td>GitHub, Inc.（アメリカ合衆国）</td></tr>
+    </table></div>
+    <p>アメリカ合衆国の個人情報の保護に関する制度については、個人情報保護委員会のウェブサイト（<a href="https://www.ppc.go.jp/" target="_blank" rel="noopener">https://www.ppc.go.jp/</a>）に掲載されている「外国における個人情報の保護に関する制度等の調査」をご覧ください。当社は、同国の制度を把握したうえで、次の項目の安全管理措置を講じています。</p>
 
-    <h2>5. 端末に保存する情報</h2>
-    <p>次にログインするときの手間を減らし、画面をすばやく表示するため、ログインの状態、ニックネーム、ご自身の投票と票の付与の記録、推しモデルなどを、お使いのブラウザ（端末の中）に保存します。他の会員の情報は保存しません。マイページの「ログアウト」でログインの状態は消えます。すべて消したいときは、ブラウザの設定からこのサイトのデータを削除してください。共用の端末では、使い終わったらログアウトしてください。広告のための追跡はしていません。</p>
-
-    <h2>6. 情報を守るための取り組み</h2>
+    <h2>6. 安全管理のために講じている措置</h2>
     <ul>
-      <li>パスコードは元に戻せない形に変換して保存し、確認コードは短い時間で使えなくなるようにしています。</li>
-      <li>パスコードや確認コードを何度も間違えたときは、一定の時間ログインできないようにしています。</li>
-      <li>ログインした会員には、その会員本人の情報だけを返します。</li>
-      <li>会員の記録を見たり変えたりできるのは、運営担当者だけです。管理画面にはパスワードによる確認を設けています。</li>
-      <li>記録を保存するファイルは、運営担当者だけが開けるように設定します。</li>
-      <li>運営担当者には、個人情報を目的の範囲でだけ扱うよう徹底します。</li>
+      <li><b>基本方針・規律の整備：</b>個人情報を適正に取り扱うための方針として本ポリシーを定め、本サービスの運用手順書で取扱いの方法を定めています。</li>
+      <li><b>組織的な措置：</b>個人情報を取り扱う担当者を限定し、取扱状況を確認しています。漏えいなどが発生した場合は、法令に従って個人情報保護委員会への報告とご本人への通知を行います。</li>
+      <li><b>人的な措置：</b>担当者に対して、個人情報を利用目的の範囲内でのみ取り扱うよう指導しています。</li>
+      <li><b>物理的な措置：</b>個人情報を取り扱う端末は担当者が管理し、第三者に見られないようにしています。</li>
+      <li><b>技術的な措置：</b>パスコードはハッシュ値で保存し、確認コードは10分で無効になります。パスコードや確認コードを繰り返し間違えた場合は、一定時間ログインできないようにしています。ログインした会員には、その会員本人の情報だけを表示します。記録を保存するファイルと管理画面は、当社の担当者だけが利用できるよう設定しています。</li>
+      <li><b>外的環境の把握：</b>前項のとおり、データを保存する国の制度を把握したうえで、安全管理措置を講じています。</li>
     </ul>
 
-    <h2>7. 保存する期間</h2>
-    <p>個人情報は、使う目的のために必要な間だけ保存し、必要がなくなったときは消去します。ただし、退会した後も、集計の確認やお問い合わせへの対応のために、投票と付与の記録をしばらく保存することがあります。</p>
+    <h2>7. 端末への情報の保存</h2>
+    <p>本サービスは、次回のログインの手間を減らし、画面をすばやく表示するため、ログインの状態、ニックネーム、ご自身の投票と票の付与の記録、推しモデルなどを、ご利用のブラウザ内（ローカルストレージ）に保存します。他の会員の情報は保存しません。マイページの「ログアウト」でログインの状態は削除されます。すべて削除したい場合は、ブラウザの設定から本サービスのサイトデータを削除してください。共用の端末では、利用後にログアウトしてください。本サービスでは、広告を目的とした追跡は行っていません。</p>
 
-    <h2>8. 開示・訂正・利用停止などのご請求</h2>
-    <p>会員ご本人は、運営が保有している自分の個人情報について、利用目的の通知、開示、訂正・追加・削除、利用の停止・消去、第三者への提供の停止、第三者への提供の記録の開示を請求できます。下の問い合わせ先までメールでご連絡ください。ご本人であることを確かめるため、iito members に登録しているメールアドレスから送ってください。法令に従い、遅れることなく対応します。</p>
+    <h2>8. 外部への情報の送信</h2>
+    <p>本サービスのページを表示する際、文字やアイコン、ログイン機能を読み込むため、ご利用の端末から次の事業者に、IPアドレス、ブラウザの種類、閲覧したページのアドレスなどの情報が送信されます。</p>
+    <div class="tbl"><table>
+      <tr><th>送信先</th><th>目的</th></tr>
+      <tr><td>Google LLC（Google Fonts、Firebase）</td><td>文字（フォント）の表示、ログイン機能の読み込み</td></tr>
+      <tr><td>jsDelivr（オープンソースのファイル配信サービス）</td><td>アイコンの表示</td></tr>
+      <tr><td>GitHub, Inc.（GitHub Pages）</td><td>ページの配信</td></tr>
+    </table></div>
+    <p>送信された情報は、各事業者のプライバシーポリシーに従って取り扱われます。</p>
 
-    <h2>9. このポリシーの変更</h2>
-    <p>法令の変更やサービスの変更に合わせて、このポリシーを変えることがあります。大切な変更のときは、本サービスの画面などでお知らせします。</p>
+    <h2>9. 保存期間</h2>
+    <p>当社は、個人情報を利用目的の達成に必要な期間に限り保存し、必要がなくなったときは遅滞なく消去します。ただし、会員がプランを解約した後も、集計の確認やお問い合わせへの対応のため、投票と票の付与の記録を一定期間保存することがあります。</p>
 
-    <h2>10. 問い合わせ先</h2>
-    <p>iito members 運営事務局<br>メール：<a href="mailto:info@reason.holdings">info@reason.holdings</a><br>運営者の住所・代表者の氏名は、お問い合わせいただければ、遅れることなくお答えします。</p>
+    <h2>10. 開示等のご請求</h2>
+    <ol>
+      <li>ご本人は、当社が保有するご自身の個人データについて、利用目的の通知、開示（第三者提供の記録の開示を含みます）、内容の訂正・追加・削除、利用の停止・消去、および第三者への提供の停止を請求することができます。</li>
+      <li>ご請求は、下記の窓口へメールでご連絡ください。ご本人であることを確認するため、iito members に登録しているメールアドレスからお送りいただくか、当社が別途お願いする方法で確認させていただきます。代理人によるご請求の場合は、代理権を確認できる書類をお願いすることがあります。</li>
+      <li>当社は、ご本人であることを確認したうえで、法令に従い遅滞なく対応します。法令により対応できない場合は、その理由をご説明します。</li>
+      <li>開示のご請求の手数料はいただきません。</li>
+    </ol>
+
+    <h2>11. お問い合わせ・苦情の窓口</h2>
+    <p>個人情報の取扱いに関するお問い合わせや苦情は、次の窓口で受け付けます。<br>
+    株式会社リーズン　iito members 運営担当<br>
+    メール：<a href="mailto:info@reason.holdings">info@reason.holdings</a></p>
+
+    <h2>12. 本ポリシーの変更</h2>
+    <p>当社は、法令の改正やサービスの変更に応じて、本ポリシーを変更することがあります。重要な変更を行う場合は、本サービスの画面その他の適切な方法でお知らせします。</p>
+
+    <div class="sign"><p>2026年11月19日 制定<br>株式会社リーズン</p></div>
   </div>
   <div class="foot"><a href="terms.html">利用規約</a>　｜　<a href="./">投票ページへ戻る</a></div>
 </div>
