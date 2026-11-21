@@ -209,6 +209,25 @@ body.has-tabbar .screen{padding-bottom:120px}
 .gh-v{text-align:right;font-size:13px;color:#1A1A1A;line-height:1.6}
 .gh-v b{font-size:15px}
 .gh-ok{display:inline-block;font-size:10.5px;font-weight:700;color:#2F4A6D;background:#E6ECF3;border-radius:999px;padding:1px 8px;margin-left:6px;vertical-align:2px}
+.gh-all{display:flex;align-items:center;justify-content:center;gap:4px;width:100%;margin-top:8px;padding:9px;border:1px solid #DADADF;background:#fff;border-radius:999px;font-family:inherit;font-size:13px;font-weight:700;color:#1A1A1A;cursor:pointer}
+.gh-sum{display:grid;grid-template-columns:auto 1fr 1fr 1fr;gap:2px 8px;align-items:center;font-size:13px;margin-top:6px}
+.gh-sum .h{font-size:11px;color:#888;text-align:right}
+.gh-sum .m{font-weight:700;color:#1A1A1A;padding:6px 0;border-top:1px solid #F0F0F2}
+.gh-sum .v{text-align:right;padding:6px 0;border-top:1px solid #F0F0F2;color:#1A1A1A}
+.gh-sum .v.rest{font-weight:700;color:var(--ac-d)}
+.gh-sum .v.dim{color:#AAA}
+.gh-mbox{max-width:420px;max-height:88vh;overflow-y:auto}
+.gh-mhd{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.gh-close{border:1px solid #DADADF;background:#fff;border-radius:50%;width:34px;height:34px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;color:#1A1A1A}
+.gh-month{border:1px solid #EFEFF2;border-radius:14px;padding:10px 12px;margin-bottom:10px;background:#fff}
+.gh-mt{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:6px}
+.gh-mt .mm{font-size:15px;font-weight:700;color:#1A1A1A}
+.gh-line{display:flex;justify-content:space-between;gap:10px;font-size:13px;padding:3px 0;color:#1A1A1A}
+.gh-line .k{color:#666;flex:0 0 auto}
+.gh-line .v{text-align:right}
+.gh-sub{font-size:12px;color:#666;padding:1px 0 1px 12px;display:flex;justify-content:space-between;gap:8px}
+.gh-rest{display:flex;justify-content:space-between;font-size:13px;font-weight:700;color:var(--ac-d);border-top:1px dashed #E4E4E8;margin-top:6px;padding-top:6px}
+.gh-rest.dim{color:#AAA;font-weight:500}
 .gh-pend{font-size:12px;color:#888}
 .ng-box{background:#EEF3F9;border:1px solid #D5E0EC;border-radius:12px;padding:10px 12px;margin:10px 0 4px}
 .ng-h{font-size:12px;font-weight:700;color:#2F4A6D}
@@ -686,10 +705,11 @@ body.ia-open{overflow:hidden}
 
   <!-- 票の付与履歴（2026-11-21 追加） -->
   <div class="mp-card">
-    <div class="mp-sec"><i class="ti ti-gift"></i>票の付与履歴</div>
-    <div class="mp-note">プランの支払いが確定したときに付与された票です（2026年11月までは毎月1日に付与）。使わなかった票は、付与された月の翌々月の末日まで使えます。</div>
+    <div class="mp-sec"><i class="ti ti-gift"></i>票の履歴</div>
+    <div class="mp-note">月ごとに、付与された票・使った票・残りの票を表示します。使わなかった票は、付与された月の翌々月の末日まで使えます。</div>
     <div id="mp-next-grant"></div>
     <div id="mp-grants"></div>
+    <button class="gh-all" onclick="openGhModal()">付与・使用の履歴をすべて見る <i class="ti ti-chevron-right"></i></button>
     <div class="mp-update-note"><i class="ti ti-refresh" style="vertical-align:-2px"></i> 会員情報（プランの加入・変更・解約）は、投票イベントの期間外は<b>毎週月曜日</b>、期間中は<b>毎日12:00</b>に更新します。プランを変更した場合、付与の履歴と票数には、次の更新のあとに反映されます。</div>
   </div>
 
@@ -761,6 +781,16 @@ body.ia-open{overflow:hidden}
 <div class="ia-ov" id="ia-ov" onclick="if(event.target===this)closeIaByBackdrop()"></div>
 
 <!-- ログアウト確認モーダル -->
+<!-- 票の履歴（付与・使用）をすべて見る画面（2026-11-21） -->
+<div class="overlay" id="gh-modal" onclick="if(event.target===this)closeGhModal()">
+  <div class="mbox gh-mbox">
+    <div class="gh-mhd"><h3 style="margin:0">票の履歴</h3><button class="gh-close" onclick="closeGhModal()" aria-label="閉じる"><i class="ti ti-x"></i></button></div>
+    <div class="mp-note" style="margin:4px 0 10px">プランの支払いが確定したときに付与された票と、投票で使った票です（2026年11月までは毎月1日に付与）。票は古いものから順に使われ、付与された月の翌々月の末日まで使えます。</div>
+    <div id="gh-full"></div>
+    <div class="mp-update-note"><i class="ti ti-refresh" style="vertical-align:-2px"></i> 会員情報は、投票イベントの期間外は<b>毎週月曜日</b>、期間中は<b>毎日12:00</b>に更新します。付与の履歴は、更新のあとに反映されます。</div>
+  </div>
+</div>
+
 <div class="overlay" id="logout-modal">
     <div class="mbox" style="max-width:340px;text-align:center">
       <h3 style="text-align:center"><i class="ti ti-logout" style="font-size:15px;vertical-align:-2px;margin-right:6px;color:var(--ac)"></i>ログアウトしますか？</h3>
@@ -2439,40 +2469,86 @@ function renderNextGrant(m){
   if(line){line.textContent=n.passed?`更新日（${ds}）の本付与を待っています：${n.votes}票`:`次の付与予定：${ds}（更新日）に ${n.votes}票（お支払いの確定後に本付与）`;line.style.display='block';}
 }
 
-// マイページ：票の付与履歴（新しい月から順に、最大6か月分）
-//  grants[ニックネーム][期] = その月に付与されたプランの一覧（GASの「プラン付与履歴」から本人の分だけ取得したもの）
-//  付与は管理画面で会員情報（決済CSV）を読み込んだときに記録されるため、今月分が未記録なら「次の更新で記録」と案内する
+// ── 票の履歴（付与・使用）（2026-11-21）─────────────────────────
+//  月ごとに「付与された票」「その月に使った票」「その月に付与された票のうち、いま残っている票」を計算する。
+//  票は古いものから使う（2か月前の残り → 1か月前の残り → その月の付与）。付与された月の翌々月の末日を過ぎると消える。
+//  会員でなかった月（付与も投票も無い月）があると、それより前の残りは消える（全プランをやめたとき）。
+//  付与＝grants（GASの「プラン付与履歴」の本人の分）、使用＝allVotes（本人の投票の記録）。画面の繰越の計算と同じ考え方。
+function voteLedger(m){
+  const ym=t=>{const r=String(t).match(/^(\d{4})年(\d{1,2})月期$/);return r?(+r[1])*12+(+r[2]-1):null;};
+  const tOf=k=>`${Math.floor(k/12)}年${k%12+1}月期`;
+  const mine=grants[m.nick]||{};
+  const G={},U={},D={};
+  Object.keys(mine).forEach(t=>{const k=ym(t);if(k==null)return;const ps=[...new Set(mine[t]||[])].filter(p=>PLANS[p]!=null);if(ps.length)G[k]=ps;});
+  (events||[]).forEach(e=>{
+    const k=ym(e.termId);if(k==null)return;
+    const v=(allVotes[e.id]||{})[m.nick]||{};
+    const rows=Object.entries(v).filter(([,c])=>Number(c)>0);
+    const tot=rows.reduce((a,[,c])=>a+Number(c),0);if(!tot)return;
+    U[k]=(U[k]||0)+tot;(D[k]=D[k]||[]).push({ev:e,rows,tot});
+  });
+  const now=new Date();const cur=now.getFullYear()*12+now.getMonth();
+  const keys=[...Object.keys(G),...Object.keys(U)].map(Number);
+  if(!keys.length)return [];
+  const first=Math.min(...keys);
+  const left={},spent={},out=[];let chainStart=first; // spent[月]＝その月に付与された票のうち、使われた票
+  for(let k=first;k<=cur;k++){
+    const g=(G[k]||[]).reduce((a,p)=>a+PLANS[p],0),u=U[k]||0;
+    const member=g>0||u>0;
+    if(!member){for(const x in left)left[x]=0;chainStart=k+1;out.push({k,t:tOf(k),g:0,plans:[],u:0,uses:[],gap:true});continue;}
+    left[k]=g;
+    let need=u;
+    for(const w of [k-2,k-1,k]){if(w<chainStart||left[w]==null)continue;const x=Math.min(left[w],need);left[w]-=x;spent[w]=(spent[w]||0)+x;need-=x;}
+    out.push({k,t:tOf(k),g,plans:(G[k]||[]).slice().sort((a,b)=>(PLAN_RANK[a]||0)-(PLAN_RANK[b]||0)),u,uses:D[k]||[]});
+  }
+  out.forEach(r=>{if(r.gap)return;r.rest=left[r.k]||0;r.spent=spent[r.k]||0;r.expired=cur>r.k+2;r.expTxt=(()=>{const e=r.k+2;const y=Math.floor(e/12);return (y!==now.getFullYear()?y+'年':'')+(e%12+1)+'月末まで';})();});
+  return out.reverse(); // 新しい月から
+}
+function ghMonthLabel(k){const y=Math.floor(k/12),mo=k%12+1;return (y!==new Date().getFullYear()?y+'年':'')+mo+'月';}
+// マイページ：要約（最近3か月の付与・使用・残り）
 function renderGrantHistory(m){
   const box=document.getElementById('mp-grants');if(!box)return;box.innerHTML='';
-  const ym=t=>{const r=String(t).match(/^(\d{4})年(\d{1,2})月期$/);return r?[+r[1],+r[2]]:null;};
-  const mine=grants[m.nick]||{};
-  const terms=Object.keys(mine).filter(t=>ym(t)&&(mine[t]||[]).some(p=>PLANS[p]!=null))
-    .sort((a,b)=>{const x=ym(a),y=ym(b);return (y[0]*12+y[1])-(x[0]*12+x[1]);});
+  const L=voteLedger(m).filter(r=>!r.gap);
   const now=new Date();const curT=`${now.getFullYear()}年${now.getMonth()+1}月期`;
-  if(!mine[curT]||!(mine[curT]||[]).some(p=>PLANS[p]!=null)){
-    const r=document.createElement('div');r.className='gh-row';
-    const a=document.createElement('div');a.innerHTML=`<div class="gh-m">${now.getMonth()+1}月</div>`;
-    const b=document.createElement('div');b.className='gh-v';
-    b.innerHTML=isPayGrantTerm(curT)
+  let html='';
+  if(!(grants[m.nick]||{})[curT]||!((grants[m.nick]||{})[curT]||[]).some(p=>PLANS[p]!=null)){
+    html+=`<div class="gh-row"><div><div class="gh-m">${now.getMonth()+1}月</div></div><div class="gh-v">`+(isPayGrantTerm(curT)
       ?`<span class="gh-pend">更新日のお支払いの確定後に本付与されます<br>（上の「次の付与予定」をご覧ください）</span>`
-      :`<span class="gh-pend">次の会員情報の更新で記録されます<br>（記録前も、今のプランの${PLANS[m.plan]??'—'}票を使えます）</span>`;
-    r.appendChild(a);r.appendChild(b);box.appendChild(r);
+      :`<span class="gh-pend">次の会員情報の更新で記録されます<br>（記録前も、今のプランの${PLANS[m.plan]??'—'}票を使えます）</span>`)+`</div></div>`;
   }
-  if(!terms.length&&box.children.length===0){const e=document.createElement('div');e.className='mv-empty';e.textContent='まだ付与の記録がありません';box.appendChild(e);return;}
-  terms.slice(0,6).forEach(t=>{
-    const [y,mo]=ym(t);
-    const plans=[...new Set(mine[t])].filter(p=>PLANS[p]!=null).sort((a,b)=>(PLAN_RANK[a]||0)-(PLAN_RANK[b]||0));
-    const total=plans.reduce((s,p)=>s+PLANS[p],0);
-    const exp=new Date(y,mo-1+2,1); // 翌々月
-    const expired=new Date(y,mo-1+3,1)<=now; // 翌々月の末日を過ぎた
-    const r=document.createElement('div');r.className='gh-row';
-    const a=document.createElement('div');
-    a.innerHTML=`<div class="gh-m">${y!==now.getFullYear()?y+'年':''}${mo}月${isPayGrantTerm(t)?'<span class="gh-ok">本付与済み</span>':''}</div><div class="gh-exp">${expired?'使える期限を過ぎました':(exp.getFullYear()!==now.getFullYear()?exp.getFullYear()+'年':'')+(exp.getMonth()+1)+'月末まで使えます'}</div>`;
-    const b=document.createElement('div');b.className='gh-v';
-    b.innerHTML=plans.map(p=>`${PLAN_LBL[p]} ${PLANS[p]}票`).join('<br>')+(plans.length>1?`<br><b>合計 ${total}票</b>`:'');
-    r.appendChild(a);r.appendChild(b);box.appendChild(r);
+  if(!L.length){box.innerHTML=html+'<div class="mv-empty">まだ記録がありません</div>';return;}
+  html+=`<div class="gh-sum"><span></span><span class="h">付与</span><span class="h">使用</span><span class="h">残り</span>`;
+  L.slice(0,3).forEach(r=>{
+    html+=`<span class="m">${ghMonthLabel(r.k)}</span><span class="v">${r.g}票</span><span class="v">${r.u}票</span><span class="v ${r.expired?'dim':'rest'}">${r.expired?'期限切れ':r.rest+'票'}</span>`;
   });
+  box.innerHTML=html+'</div>';
 }
+// すべての履歴（モーダル）
+function openGhModal(){
+  if(!curUser)return;
+  const box=document.getElementById('gh-full');box.innerHTML='';
+  const L=voteLedger(curUser);
+  const e=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  if(!L.length){box.innerHTML='<div class="mv-empty">まだ記録がありません</div>';}
+  L.forEach(r=>{
+    if(r.gap){box.insertAdjacentHTML('beforeend',`<div class="gh-month"><div class="gh-mt"><span class="mm">${ghMonthLabel(r.k)}</span></div><div class="gh-line"><span class="k">プランに加入していない月です（それまでの票はなくなりました）</span></div></div>`);return;}
+    const pay=isPayGrantTerm(r.t);
+    let h=`<div class="gh-month"><div class="gh-mt"><span class="mm">${ghMonthLabel(r.k)}${pay&&r.g?'<span class="gh-ok">本付与済み</span>':''}</span><span class="gh-exp">${r.g?(r.expired?'使える期限を過ぎました':r.expTxt+'使えます'):''}</span></div>`;
+    h+=`<div class="gh-line"><span class="k">付与</span><span class="v">${r.g?r.g+'票':'なし'}</span></div>`;
+    r.plans.forEach(p=>{h+=`<div class="gh-sub"><span>${PLAN_LBL[p]}</span><span>${PLANS[p]}票</span></div>`;});
+    h+=`<div class="gh-line"><span class="k">使用</span><span class="v">${r.u?r.u+'票':'なし'}</span></div>`;
+    r.uses.forEach(x=>{
+      h+=`<div class="gh-sub"><span>${e(x.ev.name||'イベント')}</span><span>${x.tot}票</span></div>`;
+      x.rows.sort((a,b)=>b[1]-a[1]).forEach(([mid,c])=>{h+=`<div class="gh-sub" style="padding-left:24px;color:#888"><span>${e(findMod(mid)?.name||mid)}</span><span>${c}票</span></div>`;});
+    });
+    if(r.g)h+=`<div class="gh-line" style="margin-top:4px"><span class="k">この月に付与された票のうち使われた票</span><span class="v">${r.spent}票</span></div>`;
+    if(r.g&&r.spent>0&&r.spent>r.u)h+=`<div class="gh-sub" style="padding-left:0"><span>票は古いものから使われるため、あとの月の投票にも使われています</span></div>`;
+    if(r.g)h+=`<div class="gh-rest ${r.expired?'dim':''}"><span>この月に付与された票の残り</span><span>${r.expired?(r.rest?r.rest+'票（期限切れ）':'0票'):r.rest+'票'}</span></div>`;
+    box.insertAdjacentHTML('beforeend',h+'</div>');
+  });
+  document.getElementById('gh-modal').classList.add('open');
+}
+function closeGhModal(){document.getElementById('gh-modal').classList.remove('open');}
 
 // メールリンク認証の完了後、実際にログインを完了させる処理
 // （パスコードログイン・旧方式のメールリンクの両方から使う。selNickの代わりに会員データmを受け取る）
