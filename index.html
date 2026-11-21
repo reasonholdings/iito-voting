@@ -181,6 +181,13 @@ body.has-tabbar .screen{padding-bottom:120px}
 .gh-v{text-align:right;font-size:13px;color:#1A1A1A;line-height:1.6}
 .gh-v b{font-size:15px}
 .gh-pend{font-size:12px;color:#888}
+.ng-box{background:#EEF3F9;border:1px solid #D5E0EC;border-radius:12px;padding:10px 12px;margin:10px 0 4px}
+.ng-h{font-size:12px;font-weight:700;color:#2F4A6D}
+.ng-main{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-top:2px}
+.ng-date{font-size:18px;font-weight:700;color:#1A1A1A;white-space:nowrap}
+.ng-votes{font-size:15px;font-weight:700;color:#1A1A1A;white-space:nowrap}
+.ng-note{font-size:11.5px;color:#555;line-height:1.6;margin-top:4px}
+.mp-next-line{font-size:12.5px;color:#2F4A6D;background:#EEF3F9;border-radius:10px;padding:7px 10px;margin-top:10px;text-align:center}
 .mp-update-note{font-size:12px;line-height:1.6;color:#444;background:#F4F4F6;border-radius:10px;padding:8px 10px;margin-top:10px}
 .mv-ev{font-size:13px;font-weight:700;color:#1A1A1A;margin:10px 0 2px;padding-left:8px;border-left:3px solid var(--ac)}
 .mv-total{font-size:13px;color:#1A1A1A;font-weight:700;text-align:right;margin-top:6px}
@@ -623,6 +630,7 @@ body.has-tabbar .screen{padding-bottom:120px}
       <div class="mp-stat accent"><div class="n" id="mp-remain">—</div><div class="l">残り票数</div></div>
       <div class="mp-stat"><div class="n" id="mp-used">—</div><div class="l">投票した票数</div></div>
     </div>
+    <div class="mp-next-line" id="mp-next-line" style="display:none"></div>
   </div>
 
   <!-- あなたの投票 -->
@@ -636,6 +644,7 @@ body.has-tabbar .screen{padding-bottom:120px}
   <div class="mp-card">
     <div class="mp-sec"><i class="ti ti-gift"></i>票の付与履歴</div>
     <div class="mp-note">プランの支払いが確定したときに付与された票です（2026年11月までは毎月1日に付与）。使わなかった票は、付与された月の翌々月の末日まで使えます。</div>
+    <div id="mp-next-grant"></div>
     <div id="mp-grants"></div>
     <div class="mp-update-note"><i class="ti ti-refresh" style="vertical-align:-2px"></i> 会員情報（プランの加入・変更・解約）は、投票イベントの期間外は<b>毎週月曜日</b>、期間中は<b>毎日12:00</b>に更新します。プランを変更した場合、付与の履歴と票数には、次の更新のあとに反映されます。</div>
   </div>
@@ -1137,7 +1146,8 @@ function demoGas(action,payload){
     case 'requestPinCode': return ok();
     case 'me': {
       const g={};g[demoTerm(0)]=['producer'];g[demoTerm(-1)]=['producer'];g[demoTerm(-2)]=['producer'];
-      return ok({member:{nick:DEMO_NICK,mid:'0',plan:'producer',email:'test@example.com'},votes:votes,grants:g,termPlans:{}});
+      const pd=new Date();pd.setDate(pd.getDate()-10);
+      return ok({member:{nick:DEMO_NICK,mid:'0',plan:'producer',email:'test@example.com',paidAt:ymdOf(pd.getTime())},votes:votes,grants:g,termPlans:{}});
     }
     case 'saveVote': {
       const ev=payload.evId||'demo-event';const mine=votes[ev]||(votes[ev]={});
@@ -2284,7 +2294,8 @@ function renderMypage(){
     const t=document.createElement('div');t.className='mv-total';t.textContent=`合計 ${tot}票`;vb.appendChild(t);
   });
   document.getElementById('mp-used').textContent=evs.length?used:'—';
-  // 票の付与履歴
+  // 票の付与履歴と、次の付与予定（12月からは「更新日の支払いが確定した日」に付与）
+  renderNextGrant(m);
   renderGrantHistory(m);
   // 推しモデル
   renderPills('mp-oshi',oshiMap[m.nick]||[],null);
@@ -2306,6 +2317,37 @@ function renderMypage(){
   });
 }
 
+// マイページ：次の付与予定（2026年12月期からのルール：更新日の支払いが確定したら、そのプランの票を付与）
+//  更新日＝最終決済日（会員データのF列。GASの me が本人の分だけ返す）の1か月後。
+//  11月期までは毎月1日に付与済みなので、11月中の更新日は飛ばして、12月期以降の最初の更新日を出す。
+//  今のプランのまま更新した場合の予定。実際の付与は、支払いの確定後、会員情報の更新（CSVの読み込み）で記録される。
+function nextGrantInfo(m){
+  const paidT=ymdTime(m&&m.paidAt);const base=PLANS[m&&m.plan];
+  if(!paidT||base==null)return null;
+  // 最終決済日から k か月後（月末の日付は、その月の末日にそろえる。例：10/31 → 11/30 → 12/31）
+  const pd=new Date(paidT);const addM=k=>{const y=pd.getFullYear(),mo=pd.getMonth()+k;const last=new Date(y,mo+1,0).getDate();return new Date(y,mo,Math.min(pd.getDate(),last)).getTime();};
+  const termOf=x=>{const d=new Date(x);return `${d.getFullYear()}年${d.getMonth()+1}月期`;};
+  let k=1,t=addM(1);
+  while(k<4&&!isPayGrantTerm(termOf(t))){k++;t=addM(k);}
+  if(!isPayGrantTerm(termOf(t)))return null;
+  const d=new Date(t);const today=new Date();today.setHours(0,0,0,0);
+  return {t,month:d.getMonth()+1,day:d.getDate(),year:d.getFullYear(),plan:m.plan,votes:base,passed:t<=today.getTime()};
+}
+function renderNextGrant(m){
+  const box=document.getElementById('mp-next-grant');const line=document.getElementById('mp-next-line');
+  if(box)box.innerHTML='';if(line)line.style.display='none';
+  const n=nextGrantInfo(m);if(!n)return;
+  const ds=`${n.year!==new Date().getFullYear()?n.year+'年':''}${n.month}月${n.day}日`;
+  if(box){
+    box.innerHTML=`<div class="ng-box"><div class="ng-h">${n.passed?'付与待ち（更新日）':'次の付与予定（更新日）'}</div>`
+      +`<div class="ng-main"><span class="ng-date">${ds}</span><span class="ng-votes">${PLAN_LBL[n.plan]} ${n.votes}票</span></div>`
+      +`<div class="ng-note">${n.passed
+        ?'更新日を過ぎています。更新のお支払いが確定したあと、次の会員情報の更新で付与されます。'
+        :'今のプランのまま更新した場合の予定です。更新日のお支払いが確定したあと、会員情報の更新で付与されます。プランを変えた場合は、変えたあとのプランの票になります。'}</div></div>`;
+  }
+  if(line){line.textContent=n.passed?`更新日（${ds}）の付与を待っています：${n.votes}票`:`次の付与予定：${ds}（更新日）に ${n.votes}票`;line.style.display='block';}
+}
+
 // マイページ：票の付与履歴（新しい月から順に、最大6か月分）
 //  grants[ニックネーム][期] = その月に付与されたプランの一覧（GASの「プラン付与履歴」から本人の分だけ取得したもの）
 //  付与は管理画面で会員情報（決済CSV）を読み込んだときに記録されるため、今月分が未記録なら「次の更新で記録」と案内する
@@ -2321,7 +2363,7 @@ function renderGrantHistory(m){
     const a=document.createElement('div');a.innerHTML=`<div class="gh-m">${now.getMonth()+1}月</div>`;
     const b=document.createElement('div');b.className='gh-v';
     b.innerHTML=isPayGrantTerm(curT)
-      ?`<span class="gh-pend">今月の更新日の支払いが確定し、<br>会員情報が更新されたあとに記録されます</span>`
+      ?`<span class="gh-pend">更新日のお支払いの確定後に付与されます<br>（上の「次の付与予定」をご覧ください）</span>`
       :`<span class="gh-pend">次の会員情報の更新で記録されます<br>（記録前も、今のプランの${PLANS[m.plan]??'—'}票を使えます）</span>`;
     r.appendChild(a);r.appendChild(b);box.appendChild(r);
   }

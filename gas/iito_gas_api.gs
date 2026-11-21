@@ -132,16 +132,22 @@ function verifyIdToken_(idToken) {
 }
 
 // 会員データから1人分を探す（ニックネームは大文字小文字を区別しない）
+// 会員データの「最終決済日」（F列）を 'yyyy-MM-dd' の文字にする（文字で保存しているが、日付になっていても読めるようにする）
+function paidAtText_(v) {
+  if (v instanceof Date) return Utilities.formatDate(v, 'Asia/Tokyo', 'yyyy-MM-dd');
+  return String(v || '').replace(/^'/, '').trim();
+}
+
 function findMember_(nick) {
   const target = String(nick || '').trim().toLowerCase();
   if (!target) return null;
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_MEMBERS);
   if (!sheet || sheet.getLastRow() <= 1) return null;
-  const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 5).getValues();
+  const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 6).getValues();
   for (var i = 0; i < rows.length; i++) {
     if (String(rows[i][1]).trim().toLowerCase() === target) {
       return { mid: String(rows[i][0] || ''), nick: String(rows[i][1]).trim(), plan: String(rows[i][2] || 'supporter').trim(),
-               email: String(rows[i][3] || '').trim().toLowerCase() };
+               email: String(rows[i][3] || '').trim().toLowerCase(), paidAt: paidAtText_(rows[i][5]) };
     }
   }
   return null;
@@ -1057,10 +1063,11 @@ function findMemberByEmail_(email) {
   if (!target) return null;
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_MEMBERS);
   if (!sheet || sheet.getLastRow() <= 1) return null;
-  const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 5).getValues();
+  const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 6).getValues();
   for (var i = 0; i < rows.length; i++) {
     if (normEmail_(rows[i][3]) === target && String(rows[i][1]).trim()) {
-      return { mid: String(rows[i][0] || ''), nick: String(rows[i][1]).trim(), plan: String(rows[i][2] || 'supporter').trim(), email: target };
+      return { mid: String(rows[i][0] || ''), nick: String(rows[i][1]).trim(), plan: String(rows[i][2] || 'supporter').trim(), email: target,
+               paidAt: paidAtText_(rows[i][5]) }; // 最終決済日（マイページの「次の付与予定」＝更新日の表示に使う。本人にだけ返す）
     }
   }
   return null;
