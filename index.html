@@ -89,7 +89,8 @@ html,body{min-height:100vh;background:var(--bg2);font-family:"Zen Maru Gothic","
 .sr-panel{position:absolute;top:8px;right:8px;bottom:8px;width:56%;max-width:280px;z-index:3;background:rgba(18,20,28,.58);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);color:#fff;border-radius:12px;padding:8px 10px 8px;text-align:left;display:flex;flex-direction:column;box-shadow:0 4px 14px rgba(0,0,0,.18)}
 .sr-hd{display:flex;align-items:center;justify-content:space-between;gap:6px}
 .sr-ttl{font-size:11px;font-weight:700;letter-spacing:.04em;opacity:.9}
-.sr-x{background:none;border:none;color:#fff;opacity:.8;font-size:15px;line-height:1;cursor:pointer;padding:2px 2px 2px 6px}
+.sr-x{display:flex;align-items:center;gap:3px;background:rgba(255,255,255,.16);border:none;color:#fff;font-family:inherit;font-size:11px;font-weight:700;line-height:1;cursor:pointer;padding:4px 8px;border-radius:999px}
+.sr-x .ti{font-size:13px}
 .sr-tabs{display:flex;gap:4px;flex-wrap:nowrap;overflow-x:auto;margin:5px 0 2px;scrollbar-width:none}
 .sr-tabs::-webkit-scrollbar{display:none}
 .sr-tab{flex:0 0 auto;border:1px solid rgba(255,255,255,.45);background:transparent;color:#fff;font-family:inherit;font-size:11px;border-radius:999px;padding:1px 8px;cursor:pointer;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -105,7 +106,11 @@ html,body{min-height:100vh;background:var(--bg2);font-family:"Zen Maru Gothic","
 .sr-row.me .sr-nm,.sr-row.me .sr-ct{color:#FFD86B}
 .sr-me{font-size:11.5px;margin-top:4px;padding-top:4px;border-top:1px dashed rgba(255,255,255,.35);color:#FFD86B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sr-ft{font-size:10px;opacity:.75;margin-top:3px;text-align:right}
-.sr-open{position:absolute;top:8px;right:8px;z-index:3;border:none;background:rgba(18,20,28,.58);color:#fff;font-family:inherit;font-size:11px;font-weight:700;border-radius:999px;padding:4px 10px;cursor:pointer}
+.sr-open{position:absolute;top:8px;right:8px;z-index:3;display:flex;align-items:center;gap:6px;border:none;background:rgba(18,20,28,.62);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);color:#fff;font-family:inherit;font-size:12px;font-weight:700;border-radius:999px;padding:6px 12px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.18)}
+.sr-open .me{color:#FFD86B}
+.sr-open .ti{font-size:14px}
+.sr-panel{animation:sr-in .18s ease}
+@keyframes sr-in{from{opacity:0;transform:scale(.96);transform-origin:top right}to{opacity:1;transform:none}}
 .banner-img-wrap{margin:-14px -16px 12px;border-radius:13px 13px 0 0;overflow:hidden;line-height:0}
 .banner-img-wrap img{width:100%;max-height:200px;object-fit:cover;display:block}
 .banner-name{font-size:13px;font-weight:500;text-align:center;margin-bottom:4px}
@@ -587,7 +592,7 @@ body.has-tabbar .screen{padding-bottom:120px}
   <div class="banner" id="vote-banner" style="margin-bottom:14px;position:relative">
     <!-- 応援ランキング（2026-11-21）：自分が投票したモデルに、いま誰が何票入れているか（上位5名）。半透明で右側に重ねる -->
     <div class="sr-panel" id="sr-panel" style="display:none" aria-live="polite"></div>
-    <button type="button" class="sr-open" id="sr-open" style="display:none" onclick="setSrHidden(false)"><i class="ti ti-trophy"></i> 応援ランキング</button>
+    <button type="button" class="sr-open" id="sr-open" style="display:none" onclick="setSrHidden(false)" aria-label="応援ランキングを表示する"></button>
     <div class="banner-img-wrap" id="v-ev-img-wrap" style="display:none"><img id="v-ev-img" alt="イベント画像"/></div>
     <div class="banner-name" id="v-ev-name"></div>
     <div class="banner-period" id="v-ev-period"></div>
@@ -2708,7 +2713,13 @@ function renderSupporterRank(){
   const bn=document.getElementById('vote-banner');
   const models=(srData&&srData.models)||[];
   if(!models.length){p.style.display='none';ob.style.display='none';if(bn)bn.style.minHeight='';return;}
-  if(srHidden()){p.style.display='none';ob.style.display='';if(bn)bn.style.minHeight='';return;}
+  if(srHidden()){
+    // 最小化中：右上に小さなボタンだけ出す（自分の順位も一緒に見せる）。押すと元に戻る
+    const top=models.find(x=>x.modelId===srSel)||models[0];
+    const meTxt=top&&top.me?`<span class="me">あなた ${top.me.rank}位</span>`:'';
+    ob.innerHTML=`<i class="ti ti-trophy"></i>応援ランキング ${meTxt}<i class="ti ti-arrows-maximize"></i>`;
+    p.style.display='none';ob.style.display='flex';if(bn)bn.style.minHeight='';return;
+  }
   if(bn)bn.style.minHeight='340px'; // 画像の無いイベントでも、5人分が収まる高さにする
   ob.style.display='none';
   if(!models.some(m=>m.modelId===srSel))srSel=models[0].modelId;
@@ -2719,7 +2730,7 @@ function renderSupporterRank(){
   const rows=m.top.map(r=>`<div class="sr-row${r.me?' me':''}"><span class="sr-rk">${r.rank}</span><span class="sr-body"><span class="sr-nm">${e(r.nick)}</span><span class="sr-ct">${Number(r.count).toLocaleString()}票</span></span></div>`).join('');
   const meLine=(m.me&&!m.top.some(r=>r.me))?`<div class="sr-me">あなた：${m.me.rank}位　${Number(m.me.count).toLocaleString()}票</div>`:'';
   const at=srData.at?new Date(srData.at):null;
-  p.innerHTML=`<div class="sr-hd"><span class="sr-ttl"><i class="ti ti-trophy"></i> 応援ランキング</span><button type="button" class="sr-x" aria-label="閉じる" onclick="setSrHidden(true)">×</button></div>`
+  p.innerHTML=`<div class="sr-hd"><span class="sr-ttl"><i class="ti ti-trophy"></i> 応援ランキング</span><button type="button" class="sr-x" aria-label="最小化する" onclick="setSrHidden(true)"><i class="ti ti-minus"></i>最小化</button></div>`
     +tabs+(models.length>1?'':`<div class="sr-model">${nm}</div>`)
     +`<div class="sr-list">${rows}</div>`+meLine
     +(at?`<div class="sr-ft">${pad(at.getHours())}:${pad(at.getMinutes())} 時点・${m.total}人が投票</div>`:'');
