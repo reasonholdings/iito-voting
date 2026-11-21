@@ -2337,6 +2337,7 @@ function nextGrantInfo(m){
 function renderNextGrant(m){
   const box=document.getElementById('mp-next-grant');const line=document.getElementById('mp-next-line');
   if(box)box.innerHTML='';if(line)line.style.display='none';
+  if(!isPayGrantTerm(todayTermId()))return; // 「次の付与予定」は、新しいルールが始まる2026年12月から表示する（11月中は出さない）
   const n=nextGrantInfo(m);if(!n)return;
   const ds=`${n.year!==new Date().getFullYear()?n.year+'年':''}${n.month}月${n.day}日`;
   if(box){
