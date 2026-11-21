@@ -180,6 +180,7 @@ body.has-tabbar .screen{padding-bottom:120px}
 .gh-exp{font-size:11px;color:#888;margin-top:1px}
 .gh-v{text-align:right;font-size:13px;color:#1A1A1A;line-height:1.6}
 .gh-v b{font-size:15px}
+.gh-ok{display:inline-block;font-size:10.5px;font-weight:700;color:#2F4A6D;background:#E6ECF3;border-radius:999px;padding:1px 8px;margin-left:6px;vertical-align:2px}
 .gh-pend{font-size:12px;color:#888}
 .ng-box{background:#EEF3F9;border:1px solid #D5E0EC;border-radius:12px;padding:10px 12px;margin:10px 0 4px}
 .ng-h{font-size:12px;font-weight:700;color:#2F4A6D}
@@ -2339,13 +2340,13 @@ function renderNextGrant(m){
   const n=nextGrantInfo(m);if(!n)return;
   const ds=`${n.year!==new Date().getFullYear()?n.year+'年':''}${n.month}月${n.day}日`;
   if(box){
-    box.innerHTML=`<div class="ng-box"><div class="ng-h">${n.passed?'付与待ち（更新日）':'次の付与予定（更新日）'}</div>`
+    box.innerHTML=`<div class="ng-box"><div class="ng-h">${n.passed?'本付与待ち（更新日）':'次の付与予定（更新日）'}</div>`
       +`<div class="ng-main"><span class="ng-date">${ds}</span><span class="ng-votes">${PLAN_LBL[n.plan]} ${n.votes}票</span></div>`
       +`<div class="ng-note">${n.passed
-        ?'更新日を過ぎています。更新のお支払いが確定したあと、次の会員情報の更新で付与されます。'
-        :'今のプランのまま更新した場合の予定です。更新日のお支払いが確定したあと、会員情報の更新で付与されます。プランを変えた場合は、変えたあとのプランの票になります。'}</div></div>`;
+        ?'更新日を過ぎています。更新のお支払いが確定したあと、次の会員情報の更新で本付与されます。本付与されるまでは、この票は使えません。'
+        :'今のプランのまま更新した場合の予定です（まだ使えません）。更新日のお支払いが確定したあと、会員情報の更新で本付与され、使えるようになります。プランを変えた場合は、変えたあとのプランの票になります。'}</div></div>`;
   }
-  if(line){line.textContent=n.passed?`更新日（${ds}）の付与を待っています：${n.votes}票`:`次の付与予定：${ds}（更新日）に ${n.votes}票`;line.style.display='block';}
+  if(line){line.textContent=n.passed?`更新日（${ds}）の本付与を待っています：${n.votes}票`:`次の付与予定：${ds}（更新日）に ${n.votes}票（お支払いの確定後に本付与）`;line.style.display='block';}
 }
 
 // マイページ：票の付与履歴（新しい月から順に、最大6か月分）
@@ -2363,7 +2364,7 @@ function renderGrantHistory(m){
     const a=document.createElement('div');a.innerHTML=`<div class="gh-m">${now.getMonth()+1}月</div>`;
     const b=document.createElement('div');b.className='gh-v';
     b.innerHTML=isPayGrantTerm(curT)
-      ?`<span class="gh-pend">更新日のお支払いの確定後に付与されます<br>（上の「次の付与予定」をご覧ください）</span>`
+      ?`<span class="gh-pend">更新日のお支払いの確定後に本付与されます<br>（上の「次の付与予定」をご覧ください）</span>`
       :`<span class="gh-pend">次の会員情報の更新で記録されます<br>（記録前も、今のプランの${PLANS[m.plan]??'—'}票を使えます）</span>`;
     r.appendChild(a);r.appendChild(b);box.appendChild(r);
   }
@@ -2376,7 +2377,7 @@ function renderGrantHistory(m){
     const expired=new Date(y,mo-1+3,1)<=now; // 翌々月の末日を過ぎた
     const r=document.createElement('div');r.className='gh-row';
     const a=document.createElement('div');
-    a.innerHTML=`<div class="gh-m">${y!==now.getFullYear()?y+'年':''}${mo}月</div><div class="gh-exp">${expired?'使える期限を過ぎました':(exp.getFullYear()!==now.getFullYear()?exp.getFullYear()+'年':'')+(exp.getMonth()+1)+'月末まで使えます'}</div>`;
+    a.innerHTML=`<div class="gh-m">${y!==now.getFullYear()?y+'年':''}${mo}月${isPayGrantTerm(t)?'<span class="gh-ok">本付与済み</span>':''}</div><div class="gh-exp">${expired?'使える期限を過ぎました':(exp.getFullYear()!==now.getFullYear()?exp.getFullYear()+'年':'')+(exp.getMonth()+1)+'月末まで使えます'}</div>`;
     const b=document.createElement('div');b.className='gh-v';
     b.innerHTML=plans.map(p=>`${PLAN_LBL[p]} ${PLANS[p]}票`).join('<br>')+(plans.length>1?`<br><b>合計 ${total}票</b>`:'');
     r.appendChild(a);r.appendChild(b);box.appendChild(r);
