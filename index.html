@@ -31,7 +31,7 @@
 html,body{min-height:100vh;background:var(--bg2);font-family:"Zen Maru Gothic","Yu Gothic Medium","游ゴシック Medium",'Hiragino Sans','Hiragino Kaku Gothic ProN',Meiryo,sans-serif;color:var(--tx)}
 
 /* ── レイアウト ── */
-.app-wrap{max-width:430px;margin:0 auto;padding:0;min-height:100vh;background:var(--bg);position:relative;overflow:hidden}
+.app-wrap{max-width:430px;margin:0 auto;padding:0;min-height:100vh;background:var(--bg);position:relative;overflow:hidden;overflow:clip} /* clip：はみ出しは隠すが、上に残る表示（sticky）は効くようにする */
 /* 背景の幾何学模様（コンテンツの後ろに敷く。淡い色でじゃまをしない） */
 .app-wrap::before{
   content:"";position:absolute;inset:0;z-index:0;pointer-events:none;
@@ -231,6 +231,8 @@ body.has-tabbar .screen{padding-bottom:120px}
 .user-av{width:26px;height:26px;border-radius:50%;background:var(--ac-l);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:500;color:var(--ac-d)}
 .oshi-edit{font-size:11px;color:var(--ac);text-decoration:underline;cursor:pointer;display:block;text-align:center;margin-bottom:5px}
 .metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0 16px}
+.met-sticky{position:-webkit-sticky;position:sticky;top:var(--met-top,0px);z-index:60;margin:-24px -18px 14px;padding:10px 18px 8px;background:rgba(255,255,255,.94);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);border-bottom:1px solid var(--bd);box-shadow:0 2px 10px rgba(0,0,0,.04)}
+.met-sticky .metrics{margin:0}
 .met{background:var(--bg2);border:.5px solid var(--bd);border-radius:10px;padding:10px 4px;text-align:center;transition:border-color .12s,background .12s}
 .met.met-lk{background:var(--bl-l);border:1.5px solid var(--bl-m)}.met.met-lk .n{color:var(--bl)}.met.met-lk .l{color:var(--bl)}
 .met.met-rm{background:var(--rd-l);border:1.5px solid var(--rd-m)}.met.met-rm .n{color:var(--rd)}.met.met-rm .l{color:var(--rd)}
@@ -579,6 +581,15 @@ body.has-tabbar .screen{padding-bottom:120px}
      ②  投票画面
 ════════════════════════════════════════ -->
 <div class="screen" id="s-vote">
+  <!-- 確定済み・選択中・残り票数（2026-11-21）：ページの一番上に置き、スクロールしても上に残す（下のページだけが動く） -->
+  <div class="met-sticky" id="met-sticky">
+    <div class="metrics">
+      <div class="met met-lk"><div class="n" id="m-lk">0</div><div class="l">確定済み</div></div>
+      <div class="met" id="met-pd"><div class="n" id="m-pd">0</div><div class="l">選択中</div></div>
+      <div class="met met-rm"><div class="n" id="m-rm">0</div><div class="l">残り票数</div></div>
+    </div>
+    <div id="term-note" style="display:none;font-size:11px;color:var(--sub);text-align:center;margin:6px 0 0;line-height:1.5"></div>
+  </div>
   <div class="page-hd">
     <div class="logo">iito members</div>
     <!-- 名前・推し・プランはマイページで確認できるため、投票画面では表示しない（2026-11-17）。プログラムが参照するので要素は残して隠す -->
@@ -608,12 +619,6 @@ body.has-tabbar .screen{padding-bottom:120px}
     </div>
   </div>
 
-  <div class="metrics">
-    <div class="met met-lk"><div class="n" id="m-lk">0</div><div class="l">確定済み</div></div>
-    <div class="met" id="met-pd"><div class="n" id="m-pd">0</div><div class="l">選択中</div></div>
-    <div class="met met-rm"><div class="n" id="m-rm">0</div><div class="l">残り票数</div></div>
-  </div>
-  <div id="term-note" style="display:none;font-size:11px;color:var(--sub);text-align:center;margin:-6px 0 14px;line-height:1.5"></div>
 
   <div class="name-search" id="name-search">
     <i class="ti ti-search"></i>
@@ -1207,6 +1212,7 @@ function showDemoBanner(){
   b.innerHTML='<b>テストモード</b>：投票は保存されません（本番のデータには影響しません）。メール・パスコードは何でもOK（例 test@example.com／1234）。<a href="#" id="demo-reset">テストの票を消す</a>';
   b.style.cssText='position:sticky;top:0;z-index:300;background:#FFF4E5;border-bottom:1px solid #F0A020;color:#7A4A00;font-size:12px;line-height:1.5;padding:8px 14px;text-align:center';
   document.body.insertBefore(b,document.body.firstChild);
+  const setTop=()=>document.documentElement.style.setProperty('--met-top',b.offsetHeight+'px');setTop();window.addEventListener('resize',setTop);
   document.getElementById('demo-reset').onclick=e=>{e.preventDefault();lsDel('demo_votes');Object.keys(allVotes).forEach(k=>{if(allVotes[k])delete allVotes[k][DEMO_NICK];});ls(LS.votes,allVotes);location.reload();};
 }
 if(DEMO){if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',showDemoBanner);else showDemoBanner();}
