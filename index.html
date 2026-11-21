@@ -635,7 +635,7 @@ body.has-tabbar .screen{padding-bottom:120px}
   <!-- 票の付与履歴（2026-11-21 追加） -->
   <div class="mp-card">
     <div class="mp-sec"><i class="ti ti-gift"></i>票の付与履歴</div>
-    <div class="mp-note">プランに応じて付与された票です。使わなかった票は、付与された月の翌々月の末日まで使えます。</div>
+    <div class="mp-note">プランの支払いが確定したときに付与された票です（2026年11月までは毎月1日に付与）。使わなかった票は、付与された月の翌々月の末日まで使えます。</div>
     <div id="mp-grants"></div>
     <div class="mp-update-note"><i class="ti ti-refresh" style="vertical-align:-2px"></i> 会員情報（プランの加入・変更・解約）は、投票イベントの期間外は<b>毎週月曜日</b>、期間中は<b>毎日12:00</b>に更新します。プランを変更した場合、付与の履歴と票数には、次の更新のあとに反映されます。</div>
   </div>
@@ -1312,6 +1312,10 @@ async function pullOshi(){
 // 指定会員が指定termで付与された「プラン票の合計」（プラン変更で積み上がった今月の票）
 // プランの上下（数字が大きいほど上）
 const PLAN_RANK={supporter:1,partner:2,producer:3};
+// 【2026-12 ルール変更】2026年12月期からは「支払いが確定した日に、そのプランの票を付与」する（毎月1日の一斉付与はやめる）。
+//  11月期までは従来どおり（毎月1日に、前月の支払いがまだ有効な会員へ付与）。GASの PAY_GRANT_FROM と合わせること
+const PAY_GRANT_FROM=202612;
+function isPayGrantTerm(term){return termRank(term)>=PAY_GRANT_FROM;}
 // その月に、このプランより上のプランの付与が既にあるか（＝今回はダウングレードなので付与しない）
 function grantedTotalFor(nick,term){
   const list=(grants[nick]&&grants[nick][term])||[];
@@ -1489,7 +1493,7 @@ function getGrantedThisTerm(){
   const base=getBasePlan();
   if(curTerm.startsWith('__solo_'))return base;
   let g=grantedTotalFor(curUser?.nick,curTerm);
-  if(g<base)g=base; // 履歴が無い/未記録なら現プランの基本票を保証
+  if(g<base&&!isPayGrantTerm(curTerm))g=base; // 11月期までは、履歴が無い/未記録なら現プランの基本票を保証（12月期からは支払いの記録がある分だけ）
   return g;
 }
 // 【繰越の中核ロジック】票は「古い繰越から先に」使う（2026-11-09 ルールどおりに修正）。
@@ -2316,7 +2320,9 @@ function renderGrantHistory(m){
     const r=document.createElement('div');r.className='gh-row';
     const a=document.createElement('div');a.innerHTML=`<div class="gh-m">${now.getMonth()+1}月</div>`;
     const b=document.createElement('div');b.className='gh-v';
-    b.innerHTML=`<span class="gh-pend">次の会員情報の更新で記録されます<br>（記録前も、今のプランの${PLANS[m.plan]??'—'}票を使えます）</span>`;
+    b.innerHTML=isPayGrantTerm(curT)
+      ?`<span class="gh-pend">今月の更新日の支払いが確定し、<br>会員情報が更新されたあとに記録されます</span>`
+      :`<span class="gh-pend">次の会員情報の更新で記録されます<br>（記録前も、今のプランの${PLANS[m.plan]??'—'}票を使えます）</span>`;
     r.appendChild(a);r.appendChild(b);box.appendChild(r);
   }
   if(!terms.length&&box.children.length===0){const e=document.createElement('div');e.className='mv-empty';e.textContent='まだ付与の記録がありません';box.appendChild(e);return;}
@@ -2500,7 +2506,7 @@ function calcMemberVotes(m){
   };
   // 今期の付与合計（プラン変更で積み上がった票）。履歴が無ければ現プラン基本票を最低保証
   let grantedThis=grantedTotalFor(nick,curTerm);
-  if(grantedThis<basePlan)grantedThis=basePlan;
+  if(grantedThis<basePlan&&!isPayGrantTerm(curTerm))grantedThis=basePlan; // 12月期からは最低保証なし（支払いの記録がある分だけ）
   // 前期繰り越し（直前2期分・連続会員が条件）。投票者側getCarryOver／サーバーと同じ計算を共有する。
   const memberTermSet=new Set();
   Object.keys(grants[nick]||{}).forEach(t=>{if(t)memberTermSet.add(t);}); // 付与履歴のある期＝会員だった証拠
@@ -3260,7 +3266,9 @@ function grantsFromHistory(rows){
       const d1=new Date(y,mo,1).getTime(),d2=new Date(y,mo+1,1).getTime();
       const set=new Set();
       const before=g.filter(r=>r._t<d1),inM=g.filter(r=>r._t>=d1&&r._t<d2);
-      if(before.length){
+      if(isPayGrantTerm(term)){
+        // 12月期から：その月に確定した支払い（新規・継続・プラン変更）のプランだけを付与する
+      }else if(before.length){
         const last=before[before.length-1];
         if(last.type!=='解約'&&PLAN_RANK[last.plan]&&addOneMonth(last._t)>=d1)set.add(last.plan);
       }else{
