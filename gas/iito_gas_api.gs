@@ -90,6 +90,7 @@ function handleAction(action, data) {
   if (action === 'adminLogin')  return adminLogin(data);
   // 投票者本人
   if (action === 'me')          return getMe(data);
+  if (action === 'supporterRank') return supporterRank(data);
   if (action === 'saveVote')    return saveVote(data);
   // 管理者
   const ADMIN_ACTIONS = {
@@ -516,6 +517,59 @@ function getEventWindow(evId) {
 }
 
 // 投票データを保存（会員確認＋本人確認＋締切チェック＋繰り越し込み上限チェック）
+// ════════════════════════════════════════
+// 応援ランキング（2026-11-21 追加）
+//  投票画面で「自分が投票したモデルに、いま誰が何票入れているか」の上位5名（ニックネーム・票数）を出す。
+//  ・ログインした本人だけが呼べる。本人がこのイベントで票を入れたモデルの分だけ返す（入れていないモデルの分は返さない）
+//  ・返すのはニックネームと票数だけ（メールアドレスや会員番号は返さない）
+//  ・リアルタイム表示。同時アクセスに備えて、集計結果を20秒だけキャッシュする
+// ════════════════════════════════════════
+const SUPPORTER_TOP_N = 5;
+function supporterRank(data) {
+  const a = authVoter_(data);
+  if (a.error) return { ok: false, error: a.error };
+  const me = a.member.nick;
+  const evId = String(data.evId || '');
+  if (!evId) return { ok: false, error: 'no_event' };
+  const agg = supporterAgg_(evId); // { modelId: { name, by: { ニックネーム: 票数 } } }
+  const out = [];
+  Object.keys(agg).forEach(function(modelId){
+    const m = agg[modelId];
+    if ((m.by[me] || 0) <= 0) return; // 本人が票を入れていないモデルは返さない
+    const list = Object.keys(m.by).map(function(n){ return { nick: n, count: m.by[n] }; })
+      .filter(function(x){ return x.count > 0; })
+      .sort(function(x, y){ return y.count - x.count || (x.nick < y.nick ? -1 : x.nick > y.nick ? 1 : 0); });
+    // 同じ票数は同じ順位にする（1位・2位・2位・4位…）
+    var rank = 0, prev = null;
+    list.forEach(function(x, i){ if (x.count !== prev) { rank = i + 1; prev = x.count; } x.rank = rank; });
+    const meRow = list.filter(function(x){ return x.nick === me; })[0];
+    out.push({ modelId: modelId, name: m.name, total: list.length,
+               top: list.slice(0, SUPPORTER_TOP_N).map(function(x){ return { nick: x.nick, count: x.count, rank: x.rank, me: x.nick === me }; }),
+               me: meRow ? { rank: meRow.rank, count: meRow.count } : null });
+  });
+  out.sort(function(x, y){ return (y.me ? y.me.count : 0) - (x.me ? x.me.count : 0); }); // 自分が多く入れたモデルを先に
+  return { ok: true, models: out, at: Date.now() };
+}
+function supporterAgg_(evId) {
+  const safeId = String(evId || 'noevent').replace(/[\\\/\?\*\[\]:]/g, '_').slice(0, 80);
+  const cache = CacheService.getScriptCache();
+  const key = 'srk_' + Utilities.base64EncodeWebSafe(safeId).slice(0, 200);
+  const hit = cache.get(key);
+  if (hit) { try { return JSON.parse(hit); } catch (e) {} }
+  const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('投票_' + safeId); // 無ければ作らない
+  const agg = {};
+  if (sh && sh.getLastRow() > 2) {
+    sh.getRange(3, 1, sh.getLastRow() - 2, 12).getValues().forEach(function(r){
+      const nick = String(r[4] || '').trim(), modelId = String(r[8] || '').trim(), c = Number(r[10]) || 0;
+      if (!nick || !modelId || !c) return;
+      if (!agg[modelId]) agg[modelId] = { name: String(r[9] || modelId), by: {} };
+      agg[modelId].by[nick] = (agg[modelId].by[nick] || 0) + c;
+    });
+  }
+  try { cache.put(key, JSON.stringify(agg), 20); } catch (e) {} // 大きすぎて入らないときはキャッシュしない
+  return agg;
+}
+
 function saveVote(data) {
   const evId   = data.evId;
   const evName = data.evName;
