@@ -1806,7 +1806,8 @@ function buildGrid(grp){
   if(anyRanked){
     const bar=document.createElement('div');
     bar.className='rank-filter';bar.setAttribute('role','group');bar.setAttribute('aria-label','モデルランクで絞り込む');
-    [{rank:'all'},...groups.map(g=>({rank:g.rank}))].forEach(o=>{
+    // 「すべて」ボタンは置かない（2026-11-21）。何も選んでいないときは全員を出し、選んでいるランクをもう一度押すと全員に戻る
+    groups.map(g=>({rank:g.rank})).forEach(o=>{
       const b=document.createElement('button');b.type='button';
       b.dataset.rank=o.rank;
       b.textContent=o.rank==='all'?'すべて':rankLabel(o.rank);
@@ -1848,6 +1849,7 @@ function buildGrid(grp){
 }
 // ランクの切り替え。選択中（未確定）の票は消さずに残す
 function setRankFilter(grp,rank){
+  if(rankFilter[grp]===rank)rank='all'; // 選んでいるランクをもう一度押したら、絞り込みを外す（全員を出す）
   const reflow=colsFor(rankFilter[grp])!==colsFor(rank);
   rankFilter[grp]=rank;
   if(reflow){
@@ -1874,7 +1876,7 @@ function applyRankFilter(grp){
   sec.querySelector('.ns-empty')?.remove();
   if(nameQuery.trim()&&!boxes.some(b=>b.style.display!=='none')){
     const em=document.createElement('div');em.className='ns-empty';
-    em.textContent=`「${nameQuery.trim()}」に当てはまるモデルはいません`+(boxes.length?`（「すべて」に切り替えると${boxes.reduce((n,b)=>n+b.querySelectorAll('.cc').length,0)}人見つかります）`:'');
+    em.textContent=`「${nameQuery.trim()}」に当てはまるモデルはいません`+(boxes.length?`（ランクの絞り込みを外すと${boxes.reduce((n,b)=>n+b.querySelectorAll('.cc').length,0)}人見つかります）`:'');
     sec.appendChild(em);
   }
 }
