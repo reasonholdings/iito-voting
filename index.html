@@ -1807,13 +1807,14 @@ function buildGrid(grp){
   // 選んでいたランクが無くなっていたら「すべて」に戻す
   // 最初に開いたときは「専属」だけを表示する（専属のモデルがいないイベントでは全員）
   //  （モデル一覧の読み込み前に一度描くことがあるので、ランクのあるモデルが出そろってから決める）
-  if(rankFilter[grp]===undefined&&anyRanked)rankFilter[grp]=groups.some(g=>g.rank==='専属')?'専属':'all';
-  if(rankFilter[grp]!==undefined&&rankFilter[grp]!=='all'&&!groups.some(g=>g.rank===rankFilter[grp]))rankFilter[grp]='all';
+  //  全員を一度に出す表示はない（2026-11-21）。いつも1つのランクを選んでいる状態にする
+  const defRank=groups.some(g=>g.rank==='専属')?'専属':(groups[0]?groups[0].rank:'all');
+  if(anyRanked&&(rankFilter[grp]===undefined||rankFilter[grp]==='all'||!groups.some(g=>g.rank===rankFilter[grp])))rankFilter[grp]=defRank;
   // ランクが設定されているときだけ、切り替えボタンを出す
   if(anyRanked){
     const bar=document.createElement('div');
     bar.className='rank-filter';bar.setAttribute('role','group');bar.setAttribute('aria-label','モデルランクで絞り込む');
-    // 「すべて」ボタンは置かない（2026-11-21）。何も選んでいないときは全員を出し、選んでいるランクをもう一度押すと全員に戻る
+    // 「すべて」ボタンは置かない（2026-11-21）。いつもどれか1つのランクを選んでいる（最初は専属）
     groups.map(g=>({rank:g.rank})).forEach(o=>{
       const b=document.createElement('button');b.type='button';
       b.dataset.rank=o.rank;
@@ -1856,7 +1857,7 @@ function buildGrid(grp){
 }
 // ランクの切り替え。選択中（未確定）の票は消さずに残す
 function setRankFilter(grp,rank){
-  if(rankFilter[grp]===rank)rank='all'; // 選んでいるランクをもう一度押したら、絞り込みを外す（全員を出す）
+  if(rankFilter[grp]===rank)return; // 選んでいるランクをもう一度押しても何もしない（全員を出す表示はない）
   const reflow=colsFor(rankFilter[grp]??'all')!==colsFor(rank);
   rankFilter[grp]=rank;
   if(reflow){
@@ -1876,14 +1877,16 @@ function applyRankFilter(grp){
     b.classList.toggle('on',on);b.setAttribute('aria-pressed',on?'true':'false');
   });
   const boxes=[...sec.querySelectorAll('.rank-sec')];
+  // 名前で検索しているあいだは、ランクに関係なく当てはまるモデルを全部出す（全員表示のボタンが無いため、ほかのランクのモデルも探せるように）
+  const searching=!!nameQuery.trim();
   boxes.forEach(box=>{
-    box.style.display=(cur==='all'||box.dataset.rank===cur)?'':'none';
+    box.style.display=(searching||cur==='all'||box.dataset.rank===cur)?'':'none';
   });
   // 名前検索で1人も出ないときは、その旨を表示する
   sec.querySelector('.ns-empty')?.remove();
   if(nameQuery.trim()&&!boxes.some(b=>b.style.display!=='none')){
     const em=document.createElement('div');em.className='ns-empty';
-    em.textContent=`「${nameQuery.trim()}」に当てはまるモデルはいません`+(boxes.length?`（ランクの絞り込みを外すと${boxes.reduce((n,b)=>n+b.querySelectorAll('.cc').length,0)}人見つかります）`:'');
+    em.textContent=`「${nameQuery.trim()}」に当てはまるモデルはいません`;
     sec.appendChild(em);
   }
 }
