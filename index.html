@@ -231,6 +231,12 @@ body.has-tabbar .screen{padding-bottom:120px}
 .gh-line .k{color:#666;flex:0 0 auto}
 .gh-line .v{text-align:right}
 .gh-sub{font-size:12px;color:#666;padding:1px 0 1px 12px;display:flex;justify-content:space-between;gap:8px}
+.gh-tag{display:inline-block;font-size:12px;font-weight:700;border-radius:999px;padding:2px 10px}
+.gh-line.give .gh-tag{background:#E2FBF0;color:#0A7A4E}.gh-line.give .v{color:#0A7A4E;font-weight:700}
+.gh-line.use .gh-tag{background:#E6F1FB;color:#1F6FB2}.gh-line.use .v{color:#1F6FB2;font-weight:700}
+.gh-sub.give{border-left:3px solid #8FE7C0;margin-left:4px}.gh-sub.use{border-left:3px solid #9CC7EE;margin-left:4px}
+.gh-sum .h.give{color:#0A7A4E;font-weight:700}.gh-sum .h.use{color:#1F6FB2;font-weight:700}
+.gh-sum .v.give{color:#0A7A4E}.gh-sum .v.use{color:#1F6FB2}
 .gh-rest{display:flex;justify-content:space-between;font-size:13px;font-weight:700;color:var(--ac-d);border-top:1px dashed #E4E4E8;margin-top:6px;padding-top:6px}
 .gh-rest.dim{color:#AAA;font-weight:500}
 .gh-pend{font-size:12px;color:#888}
@@ -2537,9 +2543,9 @@ function renderGrantHistory(m){
       :`<span class="gh-pend">次の会員情報の更新で記録されます<br>（記録前も、今のプランの${PLANS[m.plan]??'—'}票を使えます）</span>`)+`</div></div>`;
   }
   if(!L.length){box.innerHTML=html+'<div class="mv-empty">まだ記録がありません</div>';return;}
-  html+=`<div class="gh-sum"><span></span><span class="h">付与</span><span class="h">使用</span><span class="h">残り</span>`;
+  html+=`<div class="gh-sum"><span></span><span class="h give">＋付与</span><span class="h use">−使用</span><span class="h">残り</span>`;
   L.slice(0,3).forEach(r=>{
-    html+=`<span class="m">${ghMonthLabel(r.k)}</span><span class="v">${r.g}票</span><span class="v">${r.u}票</span><span class="v ${r.expired?'dim':'rest'}">${r.expired?'期限切れ':r.rest+'票'}</span>`;
+    html+=`<span class="m">${ghMonthLabel(r.k)}</span><span class="v give">${r.g?'＋'+r.g:'0'}票</span><span class="v use">${r.u?'−'+r.u:'0'}票</span><span class="v ${r.expired?'dim':'rest'}">${r.expired?'期限切れ':r.rest+'票'}</span>`;
   });
   box.innerHTML=html+'</div>';
 }
@@ -2554,12 +2560,12 @@ function openGhModal(){
     if(r.gap){box.insertAdjacentHTML('beforeend',`<div class="gh-month"><div class="gh-mt"><span class="mm">${ghMonthLabel(r.k)}</span></div><div class="gh-line"><span class="k">プランに加入していない月です（それまでの票はなくなりました）</span></div></div>`);return;}
     const pay=isPayGrantTerm(r.t);
     let h=`<div class="gh-month"><div class="gh-mt"><span class="mm">${ghMonthLabel(r.k)}${pay&&r.g?'<span class="gh-ok">本付与済み</span>':''}</span><span class="gh-exp">${r.g?(r.expired?'使える期限を過ぎました':r.expTxt+'使えます'):''}</span></div>`;
-    h+=`<div class="gh-line"><span class="k">付与</span><span class="v">${r.g?r.g+'票':'なし'}</span></div>`;
-    r.plans.forEach(p=>{h+=`<div class="gh-sub"><span>${PLAN_LBL[p]}</span><span>${PLANS[p]}票</span></div>`;});
-    h+=`<div class="gh-line"><span class="k">使用</span><span class="v">${r.u?r.u+'票':'なし'}</span></div>`;
+    h+=`<div class="gh-line give"><span class="gh-tag">＋ 付与</span><span class="v">${r.g?'＋'+r.g+'票':'なし'}</span></div>`;
+    r.plans.forEach(p=>{h+=`<div class="gh-sub give"><span>${PLAN_LBL[p]}</span><span>${PLANS[p]}票</span></div>`;});
+    h+=`<div class="gh-line use"><span class="gh-tag">− 使用</span><span class="v">${r.u?'−'+r.u+'票':'なし'}</span></div>`;
     r.uses.forEach(x=>{
-      h+=`<div class="gh-sub"><span>${e(x.ev.name||'イベント')}</span><span>${x.tot}票</span></div>`;
-      x.rows.sort((a,b)=>b[1]-a[1]).forEach(([mid,c])=>{h+=`<div class="gh-sub" style="padding-left:24px;color:#888"><span>${e(findMod(mid)?.name||mid)}</span><span>${c}票</span></div>`;});
+      h+=`<div class="gh-sub use"><span>${e(x.ev.name||'イベント')}</span><span>${x.tot}票</span></div>`;
+      x.rows.sort((a,b)=>b[1]-a[1]).forEach(([mid,c])=>{h+=`<div class="gh-sub use" style="padding-left:24px;color:#888"><span>${e(findMod(mid)?.name||mid)}</span><span>${c}票</span></div>`;});
     });
     if(r.g)h+=`<div class="gh-line" style="margin-top:4px"><span class="k">この月に付与された票のうち使われた票</span><span class="v">${r.spent}票</span></div>`;
     if(r.g&&r.spent>0&&r.spent>r.u)h+=`<div class="gh-sub" style="padding-left:0"><span>票は古いものから使われるため、あとの月の投票にも使われています</span></div>`;
