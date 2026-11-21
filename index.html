@@ -156,6 +156,11 @@ html,body{min-height:100vh;background:var(--bg2);font-family:"Zen Maru Gothic","
 /* 投票者向けの下のメニュー（インスタグラム風）：左＝投票、右＝マイページ。ブラウザの下のアドレス欄のすぐ上に置く（下の余白2px） */
 .tabbar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(2px + env(safe-area-inset-bottom));width:calc(100% - 32px);max-width:420px;display:none;justify-content:space-around;align-items:center;padding:6px;background:rgba(255,255,255,.94);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border:1px solid var(--bd);border-radius:999px;box-shadow:0 6px 24px rgba(0,0,0,.12);z-index:150}
 .tabbar.show{display:flex}
+.float-submit{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(82px + env(safe-area-inset-bottom));width:calc(100% - 48px);max-width:400px;z-index:140;display:flex;align-items:center;justify-content:center;gap:10px;padding:14px 18px;border:none;border-radius:999px;background:var(--ac);color:#fff;font-family:inherit;font-size:16px;font-weight:700;box-shadow:0 8px 24px rgba(216,27,96,.35);cursor:pointer;animation:fs-in .2s ease}
+.float-submit .fs-n{font-size:12.5px;font-weight:700;background:rgba(255,255,255,.22);border-radius:999px;padding:3px 10px}
+.float-submit:disabled{background:#E7A9BF;box-shadow:none;cursor:default}
+@keyframes fs-in{from{opacity:0;transform:translate(-50%,10px)}to{opacity:1;transform:translate(-50%,0)}}
+#s-vote.has-float{padding-bottom:200px} /* 浮かぶボタンで一番下のモデルが隠れないよう、下に余白を足す */
 .tb-btn{position:relative;flex:1 1 0;height:52px;border:none;background:transparent;border-radius:999px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;color:var(--sub);font-family:inherit;-webkit-tap-highlight-color:transparent}
 .tb-btn .tb-ic{font-size:23px;line-height:1}
 .tb-btn .tb-lb{font-size:10px}
@@ -658,6 +663,8 @@ body.ia-open{overflow:hidden}
   <div class="warn-txt" id="warn-txt">票数が上限を超えています</div>
   <div id="novote-note" style="display:none;text-align:center;padding:14px;background:var(--bg2);border:.5px solid var(--bd);border-radius:12px;font-size:13px;color:var(--sub);margin-bottom:12px">現在投票受付中のイベントはありません</div>
   <button class="btn-gold" id="btn-final" onclick="openConfirm()" disabled>投票を確定する</button>
+  <!-- 画面の下に浮かぶ「投票を確定する」（2026-11-21）：送っていない票があるときだけ出す。押すと今と同じ確認画面 -->
+  <button type="button" class="float-submit" id="float-submit" onclick="openConfirm()" style="display:none"></button>
   <p class="hint">各候補の票数を決定してから最終確定してください</p>
   <!-- ログアウトはマイページに移動（2026-11-17） -->
 
@@ -2145,6 +2152,19 @@ function updUI(){
   let hasUnsent=false;
   Object.keys(curUser.locked).forEach(mid=>{if((curUser.locked[mid]||0)>(sentLocked[mid]||0))hasUnsent=true;});
   document.getElementById('btn-final').disabled=!hasUnsent||Object.keys(pending).length>0||over||isVotingClosed()!=='';
+  // 画面の下に浮かぶ「投票を確定する」：送っていない票（仮確定）があるときだけ出す
+  {
+    const fs=document.getElementById('float-submit');
+    if(fs){
+      let ppl=0,vv=0;
+      Object.keys(curUser.locked).forEach(mid=>{const d=(curUser.locked[mid]||0)-(sentLocked[mid]||0);if(d>0){ppl++;vv+=d;}});
+      const show=hasUnsent&&isVotingClosed()==='';
+      fs.style.display=show?'flex':'none';
+      fs.disabled=Object.keys(pending).length>0||over;
+      fs.innerHTML=`<span>投票を確定する</span><span class="fs-n">${ppl}人・${vv}票</span>`;
+      document.getElementById('s-vote')?.classList.toggle('has-float',show);
+    }
+  }
   allMod().forEach(m=>{
     const card=document.getElementById('cc-'+m.id);const cv=document.getElementById('cv-'+m.id);if(!card)return;
     const isL=curUser.locked[m.id]!==undefined,isP=pending[m.id]!==undefined;
