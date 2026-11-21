@@ -86,6 +86,26 @@ html,body{min-height:100vh;background:var(--bg2);font-family:"Zen Maru Gothic","
 /* ── ログイン画面 ── */
 .login-hd{text-align:center;padding-top:6px;padding-bottom:16px;border-bottom:1px solid var(--bd);margin-bottom:18px}
 .banner{background:var(--bg2);border:1px solid var(--bd);border-radius:14px;padding:14px 16px;margin-bottom:6px;text-align:center}
+.sr-panel{position:absolute;top:8px;right:8px;bottom:8px;width:56%;max-width:280px;z-index:3;background:rgba(18,20,28,.58);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);color:#fff;border-radius:12px;padding:8px 10px 8px;text-align:left;display:flex;flex-direction:column;box-shadow:0 4px 14px rgba(0,0,0,.18)}
+.sr-hd{display:flex;align-items:center;justify-content:space-between;gap:6px}
+.sr-ttl{font-size:11px;font-weight:700;letter-spacing:.04em;opacity:.9}
+.sr-x{background:none;border:none;color:#fff;opacity:.8;font-size:15px;line-height:1;cursor:pointer;padding:2px 2px 2px 6px}
+.sr-tabs{display:flex;gap:4px;flex-wrap:nowrap;overflow-x:auto;margin:5px 0 2px;scrollbar-width:none}
+.sr-tabs::-webkit-scrollbar{display:none}
+.sr-tab{flex:0 0 auto;border:1px solid rgba(255,255,255,.45);background:transparent;color:#fff;font-family:inherit;font-size:11px;border-radius:999px;padding:1px 8px;cursor:pointer;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sr-tab.on{background:#fff;color:#1A1A1A;font-weight:700}
+.sr-model{font-size:13px;font-weight:700;margin:4px 0 3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sr-list{flex:1;display:flex;flex-direction:column;justify-content:space-around;min-height:0}
+.sr-row{display:flex;align-items:flex-start;gap:6px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.14);font-size:12px;line-height:1.3}
+.sr-row:last-child{border-bottom:none}
+.sr-rk{flex:0 0 16px;font-weight:700;font-size:15px;text-align:center;line-height:1.25}
+.sr-body{flex:1;min-width:0}
+.sr-nm{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-all;color:#9EE6C4}
+.sr-ct{display:block;font-weight:700;font-size:12.5px;white-space:nowrap;margin-top:1px}
+.sr-row.me .sr-nm,.sr-row.me .sr-ct{color:#FFD86B}
+.sr-me{font-size:11.5px;margin-top:4px;padding-top:4px;border-top:1px dashed rgba(255,255,255,.35);color:#FFD86B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sr-ft{font-size:10px;opacity:.75;margin-top:3px;text-align:right}
+.sr-open{position:absolute;top:8px;right:8px;z-index:3;border:none;background:rgba(18,20,28,.58);color:#fff;font-family:inherit;font-size:11px;font-weight:700;border-radius:999px;padding:4px 10px;cursor:pointer}
 .banner-img-wrap{margin:-14px -16px 12px;border-radius:13px 13px 0 0;overflow:hidden;line-height:0}
 .banner-img-wrap img{width:100%;max-height:200px;object-fit:cover;display:block}
 .banner-name{font-size:13px;font-weight:500;text-align:center;margin-bottom:4px}
@@ -564,7 +584,10 @@ body.has-tabbar .screen{padding-bottom:120px}
 
   <div class="ev-tabs" id="ev-tabs" style="display:none;gap:8px;margin-bottom:12px;flex-wrap:wrap;justify-content:center"></div>
 
-  <div class="banner" id="vote-banner" style="margin-bottom:14px">
+  <div class="banner" id="vote-banner" style="margin-bottom:14px;position:relative">
+    <!-- 応援ランキング（2026-11-21）：自分が投票したモデルに、いま誰が何票入れているか（上位5名）。半透明で右側に重ねる -->
+    <div class="sr-panel" id="sr-panel" style="display:none" aria-live="polite"></div>
+    <button type="button" class="sr-open" id="sr-open" style="display:none" onclick="setSrHidden(false)"><i class="ti ti-trophy"></i> 応援ランキング</button>
     <div class="banner-img-wrap" id="v-ev-img-wrap" style="display:none"><img id="v-ev-img" alt="イベント画像"/></div>
     <div class="banner-name" id="v-ev-name"></div>
     <div class="banner-period" id="v-ev-period"></div>
@@ -1156,6 +1179,18 @@ function demoGas(action,payload){
       ls('demo_votes',votes);return ok({saved:Object.keys(payload.votes||{}).length});
     }
     case 'getResults': return ok({votes:{}});
+    case 'supporterRank': {
+      // テストモード：自分が票を入れたモデルに、架空の5人が投票している形で返す
+      const mine=votes[payload.evId]||{};
+      const fake=[['🌼香川産レタス🍐もう梨渚だけ！',441],['ふくしき🍰WeddingMuse支援中',127],['ららパパ',98],['ありあり',88],['なかちゃん@れもん🍋',78],['てつぞー@桜花',66]];
+      const models=Object.entries(mine).filter(([,c])=>c>0).map(([mid,c])=>{
+        const list=fake.map(([n,v])=>({nick:n,count:v})).concat([{nick:DEMO_NICK,count:c,me:true}]).sort((a,b)=>b.count-a.count);
+        list.forEach((x,i)=>x.rank=i+1);
+        const me=list.find(x=>x.me);
+        return {modelId:mid,name:mid,total:list.length,top:list.slice(0,5).map(x=>({nick:x.nick,count:x.count,rank:x.rank,me:!!x.me})),me:{rank:me.rank,count:me.count}};
+      });
+      return ok({models,at:Date.now()});
+    }
     default: return ok();
   }
 }
@@ -2640,7 +2675,57 @@ function buildVoteScreen(){
   const hint=document.querySelector('#s-vote .hint');if(hint)hint.style.display=noEvent?'none':'';
   // メトリクス（残り票数）は隠さない ＝ イベントが無くても繰り越し込みの残り票数を見せる
   const metrics=document.querySelector('#s-vote .metrics');if(metrics)metrics.style.display='';
+  refreshSupporterRank();
 }
+// ── 応援ランキング（2026-11-21）────────────────────────────────
+//  自分がこのイベントで票を入れたモデルについて、いま誰が何票入れているか（上位5名・ニックネームと票数）を、
+//  投票画面のバナーの右側に半透明で重ねて出す。リアルタイム（画面を開いたとき・送信後・表示中は60秒ごとに取り直す）。
+//  GASの supporterRank は、ログインした本人が票を入れたモデルの分だけ返す。
+let srData=null,srSel='',srTimer=null,srBusy=false;
+function srHidden(){return !!ls('iito_sr_hidden');}
+function setSrHidden(v){ls('iito_sr_hidden',v?1:0);renderSupporterRank();}
+async function refreshSupporterRank(force){
+  if(!curUser||!curEvId)return;
+  const pub=getPublicEvents();if(!pub.some(e=>e.id===curEvId)){srData=null;renderSupporterRank();return;}
+  if(srBusy&&!force)return;srBusy=true;
+  try{
+    const va=DEMO?{}:await getVoterAuth();
+    if(!va&&!DEMO){srBusy=false;return;}
+    const ev=curEvId;
+    const r=await gasPost('supporterRank',{nick:curUser.nick,evId:ev,...(va||{})});
+    if(ev!==curEvId){srBusy=false;return;} // 取りに行っている間にイベントを切り替えた
+    srData=(r&&r.ok&&Array.isArray(r.models))?r:null;
+  }catch(e){console.warn('応援ランキングの取得に失敗',e);}
+  srBusy=false;
+  renderSupporterRank();
+  if(!srTimer)srTimer=setInterval(()=>{
+    const vs=document.getElementById('s-vote');
+    if(vs&&vs.classList.contains('active')&&document.visibilityState==='visible'&&curUser)refreshSupporterRank();
+  },60000);
+}
+function renderSupporterRank(){
+  const p=document.getElementById('sr-panel'),ob=document.getElementById('sr-open');if(!p||!ob)return;
+  const bn=document.getElementById('vote-banner');
+  const models=(srData&&srData.models)||[];
+  if(!models.length){p.style.display='none';ob.style.display='none';if(bn)bn.style.minHeight='';return;}
+  if(srHidden()){p.style.display='none';ob.style.display='';if(bn)bn.style.minHeight='';return;}
+  if(bn)bn.style.minHeight='340px'; // 画像の無いイベントでも、5人分が収まる高さにする
+  ob.style.display='none';
+  if(!models.some(m=>m.modelId===srSel))srSel=models[0].modelId;
+  const m=models.find(x=>x.modelId===srSel);
+  const e=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const nm=e((findMod(m.modelId)||{}).name||m.name||'');
+  const tabs=models.length>1?`<div class="sr-tabs">${models.map(x=>`<button type="button" class="sr-tab${x.modelId===srSel?' on':''}" onclick="srSel='${e(x.modelId)}';renderSupporterRank()">${e((findMod(x.modelId)||{}).name||x.name||'')}</button>`).join('')}</div>`:'';
+  const rows=m.top.map(r=>`<div class="sr-row${r.me?' me':''}"><span class="sr-rk">${r.rank}</span><span class="sr-body"><span class="sr-nm">${e(r.nick)}</span><span class="sr-ct">${Number(r.count).toLocaleString()}票</span></span></div>`).join('');
+  const meLine=(m.me&&!m.top.some(r=>r.me))?`<div class="sr-me">あなた：${m.me.rank}位　${Number(m.me.count).toLocaleString()}票</div>`:'';
+  const at=srData.at?new Date(srData.at):null;
+  p.innerHTML=`<div class="sr-hd"><span class="sr-ttl"><i class="ti ti-trophy"></i> 応援ランキング</span><button type="button" class="sr-x" aria-label="閉じる" onclick="setSrHidden(true)">×</button></div>`
+    +tabs+(models.length>1?'':`<div class="sr-model">${nm}</div>`)
+    +`<div class="sr-list">${rows}</div>`+meLine
+    +(at?`<div class="sr-ft">${pad(at.getHours())}:${pad(at.getMinutes())} 時点・${m.total}人が投票</div>`:'');
+  p.style.display='flex';
+}
+
 // 投票者画面の上部イベントタブ（ONイベントが複数のときだけ表示）
 function renderEventTabs(){
   const tabs=document.getElementById('ev-tabs');if(!tabs)return;
@@ -2678,6 +2763,7 @@ function switchEvent(evId){
   ls(sentKey,{...sentLocked});
   submitted=false;
   applyEvUI();renderEventTabs();buildGrids();updUI();startCd();
+  srData=null;renderSupporterRank();refreshSupporterRank();
 }
 
 // 投票確認・送信
@@ -2763,6 +2849,7 @@ async function doSubmit(){
     if(okBtn){okBtn.disabled=false;okBtn.textContent=okOrig;}
     if(backBtn)backBtn.disabled=false;
     _finishSubmit();
+    refreshSupporterRank(true); // 送信したら応援ランキングもすぐ取り直す
   }else if(hardError){
     // サーバーが拒否（票は記録されていない）。送信済みは進めない
     if(okBtn){okBtn.disabled=false;okBtn.textContent=okOrig;}
