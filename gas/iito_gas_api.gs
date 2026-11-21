@@ -520,11 +520,12 @@ function getEventWindow(evId) {
 // ════════════════════════════════════════
 // 応援ランキング（2026-11-21 追加）
 //  投票画面で「自分が投票したモデルに、いま誰が何票入れているか」の上位5名（ニックネーム・票数）を出す。
-//  ・ログインした本人だけが呼べる。本人がこのイベントで票を入れたモデルの分だけ返す（入れていないモデルの分は返さない）
+//  ・ログインした本人だけが呼べる。本人がこのイベントで10票以上入れたモデルの分だけ返す（10票未満なら「あと何票」だけ、入れていないモデルは何も返さない）
 //  ・返すのはニックネームと票数だけ（メールアドレスや会員番号は返さない）
 //  ・リアルタイム表示。同時アクセスに備えて、集計結果を20秒だけキャッシュする
 // ════════════════════════════════════════
 const SUPPORTER_TOP_N = 5;
+const SUPPORTER_MIN_VOTES = 10; // このイベントでそのモデルに10票以上入れた人だけが、そのモデルの応援ランキングを見られる（2026-11-21）
 function supporterRank(data) {
   const a = authVoter_(data);
   if (a.error) return { ok: false, error: a.error };
@@ -535,7 +536,13 @@ function supporterRank(data) {
   const out = [];
   Object.keys(agg).forEach(function(modelId){
     const m = agg[modelId];
-    if ((m.by[me] || 0) <= 0) return; // 本人が票を入れていないモデルは返さない
+    const mine = m.by[me] || 0;
+    if (mine <= 0) return; // 本人が票を入れていないモデルは返さない
+    if (mine < SUPPORTER_MIN_VOTES) {
+      // 10票未満：ランキングの中身は返さず、「あと何票で見られるか」だけ返す
+      out.push({ modelId: modelId, name: m.name, locked: true, mine: mine, need: SUPPORTER_MIN_VOTES - mine, top: [], me: { rank: 0, count: mine } });
+      return;
+    }
     const list = Object.keys(m.by).map(function(n){ return { nick: n, count: m.by[n] }; })
       .filter(function(x){ return x.count > 0; })
       .sort(function(x, y){ return y.count - x.count || (x.nick < y.nick ? -1 : x.nick > y.nick ? 1 : 0); });
@@ -548,7 +555,7 @@ function supporterRank(data) {
                me: meRow ? { rank: meRow.rank, count: meRow.count } : null });
   });
   out.sort(function(x, y){ return (y.me ? y.me.count : 0) - (x.me ? x.me.count : 0); }); // 自分が多く入れたモデルを先に
-  return { ok: true, models: out, at: Date.now() };
+  return { ok: true, models: out, min: SUPPORTER_MIN_VOTES, at: Date.now() };
 }
 function supporterAgg_(evId) {
   const safeId = String(evId || 'noevent').replace(/[\\\/\?\*\[\]:]/g, '_').slice(0, 80);

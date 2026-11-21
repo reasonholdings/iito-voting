@@ -105,6 +105,9 @@ html,body{min-height:100vh;background:var(--bg2);font-family:"Zen Maru Gothic","
 .sr-ct{flex:0 0 auto;font-weight:700;font-size:13px;white-space:nowrap}
 .sr-row.me .sr-nm,.sr-row.me .sr-ct{color:#FFD86B}
 .sr-me{font-size:11.5px;margin-top:4px;padding-top:4px;border-top:1px dashed rgba(255,255,255,.35);color:#FFD86B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sr-lock{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:6px;font-size:12.5px;line-height:1.5}
+.sr-lock .ti{font-size:22px;opacity:.85}
+.sr-need{font-size:15px;font-weight:700;color:#FFD86B}
 .sr-ft{font-size:10px;opacity:.75;margin-top:3px;text-align:right}
 .sr-open{position:absolute;top:8px;right:8px;z-index:3;display:flex;align-items:center;gap:6px;border:none;background:rgba(18,20,28,.62);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);color:#fff;font-family:inherit;font-size:12px;font-weight:700;border-radius:999px;padding:6px 12px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.18)}
 .sr-open .me{color:#FFD86B}
@@ -592,7 +595,7 @@ body.has-tabbar .screen{padding-bottom:120px}
   <div class="banner" id="vote-banner" style="margin-bottom:14px;position:relative">
     <!-- 応援ランキング（2026-11-21）：自分が投票したモデルに、いま誰が何票入れているか（上位5名）。半透明で右側に重ねる -->
     <div class="sr-panel" id="sr-panel" style="display:none" aria-live="polite"></div>
-    <button type="button" class="sr-open" id="sr-open" style="display:none" onclick="setSrHidden(false)" aria-label="応援ランキングを表示する"></button>
+    <button type="button" class="sr-open" id="sr-open" style="display:none" aria-label="応援ランキングを表示する"></button>
     <div class="banner-img-wrap" id="v-ev-img-wrap" style="display:none"><img id="v-ev-img" alt="イベント画像"/></div>
     <div class="banner-name" id="v-ev-name"></div>
     <div class="banner-period" id="v-ev-period"></div>
@@ -1189,12 +1192,13 @@ function demoGas(action,payload){
       const mine=votes[payload.evId]||{};
       const fake=[['🌼香川産レタス🍐もう梨渚だけ！',441],['ふくしき🍰WeddingMuse支援中',127],['ららパパ',98],['ありあり',88],['なかちゃん@れもん🍋',78],['てつぞー@桜花',66]];
       const models=Object.entries(mine).filter(([,c])=>c>0).map(([mid,c])=>{
+        if(c<10)return {modelId:mid,name:mid,locked:true,mine:c,need:10-c,top:[],me:{rank:0,count:c}};
         const list=fake.map(([n,v])=>({nick:n,count:v})).concat([{nick:DEMO_NICK,count:c,me:true}]).sort((a,b)=>b.count-a.count);
         list.forEach((x,i)=>x.rank=i+1);
         const me=list.find(x=>x.me);
         return {modelId:mid,name:mid,total:list.length,top:list.slice(0,5).map(x=>({nick:x.nick,count:x.count,rank:x.rank,me:!!x.me})),me:{rank:me.rank,count:me.count}};
       });
-      return ok({models,at:Date.now()});
+      return ok({models,min:10,at:Date.now()});
     }
     default: return ok();
   }
@@ -2687,7 +2691,7 @@ function buildVoteScreen(){
 // ── 応援ランキング（2026-11-21）────────────────────────────────
 //  自分がこのイベントで票を入れたモデルについて、いま誰が何票入れているか（上位5名・ニックネームと票数）を、
 //  投票画面のバナーの右側に半透明で重ねて出す。リアルタイム（画面を開いたとき・送信後・表示中は60秒ごとに取り直す）。
-//  GASの supporterRank は、ログインした本人が票を入れたモデルの分だけ返す。
+//  GASの supporterRank は、ログインした本人が10票以上入れたモデルの分だけ中身を返す（10票未満は「あと何票」だけ）。
 let srData=null,srSel='',srTimer=null,srBusy=false;
 function srHidden(){return !!ls('iito_sr_hidden');}
 function setSrHidden(v){ls('iito_sr_hidden',v?1:0);renderSupporterRank();}
@@ -2715,26 +2719,35 @@ function renderSupporterRank(){
   const bn=document.getElementById('vote-banner');
   const models=(srData&&srData.models)||[];
   if(!models.length){p.style.display='none';ob.style.display='none';if(bn)bn.style.minHeight='';return;}
+  const minV=(srData&&srData.min)||10;
+  if(models.every(x=>x.locked)){
+    // どのモデルにも10票未満：ランキングの中身は出さず、「あと何票で見られるか」を小さく出す
+    const x=models.slice().sort((a,b)=>a.need-b.need)[0];
+    ob.innerHTML=`<i class="ti ti-lock"></i>応援ランキングは${minV}票以上で表示 <span class="me">あと${x.need}票</span>`;
+    ob.onclick=null;ob.style.cursor='default';
+    p.style.display='none';ob.style.display='flex';if(bn)bn.style.minHeight='';return;
+  }
+  ob.onclick=()=>setSrHidden(false);ob.style.cursor='pointer';
   if(srHidden()){
     // 最小化中：右上に小さなボタンだけ出す（自分の順位も一緒に見せる）。押すと元に戻る
-    const top=models.find(x=>x.modelId===srSel)||models[0];
-    const meTxt=top&&top.me?`<span class="me">あなた ${top.me.rank}位</span>`:'';
+    const top=models.find(x=>x.modelId===srSel&&!x.locked)||models.find(x=>!x.locked);
+    const meTxt=top&&top.me&&!top.locked?`<span class="me">あなた ${top.me.rank}位</span>`:'';
     ob.innerHTML=`<i class="ti ti-trophy"></i>応援ランキング ${meTxt}<i class="ti ti-arrows-maximize"></i>`;
     p.style.display='none';ob.style.display='flex';if(bn)bn.style.minHeight='';return;
   }
   if(bn)bn.style.minHeight='340px'; // 画像の無いイベントでも、5人分が収まる高さにする
   ob.style.display='none';
-  if(!models.some(m=>m.modelId===srSel))srSel=models[0].modelId;
+  if(!models.some(m=>m.modelId===srSel))srSel=(models.find(x=>!x.locked)||models[0]).modelId;
   const m=models.find(x=>x.modelId===srSel);
   const e=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const nm=e((findMod(m.modelId)||{}).name||m.name||'');
-  const tabs=models.length>1?`<div class="sr-tabs">${models.map(x=>`<button type="button" class="sr-tab${x.modelId===srSel?' on':''}" onclick="srSel='${e(x.modelId)}';renderSupporterRank()">${e((findMod(x.modelId)||{}).name||x.name||'')}</button>`).join('')}</div>`:'';
-  const rows=m.top.map(r=>`<div class="sr-row${r.me?' me':''}"><span class="sr-rk">${r.rank}</span><span class="sr-body"><span class="sr-nm">${e(r.nick)}</span><span class="sr-ct">${Number(r.count).toLocaleString()}票</span></span></div>`).join('');
-  const meLine=(m.me&&!m.top.some(r=>r.me))?`<div class="sr-me">あなた：${m.me.rank}位　${Number(m.me.count).toLocaleString()}票</div>`:'';
+  const tabs=models.length>1?`<div class="sr-tabs">${models.map(x=>`<button type="button" class="sr-tab${x.modelId===srSel?' on':''}" onclick="srSel='${e(x.modelId)}';renderSupporterRank()">${x.locked?'<i class="ti ti-lock"></i> ':''}${e((findMod(x.modelId)||{}).name||x.name||'')}</button>`).join('')}</div>`:'';
+  const rows=m.locked?`<div class="sr-lock"><i class="ti ti-lock"></i><div>このモデルに<br><b>${minV}票以上</b>入れると<br>見られます</div><div class="sr-need">あと ${m.need}票</div></div>`:m.top.map(r=>`<div class="sr-row${r.me?' me':''}"><span class="sr-rk">${r.rank}</span><span class="sr-body"><span class="sr-nm">${e(r.nick)}</span><span class="sr-ct">${Number(r.count).toLocaleString()}票</span></span></div>`).join('');
+  const meLine=(!m.locked&&m.me&&!m.top.some(r=>r.me))?`<div class="sr-me">あなた：${m.me.rank}位　${Number(m.me.count).toLocaleString()}票</div>`:'';
   p.innerHTML=`<div class="sr-hd"><span class="sr-ttl"><i class="ti ti-trophy"></i> 応援ランキング</span><button type="button" class="sr-x" aria-label="最小化する" onclick="setSrHidden(true)"><i class="ti ti-minus"></i>最小化</button></div>`
     +tabs+(models.length>1?'':`<div class="sr-model">${nm}</div>`)
     +`<div class="sr-list">${rows}</div>`+meLine
-    +`<div class="sr-ft">${m.total}人が投票</div>`;
+    +(m.locked?'':`<div class="sr-ft">${m.total}人が投票</div>`);
   p.style.display='flex';
 }
 
