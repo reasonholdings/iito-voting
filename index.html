@@ -276,6 +276,11 @@ body.has-tabbar .screen{padding-bottom:120px}
 
 /* インライン割り振りパネル */
 .ialloc{border-radius:16px;padding:16px;margin-bottom:10px;border:2px solid var(--ac-m);background:var(--ac-l)}
+.ia-ov{display:none;position:fixed;inset:0;z-index:400;background:rgba(0,0,0,.45);align-items:center;justify-content:center;padding:20px}
+.ia-ov.open{display:flex}
+.ia-ov .ialloc{width:100%;max-width:400px;margin:0;max-height:85vh;overflow-y:auto;background:#FFF4F8;box-shadow:0 12px 40px rgba(0,0,0,.25);animation:ia-pop .18s ease}
+@keyframes ia-pop{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:none}}
+body.ia-open{overflow:hidden}
 .cc.editing .cn{color:var(--gr);font-weight:600}.cc.editing .cv{color:var(--gr);font-weight:700}
 .ev-tab{padding:9px 16px;border-radius:999px;border:1.5px solid var(--bd);background:var(--bg);font-size:13px;color:var(--sub);cursor:pointer;font-weight:500;white-space:nowrap}
 .ev-tab.on{background:var(--ac);border-color:var(--ac);color:#fff}
@@ -751,6 +756,9 @@ body.has-tabbar .screen{padding-bottom:120px}
       </div>
     </div>
 </div>
+
+<!-- 票数を入れる画面（2026-11-21）：モデルを押すと、画面のまん中に出す。外側（暗い部分）を押すと閉じる -->
+<div class="ia-ov" id="ia-ov" onclick="if(event.target===this)closeIaByBackdrop()"></div>
 
 <!-- ログアウト確認モーダル -->
 <div class="overlay" id="logout-modal">
@@ -1804,7 +1812,7 @@ function setNameQuery(q){
   const inp=document.getElementById('ns-inp');if(inp&&inp.value!==q)inp.value=q;
   document.getElementById('name-search')?.classList.toggle('has-q',!!q.trim());
   // 開いている票の入力欄は閉じるだけ（選択中の票は消さない）。並べ直して表示を戻す
-  document.querySelectorAll('#g-all .ialloc').forEach(p=>p.remove());
+  document.querySelectorAll('#ia-ov .ialloc').forEach(p=>p.remove());syncIaOv();
   buildGrids();updUI();
 }
 function buildGrid(grp){
@@ -1873,7 +1881,7 @@ function setRankFilter(grp,rank){
   rankFilter[grp]=rank;
   if(reflow){
     // 列数が変わるので並べ直す。開いている票の入力欄は閉じるだけ（選択中の票は消さない）
-    document.querySelectorAll('#g-'+grp+' .ialloc').forEach(p=>p.remove());
+    document.querySelectorAll('#ia-ov .ialloc').forEach(p=>p.remove());syncIaOv();
     buildGrids();updUI();
   }else applyRankFilter(grp);
   // 切り替えたら、ボタンの位置まで画面を戻す（下の方で押しても一覧の先頭から見られるように）
@@ -1906,7 +1914,24 @@ function getCardRow(mid){
   const card=document.getElementById('cc-'+mid);
   return card?card.closest('.cand-row'):null;
 }
-function remPanel(mid){document.getElementById('pan-'+mid)?.remove();}
+function remPanel(mid){document.getElementById('pan-'+mid)?.remove();syncIaOv();}
+// 票数を入れる画面は、画面のまん中のオーバーレイ（#ia-ov）に出す
+function mountPanel(el){
+  const ov=document.getElementById('ia-ov');if(!ov)return;
+  ov.querySelectorAll('.ialloc').forEach(p=>p.remove());
+  ov.appendChild(el);syncIaOv();
+}
+function syncIaOv(){
+  const ov=document.getElementById('ia-ov');if(!ov)return;
+  const open=!!ov.querySelector('.ialloc');
+  ov.classList.toggle('open',open);document.body.classList.toggle('ia-open',open);
+}
+// 外側（暗い部分）を押したとき：×ボタンと同じ動き（選択中の票は取り消し、確定済みの画面は閉じるだけ）
+function closeIaByBackdrop(){
+  const p=document.querySelector('#ia-ov .ialloc');if(!p)return;
+  const mid=p.id.replace('pan-','');
+  if(pending[mid]!==undefined)cancelPd(mid);else{remPanel(mid);updUI();}
+}
 // 開いているパネルをすべて閉じ、未確定のpendingも破棄（同時に1人だけ操作できるようにする）
 function closeAllPanels(exceptMid){
   document.querySelectorAll('.ialloc').forEach(p=>{
@@ -1916,6 +1941,7 @@ function closeAllPanels(exceptMid){
     if(pending[pid]!==undefined)delete pending[pid];
     p.remove();
   });
+  syncIaOv();
 }
 
 // ════════════════════════════════════════
@@ -1940,7 +1966,7 @@ function insertPanel(mid,mode){
   remPanel(mid);const row=getCardRow(mid);if(!row)return;
   const el=document.createElement('div');el.id='pan-'+mid;el.className='ialloc';
   el.innerHTML=mode==='locked'?buildLkHTML(mid):buildPdHTML(mid);
-  row.insertAdjacentElement('afterend',el);
+  mountPanel(el);
   updUI();
 }
 function buildPdHTML(mid){
@@ -1991,7 +2017,7 @@ function addToLocked(mid){
   // タイトルに確定済み票数を表示
   const title=el.querySelector('.ia-title');
   if(title)title.innerHTML=`${m?.name||''}`;
-  row.insertAdjacentElement('afterend',el);
+  mountPanel(el);
 }
 function cancelPd(mid){delete pending[mid];remPanel(mid);updUI();}
 function decide(mid){
