@@ -34,6 +34,9 @@ const PIN_MAX_FAIL   = 5;        // 暗証番号を5回間違えたら
 const PIN_LOCK_SEC   = 15 * 60;  //   15分ロック
 
 // プランごとの基本持ち票（HTML側の PLANS と必ず一致させること）
+// 【2026-12 ルール変更】2026年12月期からは「支払いが確定した日に、そのプランの票を付与」する。HTMLの PAY_GRANT_FROM と合わせること
+const PAY_GRANT_FROM = 202612;
+
 const PLAN_VOTES = {
   supporter: 12,
   partner:   40,
@@ -462,8 +465,9 @@ function calcServerLimit(nick, curTermId, curPlan) {
 
   // ① 今月の付与合計（プラン変更で積み上がった票）
   var grantedThis = grantedVotesInTerm_(nick, curTermId);
-  // 履歴が無い/現プランがまだ記録されていない場合は、現プランの基本票を最低保証
-  if (grantedThis < curBase) grantedThis = curBase;
+  // 11月期までは、履歴が無い/現プランがまだ記録されていない場合に現プランの基本票を最低保証する。
+  // 2026年12月期からは「支払いが確定した日に付与」のルールなので、最低保証はせず、記録された付与の分だけにする
+  if (grantedThis < curBase && termRankGAS(curTermId) < PAY_GRANT_FROM) grantedThis = curBase;
 
   // ② 繰越：前月から、連続して会員だった期を古い方へさかのぼり、1か月ずつ「残り」を計算する
   //  会員実績の判定＝ 付与履歴のある期（未投票でも会員）∪ 投票記録のある期（移行期の救済）。
