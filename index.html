@@ -2729,11 +2729,10 @@ function renderSupporterRank(){
   const tabs=models.length>1?`<div class="sr-tabs">${models.map(x=>`<button type="button" class="sr-tab${x.modelId===srSel?' on':''}" onclick="srSel='${e(x.modelId)}';renderSupporterRank()">${e((findMod(x.modelId)||{}).name||x.name||'')}</button>`).join('')}</div>`:'';
   const rows=m.top.map(r=>`<div class="sr-row${r.me?' me':''}"><span class="sr-rk">${r.rank}</span><span class="sr-body"><span class="sr-nm">${e(r.nick)}</span><span class="sr-ct">${Number(r.count).toLocaleString()}票</span></span></div>`).join('');
   const meLine=(m.me&&!m.top.some(r=>r.me))?`<div class="sr-me">あなた：${m.me.rank}位　${Number(m.me.count).toLocaleString()}票</div>`:'';
-  const at=srData.at?new Date(srData.at):null;
   p.innerHTML=`<div class="sr-hd"><span class="sr-ttl"><i class="ti ti-trophy"></i> 応援ランキング</span><button type="button" class="sr-x" aria-label="最小化する" onclick="setSrHidden(true)"><i class="ti ti-minus"></i>最小化</button></div>`
     +tabs+(models.length>1?'':`<div class="sr-model">${nm}</div>`)
     +`<div class="sr-list">${rows}</div>`+meLine
-    +(at?`<div class="sr-ft">${pad(at.getHours())}:${pad(at.getMinutes())} 時点・${m.total}人が投票</div>`:'');
+    +`<div class="sr-ft">${m.total}人が投票</div>`;
   p.style.display='flex';
 }
 
