@@ -3804,17 +3804,11 @@ function grantsFromHistory(rows){
       const d1=new Date(y,mo,1).getTime(),d2=new Date(y,mo+1,1).getTime();
       const set=new Set();
       const before=g.filter(r=>r._t<d1),inM=g.filter(r=>r._t>=d1&&r._t<d2);
-      if(isPayGrantTerm(term)){
-        // 12月期から：その月に確定した支払い（新規・継続・プラン変更）のプランだけを付与する
-      }else if(before.length){
-        const last=before[before.length-1];
-        if(last.type!=='解約'&&PLAN_RANK[last.plan]&&addOneMonth(last._t)>=d1)set.add(last.plan);
-      }else{
-        const pg=((grants[nick]||{})[prevTermIdOf(term)]||[]).filter(p=>PLAN_RANK[p]);
-        if(pg.length&&inM.length&&inM[0].type!=='新規'){
-          set.add(inM[0].type==='継続'&&PLAN_RANK[inM[0].plan]?inM[0].plan:pg.slice().sort((a,b)=>PLAN_RANK[b]-PLAN_RANK[a])[0]);
-        }
-      }
+      // 「1回の支払い＝1か月分」（2026-11-22 運営判断）：どの月も、その月に確定した支払い（新規・継続・プラン変更）のプランだけを付与する。
+      //  以前は11月期まで「月初に有効な前月の支払いのプラン」も付与していたため、プランを下げた人・解約した人に、
+      //  1回の支払いで2か月分の票が付いていた（例：9/6にプロデューサー → 10/6にサポーターへ変更 → 10月期にプロデューサー150票＋サポーター12票）。
+      //  このボタンは足りない付与を追加するだけなので、すでに記録された付与は消さない。
+      void before;
       inM.forEach(r=>{if(r.type!=='解約'&&PLAN_RANK[r.plan])set.add(r.plan);});
       set.forEach(p=>out.push({nick,plan:p,term}));
     }
