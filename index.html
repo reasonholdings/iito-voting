@@ -1217,14 +1217,14 @@ const TAB_SCREENS={'s-vote':'vote','s-mypage':'mypage'};
 // スクロールの向きでメニューを出し入れする（2026-11-22）
 //  ・下へ8px以上動いたら隠す
 //  ・上へは「一定の距離」をまとめて動かしたときだけ出す（すぐには出さない）。
-//    その距離は、スクロールできる長さに合わせて変える：長いページは250px、短いページ（専属だけ表示など）はその4割（最低60px）
+//    その距離は、スクロールできる長さに合わせて変える：長いページは180px、短いページ（専属だけ表示など）はその3割（最低45px）
 //  ・ページの一番上付近（40px以内）まで上へ戻したときも出す
 //  ・一度隠したら、利用者が自分で上へスクロールするまでは出さない（2026-11-22）。
 //    次の動きでは出さない：iPhoneの端での跳ね返り（はみ出した分は数えない）、画面の中身が縮んだときの位置のずれ、プログラムによる移動
 let tbLastY=0,tbUpAcc=0,tbDownAcc=0,tbTouching=false,tbInputAt=0;
 function tbMaxY(){return Math.max(0,document.documentElement.scrollHeight-window.innerHeight);}
-// 出るまでの距離：長いページは250px、短いページはスクロールできる長さの4割（最低60px）。早すぎたため 120px／2割／30px から引き上げ（2026-11-22）
-function tbUpNeed(){return Math.max(60,Math.min(250,tbMaxY()*0.4));}
+// 出るまでの距離：長いページは180px、短いページはスクロールできる長さの3割（最低45px）。2026-11-22 に 120px→250px→180px と調整
+function tbUpNeed(){return Math.max(45,Math.min(180,tbMaxY()*0.3));}
 // 利用者の操作によるスクロールか：指で触れている間、または指を離した・ホイールを回した直後（慣性で動く1.5秒）
 function tbByUser(){return tbTouching||Date.now()-tbInputAt<1500;}
 ['touchstart','touchmove'].forEach(ev=>window.addEventListener(ev,()=>{tbTouching=true;tbInputAt=Date.now();},{passive:true}));
@@ -1331,13 +1331,15 @@ function demoGas(action,payload){
     case 'me': {
       const g={};g[demoTerm(0)]=['producer'];g[demoTerm(-1)]=['producer'];g[demoTerm(-2)]=['producer'];
       const pd=new Date();pd.setDate(pd.getDate()-10);
-      return ok({member:{nick:DEMO_NICK,mid:'0',plan:'producer',email:'test@example.com',paidAt:ymdOf(pd.getTime())},votes:votes,grants:g,termPlans:{}});
+      const dso=ls('demo_oshi');
+      return ok({member:{nick:DEMO_NICK,mid:'0',plan:'producer',email:'test@example.com',paidAt:ymdOf(pd.getTime())},votes:votes,grants:g,termPlans:{},...(Array.isArray(dso)?{oshi:dso}:{})});
     }
     case 'saveVote': {
       const ev=payload.evId||'demo-event';const mine=votes[ev]||(votes[ev]={});
       Object.entries(payload.votes||{}).forEach(([mid,v])=>{mine[mid]=(mine[mid]||0)+(Number(v&&v.count)||0);});
       ls('demo_votes',votes);return ok({saved:Object.keys(payload.votes||{}).length});
     }
+    case 'saveOshi': ls('demo_oshi',payload.oshi||[]); return ok({oshi:payload.oshi||[]});
     case 'getResults': return ok({votes:{}});
     case 'supporterRank': {
       // テストモード：自分が票を入れたモデルに、架空の5人が投票している形で返す
@@ -1458,7 +1460,9 @@ async function pullMe(nick){
   ls(LS.votes, allVotes);
   grants[n] = r.grants||{}; ls('iito_grants', grants);
   termPlans[n] = r.termPlans||{}; ls('iito_termplans', termPlans);
-  return {member:r.member};
+  // 推し：サーバーに保存してあれば、それを使う（端末をまたいで同じ推しを出す。2026-11-22）
+  if(Array.isArray(r.oshi)){ oshiMap[n]=r.oshi.map(String); ls(LS.oshi,oshiMap); return {member:r.member}; }
+  return {member:r.member,noServerOshi:true};
 }
 // ログインできなかったときの案内
 // ログインをやり直してもらう必要があるエラーか（これ以外のエラーではログイン状態を消さない）
@@ -2363,7 +2367,16 @@ function renderPills(cid,ids,rmFn){
 function rmLoginOshi(id){loginOshi=loginOshi.filter(x=>x!==id);buildMsBox('oshi-box',()=>loginOshi,v=>{loginOshi=v;renderPills('oshi-pills',loginOshi,'rmLoginOshi');});renderPills('oshi-pills',loginOshi,'rmLoginOshi');}
 function openOshiModal(){modalOshi=[...(oshiMap[curUser.nick]||[])];buildMsBox('oshi-modal-box',()=>modalOshi,v=>{modalOshi=v;});document.getElementById('oshi-modal').classList.add('open');}
 function closeOshiModal(){document.getElementById('oshi-modal').classList.remove('open');}
-function saveOshi(){oshiMap[curUser.nick]=modalOshi;ls(LS.oshi,oshiMap);try{buildGrids();updUI();}catch(e){}renderPills('v-oshi-pills',oshiMap[curUser.nick]||[],null);renderPills('mp-oshi',oshiMap[curUser.nick]||[],null);closeOshiModal();}
+// 推しをサーバーに保存する（ほかの端末でも同じ推しが出るように）。失敗してもこの端末には保存済み
+async function pushOshi(nick){
+  const ids=oshiMap[nick]||[];
+  const va=await getVoterAuth();if(!va)return false;
+  const names=ids.map(id=>findMod(id)?.name||id).join('／');
+  const r=await gasPost('saveOshi',{nick,oshi:ids,names,...va});
+  return !!(r&&r.ok);
+}
+function saveOshi(){oshiMap[curUser.nick]=modalOshi;ls(LS.oshi,oshiMap);try{buildGrids();updUI();}catch(e){}
+  const nk=curUser.nick;pushOshi(nk).then(ok=>{if(!ok)alert('推しをサーバーに保存できませんでした。\nこの端末では推しが表示されますが、ほかの端末では表示されません。\n通信環境を確認して、もう一度推しを保存してください。');});renderPills('v-oshi-pills',oshiMap[curUser.nick]||[],null);renderPills('mp-oshi',oshiMap[curUser.nick]||[],null);closeOshiModal();}
 
 // ════════════════════════════════════════
 // ログイン
@@ -2753,6 +2766,8 @@ async function completeLoginAfterLink(nick){
       oshiMap[m.nick]=[];
     }
     ls(LS.oshi,oshiMap);
+    // ログイン時に推しを選んだ／サーバーにまだ推しが無く、この端末にはある → サーバーへ保存（端末をまたいで出すため）
+    if((loginOshi&&loginOshi.length)||(me.noServerOshi&&(oshiMap[m.nick]||[]).length))pushOshi(m.nick);
     ls(LS.sess,{nick:m.nick,ts:Date.now(),me:{nick:m.nick,plan:m.plan,mid:m.mid}});
     pending={};buildVoteScreen();SS('s-vote');startCd();
   }finally{ hideLoading(); }
@@ -2812,6 +2827,7 @@ async function resumeSession(){
       return;
     }
     const m=me.member;
+    if(me.noServerOshi&&(oshiMap[m.nick]||[]).length)pushOshi(m.nick); // この端末の推しを、まだサーバーに無ければ保存する
     ls(LS.sess,{...sess,ts:Date.now(),me:{nick:m.nick,plan:m.plan,mid:m.mid}}); // 使うたびに有効期間を延長
     const evV=(allVotes[curEvId]||{})[m.nick]||{};
     curUser={...m,locked:{...evV}};pending={};
