@@ -345,6 +345,12 @@ body.ia-open{overflow:hidden}
 .mbox{background:var(--bg);border-radius:20px;padding:24px 20px;width:100%;max-width:430px;max-height:85vh;overflow-y:auto}
 .mbox h3{font-size:16px;font-weight:500;margin-bottom:10px}
 .mc-modal-box{max-width:460px;padding:0}
+.crop-vp{position:relative;width:240px;height:240px;margin:0 auto 8px;overflow:hidden;border-radius:12px;background:#222;touch-action:none;cursor:grab;user-select:none}
+.crop-vp:active{cursor:grabbing}
+.crop-vp img{position:absolute;left:0;top:0;max-width:none;pointer-events:none;user-select:none;transform-origin:0 0}
+.crop-mask{position:absolute;inset:0;pointer-events:none;border-radius:12px;background:radial-gradient(circle at center,transparent 0,transparent 119px,rgba(0,0,0,.55) 120px);box-shadow:inset 0 0 0 1px rgba(255,255,255,.3)}
+.crop-zoom{display:flex;align-items:center;gap:8px;max-width:240px;margin:0 auto 4px;color:var(--sub)}
+.crop-zoom input{flex:1;accent-color:var(--ac)}
 .mc-modal-box .mc-form{margin:0;border:none;border-radius:20px}
 .clist{border:1px solid var(--bd);border-radius:12px;overflow:hidden;margin:12px 0}
 .crow{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:.5px solid var(--bd);font-size:13px}
@@ -4005,14 +4011,6 @@ function renderMcGrid(grp){
     const rankBadge=RANKS.includes(m.rank)?`<div style="font-size:9px;color:var(--ac-d);background:var(--ac-l);border:.5px solid var(--ac-m);border-radius:999px;padding:1px 7px;display:inline-block;margin-top:2px;margin-left:3px">${m.rank}</div>`:'';
     card.innerHTML=`<div class="mc-drag" title="ドラッグで並べ替え"><i class="ti ti-grip-vertical" style="font-size:13px"></i></div><div class="mav-w"><div class="mav" onclick="openMcForm('edit','${grp}','${m.id}')"${m.hidden?' style="opacity:.45"':''}>${avC}</div><div class="mav-cam" onclick="openMcForm('edit','${grp}','${m.id}')"><i class="ti ti-camera" style="font-size:10px;color:#fff"></i></div></div><div class="mc-nm">${m.name}</div>${hiddenBadge}${rankBadge}<div class="mc-acts"><button class="mc-edit" onclick="openMcForm('edit','${grp}','${m.id}')"><i class="ti ti-edit" style="font-size:11px"></i> 編集</button><button class="mc-del" onclick="confirmMcDel('${m.id}')"><i class="ti ti-trash" style="font-size:11px"></i></button></div>`;
     grid.appendChild(card);
-    // このカードが削除確認中なら、直下に確認バーを差し込む
-    if(mcDelId===m.id){
-      const del=document.createElement('div');
-      del.className='mc-inline-form';
-      del.id='mc-del-inline-'+m.id;
-      del.innerHTML=`<div class="del-bar"><p><i class="ti ti-alert-triangle" style="font-size:12px;vertical-align:-2px;margin-right:4px"></i>「${m.name}」を削除しますか？取り消せません。</p><div style="display:flex;gap:7px"><button class="btn-sm-rd-out" onclick="cancelMcDel()">キャンセル</button><button class="btn-sm-rd" onclick="doMcDel()">削除する</button></div></div>`;
-      grid.appendChild(del);
-    }
   });
   // ドラッグ並べ替えを有効化（同じランクの中だけで並べ替え）
   enableMcDrag(grp,grid,box);
@@ -4062,6 +4060,7 @@ function enableMcDrag(grp,grid,box){
 function openMcForm(mode,grp,id){
   mcDelId=null;const da=document.getElementById('mc-del-area');if(da)da.innerHTML='';
   // 登録・編集とも、画面の真ん中のポップアップで行う（2026-11-22）
+  mcCrop=null;mcOrigSrc='';
   if(mode==='add'){ mcEditId=null;mcImg=''; renderMcForm('add',grp,null); renderMcGrids(); return; }
   mcEditId=id;const m=findMod(id);if(!m)return;mcImg=m.img||'';
   renderMcForm('edit',m.grp||grp,m);renderMcGrids();
@@ -4072,10 +4071,19 @@ function buildMcFormHTML(mode,grp,m){
   return `<div class="mc-form">
 <div class="mc-form-title"><i class="ti ti-${mode==='add'?'plus':'edit'}" style="font-size:13px"></i> ${mode==='add'?'新規モデルを登録':'モデル情報を編集'}</div>
 <span class="field-lbl" style="margin-top:0">写真</span>
+<div id="mc-img-area">
 <div class="img-up" onclick="document.getElementById('mc-img-inp').click()">
 <div class="img-prev" id="mc-img-prev">${avC}</div>
-<div style="font-size:11px;color:var(--sub)">クリックして画像を選択</div>
+<div style="font-size:11px;color:var(--sub)">クリックして画像を選択（選んだあとに切り取る範囲を決められます）</div>
 <input type="file" id="mc-img-inp" accept="image/*" style="display:none" onchange="handleMcImg(this)"/>
+</div>
+<button type="button" class="btn-ghost-sm" id="mc-recrop" style="${mcImg?'':'display:none;'}width:100%;margin:-4px 0 12px" onclick="startMcCrop(mcOrigSrc||mcImg)"><i class="ti ti-crop" style="font-size:12px;vertical-align:-2px;margin-right:4px"></i>切り取る範囲を調整する</button>
+</div>
+<div id="mc-crop" style="display:none;margin-bottom:12px">
+<div class="crop-vp" id="crop-vp"><img id="crop-img" alt="" draggable="false"/><div class="crop-mask"></div></div>
+<div class="crop-zoom"><i class="ti ti-zoom-out"></i><input type="range" id="crop-zoom" min="1" max="4" step="0.01" value="1" oninput="setCropZoom(+this.value)"/><i class="ti ti-zoom-in"></i></div>
+<div style="font-size:11px;color:var(--sub);text-align:center;margin:2px 0 10px">画像をドラッグして位置を、つまみ（または2本指）で大きさを調整します。丸の中が表示される範囲です。</div>
+<div style="display:flex;gap:8px;justify-content:center"><button type="button" class="btn-ghost-sm" onclick="cancelMcCrop()">やめる</button><button type="button" class="btn-gold" style="width:auto;padding:8px 18px;margin-top:0" onclick="applyMcCrop()">この範囲で決定</button></div>
 </div>
 <span class="field-lbl">名前</span>
 <input class="inp" id="mc-nm-inp" value="${m?.name||''}" placeholder="モデル名" style="font-size:13px;margin-bottom:10px"/>
@@ -4105,33 +4113,84 @@ function buildMcFormHTML(mode,grp,m){
 function renderMcForm(mode,grp,m){
   document.getElementById('mc-modal-body').innerHTML=buildMcFormHTML(mode,grp,m);
   const ov=document.getElementById('mc-modal');ov.classList.add('open');ov.querySelector('.mbox').scrollTop=0;}
+// 画像を選んだら、切り取る範囲を選ぶ画面を出す（2026-11-22）
+let mcCrop=null,mcOrigSrc='';
+const CROP_V=240,CROP_OUT=400;
 function handleMcImg(input){
   const file=input.files[0];if(!file)return;
-  const p=document.getElementById('mc-img-prev');
-  if(p)p.innerHTML='<span style="font-size:11px;color:var(--sub)">画像を処理中...</span>';
   const r=new FileReader();
-  r.onload=e=>{
-    const img=new Image();
-    img.onload=()=>{
-      // 最大幅・高さ400pxに収まるようリサイズ（アスペクト比維持）
-      const MAX=400;
-      let w=img.width,h=img.height;
-      if(w>h){if(w>MAX){h=Math.round(h*MAX/w);w=MAX;}}
-      else{if(h>MAX){w=Math.round(w*MAX/h);h=MAX;}}
-      const canvas=document.createElement('canvas');
-      canvas.width=w;canvas.height=h;
-      const ctx=canvas.getContext('2d');
-      ctx.drawImage(img,0,0,w,h);
-      // JPEG品質0.8で圧縮。base64で保存（元が数MBでも数十KB程度に収まる）
-      mcImg=canvas.toDataURL('image/jpeg',0.8);
-      if(p)p.innerHTML=`<img src="${mcImg}" style="width:100%;height:100%;object-fit:cover"/>`;
-    };
-    img.onerror=()=>{if(p)p.innerHTML='<span style="font-size:11px;color:var(--rd)">画像の読み込みに失敗しました</span>';};
-    img.src=e.target.result;
-  };
+  r.onload=e=>{mcOrigSrc=e.target.result;startMcCrop(mcOrigSrc);input.value='';};
+  r.onerror=()=>alert('画像の読み込みに失敗しました');
   r.readAsDataURL(file);
 }
+function startMcCrop(src){
+  if(!src)return;
+  const img=new Image();
+  img.onload=()=>{
+    const min=Math.max(CROP_V/img.width,CROP_V/img.height);
+    mcCrop={img,min,s:min,x:(CROP_V-img.width*min)/2,y:(CROP_V-img.height*min)/2,pts:{}};
+    const el=document.getElementById('crop-img');el.src=src;
+    document.getElementById('crop-zoom').value=1;
+    document.getElementById('mc-img-area').style.display='none';
+    document.getElementById('mc-crop').style.display='block';
+    drawMcCrop();bindMcCrop();
+  };
+  img.onerror=()=>alert('画像の読み込みに失敗しました');
+  img.src=src;
+}
+function clampMcCrop(){
+  const c=mcCrop,w=c.img.width*c.s,h=c.img.height*c.s;
+  c.x=Math.min(0,Math.max(CROP_V-w,c.x));c.y=Math.min(0,Math.max(CROP_V-h,c.y));
+}
+function drawMcCrop(){
+  const c=mcCrop;if(!c)return;clampMcCrop();
+  const el=document.getElementById('crop-img');
+  el.style.width=(c.img.width*c.s)+'px';el.style.height=(c.img.height*c.s)+'px';
+  el.style.transform=`translate(${c.x}px,${c.y}px)`;
+}
+function setCropZoom(z,cx,cy){
+  const c=mcCrop;if(!c)return;
+  z=Math.min(4,Math.max(1,z));
+  const ns=c.min*z;cx=cx??CROP_V/2;cy=cy??CROP_V/2;
+  c.x=cx-(cx-c.x)*(ns/c.s);c.y=cy-(cy-c.y)*(ns/c.s);c.s=ns;
+  const zr=document.getElementById('crop-zoom');if(zr)zr.value=z;
+  drawMcCrop();
+}
+function bindMcCrop(){
+  const vp=document.getElementById('crop-vp');if(!vp||vp._bound)return;vp._bound=true;
+  let pinch=null;
+  vp.addEventListener('pointerdown',e=>{if(!mcCrop)return;e.preventDefault();vp.setPointerCapture(e.pointerId);mcCrop.pts[e.pointerId]={x:e.clientX,y:e.clientY};
+    const ids=Object.keys(mcCrop.pts);
+    if(ids.length===2){const [a,b]=ids.map(i=>mcCrop.pts[i]);pinch={d:Math.hypot(a.x-b.x,a.y-b.y),z:mcCrop.s/mcCrop.min};}});
+  vp.addEventListener('pointermove',e=>{const c=mcCrop;if(!c||!c.pts[e.pointerId])return;
+    const p=c.pts[e.pointerId],dx=e.clientX-p.x,dy=e.clientY-p.y;c.pts[e.pointerId]={x:e.clientX,y:e.clientY};
+    const ids=Object.keys(c.pts);
+    if(ids.length>=2&&pinch){const [a,b]=ids.slice(0,2).map(i=>c.pts[i]);const r=vp.getBoundingClientRect();
+      setCropZoom(pinch.z*Math.hypot(a.x-b.x,a.y-b.y)/pinch.d,(a.x+b.x)/2-r.left,(a.y+b.y)/2-r.top);}
+    else{c.x+=dx;c.y+=dy;drawMcCrop();}});
+  const up=e=>{if(mcCrop&&mcCrop.pts)delete mcCrop.pts[e.pointerId];pinch=null;};
+  vp.addEventListener('pointerup',up);vp.addEventListener('pointercancel',up);
+  vp.addEventListener('wheel',e=>{if(!mcCrop)return;e.preventDefault();const r=vp.getBoundingClientRect();
+    setCropZoom(mcCrop.s/mcCrop.min*(e.deltaY<0?1.08:1/1.08),e.clientX-r.left,e.clientY-r.top);},{passive:false});
+}
+function applyMcCrop(){
+  const c=mcCrop;if(!c)return;clampMcCrop();
+  const canvas=document.createElement('canvas');canvas.width=CROP_OUT;canvas.height=CROP_OUT;
+  const ctx=canvas.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,CROP_OUT,CROP_OUT);
+  ctx.drawImage(c.img,-c.x/c.s,-c.y/c.s,CROP_V/c.s,CROP_V/c.s,0,0,CROP_OUT,CROP_OUT);
+  mcImg=canvas.toDataURL('image/jpeg',0.85);
+  const p=document.getElementById('mc-img-prev');if(p)p.innerHTML=`<img src="${mcImg}" style="width:100%;height:100%;object-fit:cover"/>`;
+  const rb=document.getElementById('mc-recrop');if(rb)rb.style.display='';
+  closeMcCropUI();
+}
+function cancelMcCrop(){closeMcCropUI();}
+function closeMcCropUI(){
+  mcCrop=null;
+  const a=document.getElementById('mc-img-area'),c=document.getElementById('mc-crop');
+  if(a)a.style.display='';if(c)c.style.display='none';
+}
 function saveMcForm(mode){
+  if(mcCrop)applyMcCrop(); // 切り取りの決定を押し忘れても、表示中の範囲で保存する
   const name=(document.getElementById('mc-nm-inp')?.value||'').trim();const grp=document.getElementById('mc-grp-sel')?.value||'japan';
   const hidden=(document.getElementById('mc-vis-sel')?.value==='hide'); // 非表示フラグ
   const rankSel=document.getElementById('mc-rank-sel')?.value||''; // モデルランク（専属/1st/2nd/未設定）
@@ -4141,18 +4200,21 @@ function saveMcForm(mode){
   else{const m=findMod(mcEditId);if(!m)return;const og=m.grp;m.name=name;m.img=mcImg;m.hidden=hidden;m.rank=rank;if(og!==grp){models[og]=models[og].filter(x=>x.id!==m.id);m.grp=grp;models[grp].push(m);}}
   saveMod();closeMcForm();renderMcGrids();renderMember();buildGrids();
 }
-function closeMcForm(){mcEditId=null;mcImg='';document.getElementById('mc-modal').classList.remove('open');document.getElementById('mc-modal-body').innerHTML='';renderMcGrids();}
+function closeMcForm(){mcEditId=null;mcDelId=null;mcImg='';mcCrop=null;document.getElementById('mc-modal').classList.remove('open');document.getElementById('mc-modal-body').innerHTML='';renderMcGrids();}
+// 削除の確認も、画面の真ん中のポップアップで行う（2026-11-22）
 function confirmMcDel(id){
   const m=findMod(id);if(!m)return;
-  mcDelId=id;mcEditId=null;
-  document.getElementById('mc-modal').classList.remove('open');
-  const da=document.getElementById('mc-del-area');if(da)da.innerHTML='';
-  renderMcGrids();
-  // 差し込まれた確認バーまでスクロール
-  setTimeout(()=>{const el=document.getElementById('mc-del-inline-'+id);if(el)el.scrollIntoView({behavior:'smooth',block:'center'});},60);
+  mcDelId=id;mcEditId=null;mcCrop=null;
+  const av=m.img?`<img src="${m.img}" alt="" style="width:100%;height:100%;object-fit:cover"/>`:`<span>${m.name.replace(/[a-zA-Z]/g,'').slice(0,1)||m.name[0]}</span>`;
+  document.getElementById('mc-modal-body').innerHTML=`<div style="padding:24px 20px;text-align:center">
+<div class="img-prev" style="margin:0 auto 10px">${av}</div>
+<h3 style="text-align:center;margin-bottom:6px"><i class="ti ti-alert-triangle" style="color:var(--rd);font-size:16px;vertical-align:-2px;margin-right:4px"></i>「${m.name}」を削除しますか？</h3>
+<p style="font-size:12px;color:var(--sub);margin-bottom:18px">削除すると元に戻せません。投票画面に出したくないだけの場合は、「編集」から「非表示」にしてください。</p>
+<div style="display:flex;gap:10px;justify-content:center"><button class="btn-ghost-sm" onclick="closeMcForm()">キャンセル</button><button class="btn-sm-rd" style="padding:9px 20px" onclick="doMcDel()">削除する</button></div></div>`;
+  document.getElementById('mc-modal').classList.add('open');
 }
-function cancelMcDel(){mcDelId=null;renderMcGrids();}
-function doMcDel(){for(const g of['japan','osaka']){const b=models[g].length;models[g]=models[g].filter(m=>m.id!==mcDelId);if(models[g].length<b)break;}saveMod();mcDelId=null;renderMcGrids();buildGrids();}
+function cancelMcDel(){closeMcForm();}
+function doMcDel(){for(const g of['japan','osaka']){const b=models[g].length;models[g]=models[g].filter(m=>m.id!==mcDelId);if(models[g].length<b)break;}saveMod();closeMcForm();buildGrids();}
 
 // 集計
 // 集計タブのイベント選択ドロップダウンを更新
