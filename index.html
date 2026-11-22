@@ -475,6 +475,10 @@ body.ia-open{overflow:hidden}
 .mc-acts{display:flex;gap:5px;justify-content:center}
 .mc-edit{padding:5px 9px;font-size:11px;background:#fff;border:1px solid var(--ac-m);border-radius:6px;color:var(--ac-d);cursor:pointer}
 .mc-del{padding:5px 9px;font-size:11px;background:#fff;border:1px solid #F5C4B3;border-radius:6px;color:var(--rd);cursor:pointer}
+.mc-sec-hd{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--ac-d);margin:14px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--bd)}
+.mc-sec-hd .ct{font-size:11px;font-weight:400;color:var(--sub)}
+.mc-sec-hd.hid{color:var(--sub)}
+.mc-sec-empty{font-size:11px;color:var(--sub);margin:0 0 6px}
 .grp-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;margin-top:20px}
 .grp-hd:first-of-type{margin-top:0}
 .grp-lbl{font-size:11px;font-weight:500;color:var(--sub);letter-spacing:.1em;text-transform:uppercase}
@@ -972,12 +976,12 @@ body.ia-open{overflow:hidden}
       <span class="grp-lbl">iito JAPAN</span>
       <button class="btn-add" onclick="openMcForm('add','japan')"><i class="ti ti-plus" style="font-size:11px"></i> 新規登録</button>
     </div>
-    <div class="mc-grid" id="mc-jp"></div>
+    <div id="mc-jp"></div>
     <div class="grp-hd">
       <span class="grp-lbl">iito OSAKA</span>
       <button class="btn-add" onclick="openMcForm('add','osaka')"><i class="ti ti-plus" style="font-size:11px"></i> 新規登録</button>
     </div>
-    <div class="mc-grid" id="mc-os"></div>
+    <div id="mc-os"></div>
   </div>
 
   <!-- 集計 -->
@@ -3976,8 +3980,17 @@ function changePlan(i,plan){members[i].plan=plan;ls(LS.members,members);renderMe
 function renderMcGrids(){renderMcGrid('japan');renderMcGrid('osaka');}
 function renderMcGrid(grp){
   const gid=grp==='japan'?'jp':'os';
-  const grid=document.getElementById('mc-'+gid);if(!grid)return;grid.innerHTML='';
-  models[grp].forEach(m=>{
+  const box=document.getElementById('mc-'+gid);if(!box)return;box.innerHTML='';
+  // モデルランクごとに分けて表示し、非表示のモデルはランクに関係なく一番下にまとめる（2026-11-22）
+  const secs=[...RANKS.map(r=>({key:r,label:r,list:models[grp].filter(m=>!m.hidden&&rankOf(m)===r)})),
+    {key:'none',label:'ランク未設定',list:models[grp].filter(m=>!m.hidden&&!rankOf(m))},
+    {key:'hidden',label:'非表示',list:models[grp].filter(m=>m.hidden)}].filter(s=>s.list.length);
+  secs.forEach(sec=>{
+  const hd=document.createElement('div');hd.className='mc-sec-hd'+(sec.key==='hidden'?' hid':'');
+  hd.innerHTML=`<i class="ti ${sec.key==='hidden'?'ti-eye-off':'ti-star'}" style="font-size:13px"></i>${sec.label}<span class="ct">${sec.list.length}名</span>`;
+  box.appendChild(hd);
+  const grid=document.createElement('div');grid.className='mc-grid';grid.setAttribute('data-sec',sec.key);box.appendChild(grid);
+  sec.list.forEach(m=>{
     const card=document.createElement('div');card.className='mc-card'+(mcEditId===m.id?' mc-ed':'');
     card.setAttribute('data-mid',m.id);card.setAttribute('data-grp',grp);
     const avC=m.img?`<img src="${m.img}" alt="${m.name}"/>`:`<span>${m.name.replace(/[a-zA-Z]/g,'').slice(0,1)||m.name[0]}</span>`;
@@ -4002,11 +4015,12 @@ function renderMcGrid(grp){
       grid.appendChild(del);
     }
   });
-  // ドラッグ並べ替えを有効化
-  enableMcDrag(grp,grid);
+  // ドラッグ並べ替えを有効化（同じランクの中だけで並べ替え）
+  enableMcDrag(grp,grid,box);
+  });
 }
 // モデルカードのドラッグ並べ替え（マウス・タッチ両対応）
-function enableMcDrag(grp,grid){
+function enableMcDrag(grp,grid,box){
   grid.querySelectorAll('.mc-drag').forEach(handle=>{
     handle.addEventListener('pointerdown',e=>{
       e.preventDefault();
@@ -4021,7 +4035,7 @@ function enableMcDrag(grp,grid){
         // 指/カーソルの位置にあるカードを探して並べ替え
         const target=document.elementFromPoint(ev.clientX,ev.clientY);
         const overCard=target?target.closest('.mc-card'):null;
-        if(overCard&&overCard!==card&&overCard.getAttribute('data-grp')===grp){
+        if(overCard&&overCard!==card&&overCard.parentElement===grid){
           const allCards=[...grid.querySelectorAll('.mc-card')];
           const from=allCards.indexOf(card);
           const to=allCards.indexOf(overCard);
@@ -4033,7 +4047,7 @@ function enableMcDrag(grp,grid){
         document.removeEventListener('pointermove',moveHandler);
         document.removeEventListener('pointerup',upHandler);
         // 新しい並び順をmodelsに反映して保存
-        const newOrder=[...grid.querySelectorAll('.mc-card')].map(c=>c.getAttribute('data-mid'));
+        const newOrder=[...(box||grid).querySelectorAll('.mc-card')].map(c=>c.getAttribute('data-mid'));
         const reordered=[];
         newOrder.forEach(id=>{const m=models[grp].find(x=>x.id===id);if(m)reordered.push(m);});
         // 万一漏れがあれば元の順で末尾に追加（安全策）
