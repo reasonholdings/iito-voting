@@ -487,6 +487,8 @@ body.ia-open{overflow:hidden}
 .mc-sec-hd .ct{font-size:11px;font-weight:400;color:var(--sub)}
 .mc-sec-hd.hid{color:var(--sub)}
 .mc-sec-empty{font-size:11px;color:var(--sub);margin:0 0 6px}
+.mc-grp-hd{margin:18px 0 0}
+.mc-grp-hd .grp-lbl{font-size:13px;font-weight:700;color:var(--tx,#333);letter-spacing:.04em;text-transform:none}
 .mc-sticky{position:sticky;top:0;z-index:20;display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 -4px 4px;padding:10px 4px;background:var(--bg);border-bottom:1px solid var(--bd)}
 .grp-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;margin-top:20px}
 .grp-hd:first-of-type{margin-top:0}
@@ -986,12 +988,21 @@ body.ia-open{overflow:hidden}
   <div class="apanel" id="ap-model">
     <div id="mc-del-area"></div>
     <div id="mc-form-area"></div>
-    <!-- 見出しと「新規登録」：スクロールしても上に残る（iito OSAKA の欄は廃止。2026-11-22） -->
+    <!-- 見出しと「新規登録」：スクロールしても上に残る（2026-11-22） -->
     <div class="mc-sticky">
       <span class="grp-lbl">モデル一覧 <span id="mc-total" style="letter-spacing:0;text-transform:none"></span></span>
       <button class="btn-add" onclick="openMcForm('add','japan')"><i class="ti ti-plus" style="font-size:11px"></i> 新規登録</button>
     </div>
+    <div class="grp-hd mc-grp-hd" id="mc-jp-hd"><span class="grp-lbl">iito JAPAN</span></div>
     <div id="mc-jp"></div>
+    <div class="grp-hd mc-grp-hd" id="mc-os-hd"><span class="grp-lbl">iito OSAKA</span></div>
+    <div id="mc-os"></div>
+    <!-- 非表示のモデル：JAPAN・OSAKAとも一番下にまとめる -->
+    <div id="mc-hid-wrap" style="display:none">
+      <div class="grp-hd mc-grp-hd"><span class="grp-lbl"><i class="ti ti-eye-off" style="font-size:12px;vertical-align:-1px;margin-right:4px"></i>非表示</span></div>
+      <div id="mc-hid-jp"></div>
+      <div id="mc-hid-os"></div>
+    </div>
   </div>
 
   <!-- 集計 -->
@@ -1877,14 +1888,17 @@ function applyEvUI(){
 // ════════════════════════════════════════
 // 候補者グリッド
 // ════════════════════════════════════════
-// 投票画面はJAPAN/OSAKAを分けず、全モデルを1つの一覧に出す（グループ分けは管理画面だけ）
-function buildGrids(){buildGrid('all');}
+// 投票画面は1つの一覧。JAPANは専属・1st・2nd、OSAKAは「iito OSAKA」ボタンで切り替えて表示する
+function buildGrids(){restoreOsakaModels();buildGrid('all');}
 // 投票画面に出すモデル（非表示フラグが立っていないもの）。'all'＝JAPAN→OSAKAの順で全員
 function visibleMods(grp){return (grp==='all'?allMod():(models[grp]||[])).filter(m=>!m.hidden);}
 // モデルランク（管理画面のモデル登録で指定）。この順で表示する。未設定は「その他」
 const RANKS=['専属','1st','2nd'];
 function rankOf(m){return RANKS.includes(m.rank)?m.rank:'';}
-function rankLabel(r){return r||'その他';}
+// iito OSAKA のモデルは、投票画面では「iito OSAKA」ボタンにまとめて表示する（専属・1st・2nd は JAPAN のモデルだけ。2026-11-22）
+const OSAKA_TAB='osaka';
+function isOsaka(m){return (models.osaka||[]).some(x=>x.id===m.id);}
+function rankLabel(r){return r===OSAKA_TAB?'iito OSAKA':(r||'その他');}
 // 投票画面で選んでいるランク（グループごと）。'all'＝すべて表示
 const rankFilter={}; // 最初は「専属」だけを表示する（2026-11-21）。専属のモデルがいなければ全員
 // 名前検索の文字。ひらがな/カタカナ・全角/半角・大文字/小文字の違いは無視して部分一致で探す
@@ -1902,7 +1916,7 @@ function buildGrid(grp){
   const sec=document.getElementById('g-'+grp);sec.innerHTML='';
   const all=visibleMods(grp);
   // ランク別に分ける：専属 → 1st → 2nd → その他（未設定）
-  const groups=[...RANKS,''].map(r=>({rank:r,list:all.filter(m=>rankOf(m)===r)})).filter(g=>g.list.length);
+  const groups=[...[...RANKS,''].map(r=>({rank:r,list:all.filter(m=>!isOsaka(m)&&rankOf(m)===r)})),{rank:OSAKA_TAB,list:all.filter(isOsaka)}].filter(g=>g.list.length);
   const anyRanked=groups.some(g=>g.rank);
   // 選んでいたランクが無くなっていたら「すべて」に戻す
   // 最初に開いたときは「専属」だけを表示する（専属のモデルがいないイベントでは全員）
@@ -3987,18 +4001,26 @@ function renderMember(){
 function changePlan(i,plan){members[i].plan=plan;ls(LS.members,members);renderMember();}
 
 // モデル管理
-// iito OSAKA は廃止。OSAKAに登録されていたモデルは、管理画面を開いたときに一覧（JAPAN側）へまとめる（次の保存で反映）
-function mergeOsakaModels(){if(!(models.osaka&&models.osaka.length))return;models.osaka.forEach(m=>{m.grp='japan';models.japan.push(m);});models.osaka=[];}
-function renderMcGrids(){mergeOsakaModels();renderMcGrid('japan');const tt=document.getElementById('mc-total');if(tt){const all=allMod();tt.textContent=`（${all.length}名・うち非表示${all.filter(m=>m.hidden).length}名）`;}}
+// 【復旧】一時的に OSAKA を JAPAN へまとめていた版（2026-11-22）で保存された場合に、元の OSAKA のモデル（IDが os- で始まる）を OSAKA に戻す
+//  OSAKA が空で、JAPAN に os- のモデルがいるときだけ動く（管理画面で JAPAN に移したモデルを勝手に戻さないため）
+function restoreOsakaModels(){
+  if(models.osaka&&models.osaka.length)return;
+  const os=models.japan.filter(m=>/^os-/.test(String(m.id)));if(!os.length)return;
+  models.japan=models.japan.filter(m=>!/^os-/.test(String(m.id)));os.forEach(m=>{m.grp='osaka';});models.osaka=os;
+}
+function renderMcGrids(){restoreOsakaModels();renderMcGrid('japan');renderMcGrid('osaka');
+  const w=document.getElementById('mc-hid-wrap');if(w)w.style.display=allMod().some(m=>m.hidden)?'':'none';
+  ['jp','os'].forEach(g=>{const hd=document.getElementById('mc-'+g+'-hd');if(hd)hd.style.display=(models[g==='jp'?'japan':'osaka']||[]).some(m=>!m.hidden)?'':'none';});const tt=document.getElementById('mc-total');if(tt){const all=allMod();tt.textContent=`（${all.length}名・うち非表示${all.filter(m=>m.hidden).length}名）`;}}
 function renderMcGrid(grp){
   const gid=grp==='japan'?'jp':'os';
   const box=document.getElementById('mc-'+gid);if(!box)return;box.innerHTML='';
-  // モデルランクごとに分けて表示し、非表示のモデルはランクに関係なく一番下の「非表示」欄にまとめる（2026-11-22）
+  const hbox=document.getElementById('mc-hid-'+gid);if(hbox)hbox.innerHTML='';
+  // JAPAN・OSAKA それぞれをモデルランクごとに分けて表示し、非表示のモデルは一番下の「非表示」欄に JAPAN／OSAKA 別にまとめる（2026-11-22）
   const secs=[...RANKS.map(r=>({key:r,label:r,list:models[grp].filter(m=>!m.hidden&&rankOf(m)===r)})),
     {key:'none',label:'ランク未設定',list:models[grp].filter(m=>!m.hidden&&!rankOf(m))},
-    {key:'hidden',label:'非表示',list:models[grp].filter(m=>m.hidden)}].filter(s=>s.list.length);
+    {key:'hidden',label:grp==='japan'?'iito JAPAN':'iito OSAKA',list:models[grp].filter(m=>m.hidden)}].filter(s=>s.list.length);
   secs.forEach(sec=>{
-  const tgt=box;
+  const tgt=(sec.key==='hidden'&&hbox)?hbox:box;
   const hd=document.createElement('div');hd.className='mc-sec-hd'+(sec.key==='hidden'?' hid':'');
   hd.innerHTML=`<i class="ti ${sec.key==='hidden'?'ti-eye-off':'ti-star'}" style="font-size:13px"></i>${sec.label}<span class="ct">${sec.list.length}名</span>`;
   tgt.appendChild(hd);
@@ -4013,7 +4035,7 @@ function renderMcGrid(grp){
     grid.appendChild(card);
   });
   // ドラッグ並べ替えを有効化（同じランクの中だけで並べ替え）
-  enableMcDrag(grp,grid,[box]);
+  enableMcDrag(grp,grid,[box,hbox]);
   });
 }
 // モデルカードのドラッグ並べ替え（マウス・タッチ両対応）
@@ -4087,6 +4109,11 @@ function buildMcFormHTML(mode,grp,m){
 </div>
 <span class="field-lbl">名前</span>
 <input class="inp" id="mc-nm-inp" value="${m?.name||''}" placeholder="モデル名" style="font-size:13px;margin-bottom:10px"/>
+<span class="field-lbl">グループ</span>
+<select class="inp" id="mc-grp-sel" style="font-size:13px;margin-bottom:14px">
+<option value="japan" ${grp!=='osaka'?'selected':''}>iito JAPAN</option>
+<option value="osaka" ${grp==='osaka'?'selected':''}>iito OSAKA</option>
+</select>
 <span class="field-lbl">投票画面での表示</span>
 <select class="inp" id="mc-vis-sel" style="font-size:13px;margin-bottom:14px">
 <option value="show" ${(m&&m.hidden)?'':'selected'}>表示（投票画面に出す）</option>
@@ -4293,7 +4320,7 @@ function _renderResultLocal(){
   const rb=document.getElementById('rank-body');rb.innerHTML='';
   const maxScore=Math.max(1,...Object.values(scores));
   Object.entries(scores).sort((a,b)=>b[1]-a[1]).forEach(([mid,score],idx)=>{
-    const m=findMod(mid); // iito OSAKA 廃止に伴い、グループの列は出さない（2026-11-22）
+    const m=findMod(mid); // 集計にはグループの列は出さない（2026-11-22）
     const tr=document.createElement('tr');tr.innerHTML=`<td>${idx+1}</td><td>${m?.name||mid}</td><td style="font-weight:500"><div class="rk-cell"><span>${score}</span><div class="rk-bar"><i style="width:${Math.round(score/maxScore*100)}%"></i></div></div></td>`;tr.classList.toggle('rk-top',idx<3&&score>0);rb.appendChild(tr);
   });
 }
