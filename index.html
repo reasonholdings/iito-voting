@@ -487,6 +487,7 @@ body.ia-open{overflow:hidden}
 .mc-sec-hd .ct{font-size:11px;font-weight:400;color:var(--sub)}
 .mc-sec-hd.hid{color:var(--sub)}
 .mc-sec-empty{font-size:11px;color:var(--sub);margin:0 0 6px}
+.mc-sticky{position:sticky;top:0;z-index:20;display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 -4px 4px;padding:10px 4px;background:var(--bg);border-bottom:1px solid var(--bd)}
 .grp-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;margin-top:20px}
 .grp-hd:first-of-type{margin-top:0}
 .grp-lbl{font-size:11px;font-weight:500;color:var(--sub);letter-spacing:.1em;text-transform:uppercase}
@@ -985,22 +986,12 @@ body.ia-open{overflow:hidden}
   <div class="apanel" id="ap-model">
     <div id="mc-del-area"></div>
     <div id="mc-form-area"></div>
-    <div class="grp-hd">
-      <span class="grp-lbl">iito JAPAN</span>
+    <!-- 見出しと「新規登録」：スクロールしても上に残る（iito OSAKA の欄は廃止。2026-11-22） -->
+    <div class="mc-sticky">
+      <span class="grp-lbl">モデル一覧 <span id="mc-total" style="letter-spacing:0;text-transform:none"></span></span>
       <button class="btn-add" onclick="openMcForm('add','japan')"><i class="ti ti-plus" style="font-size:11px"></i> 新規登録</button>
     </div>
     <div id="mc-jp"></div>
-    <div class="grp-hd">
-      <span class="grp-lbl">iito OSAKA</span>
-      <button class="btn-add" onclick="openMcForm('add','osaka')"><i class="ti ti-plus" style="font-size:11px"></i> 新規登録</button>
-    </div>
-    <div id="mc-os"></div>
-    <!-- 非表示のモデル：JAPAN・OSAKAとも、表示するモデルの下（一番下）にまとめる（2026-11-22） -->
-    <div id="mc-hid-wrap" style="display:none">
-      <div class="grp-hd"><span class="grp-lbl"><i class="ti ti-eye-off" style="font-size:12px;vertical-align:-1px;margin-right:4px"></i>非表示</span></div>
-      <div id="mc-hid-jp"></div>
-      <div id="mc-hid-os"></div>
-    </div>
   </div>
 
   <!-- 集計 -->
@@ -3996,17 +3987,18 @@ function renderMember(){
 function changePlan(i,plan){members[i].plan=plan;ls(LS.members,members);renderMember();}
 
 // モデル管理
-function renderMcGrids(){renderMcGrid('japan');renderMcGrid('osaka');const w=document.getElementById('mc-hid-wrap');if(w)w.style.display=allMod().some(m=>m.hidden)?'':'none';}
+// iito OSAKA は廃止。OSAKAに登録されていたモデルは、管理画面を開いたときに一覧（JAPAN側）へまとめる（次の保存で反映）
+function mergeOsakaModels(){if(!(models.osaka&&models.osaka.length))return;models.osaka.forEach(m=>{m.grp='japan';models.japan.push(m);});models.osaka=[];}
+function renderMcGrids(){mergeOsakaModels();renderMcGrid('japan');const tt=document.getElementById('mc-total');if(tt){const all=allMod();tt.textContent=`（${all.length}名・うち非表示${all.filter(m=>m.hidden).length}名）`;}}
 function renderMcGrid(grp){
   const gid=grp==='japan'?'jp':'os';
   const box=document.getElementById('mc-'+gid);if(!box)return;box.innerHTML='';
-  const hbox=document.getElementById('mc-hid-'+gid);if(hbox)hbox.innerHTML='';
-  // モデルランクごとに分けて表示し、非表示のモデルはランクに関係なく、OSAKAの下の「非表示」欄にまとめる（2026-11-22）
+  // モデルランクごとに分けて表示し、非表示のモデルはランクに関係なく一番下の「非表示」欄にまとめる（2026-11-22）
   const secs=[...RANKS.map(r=>({key:r,label:r,list:models[grp].filter(m=>!m.hidden&&rankOf(m)===r)})),
     {key:'none',label:'ランク未設定',list:models[grp].filter(m=>!m.hidden&&!rankOf(m))},
-    {key:'hidden',label:grp==='japan'?'iito JAPAN':'iito OSAKA',list:models[grp].filter(m=>m.hidden)}].filter(s=>s.list.length);
+    {key:'hidden',label:'非表示',list:models[grp].filter(m=>m.hidden)}].filter(s=>s.list.length);
   secs.forEach(sec=>{
-  const tgt=(sec.key==='hidden'&&hbox)?hbox:box;
+  const tgt=box;
   const hd=document.createElement('div');hd.className='mc-sec-hd'+(sec.key==='hidden'?' hid':'');
   hd.innerHTML=`<i class="ti ${sec.key==='hidden'?'ti-eye-off':'ti-star'}" style="font-size:13px"></i>${sec.label}<span class="ct">${sec.list.length}名</span>`;
   tgt.appendChild(hd);
@@ -4021,7 +4013,7 @@ function renderMcGrid(grp){
     grid.appendChild(card);
   });
   // ドラッグ並べ替えを有効化（同じランクの中だけで並べ替え）
-  enableMcDrag(grp,grid,[box,hbox]);
+  enableMcDrag(grp,grid,[box]);
   });
 }
 // モデルカードのドラッグ並べ替え（マウス・タッチ両対応）
@@ -4095,11 +4087,6 @@ function buildMcFormHTML(mode,grp,m){
 </div>
 <span class="field-lbl">名前</span>
 <input class="inp" id="mc-nm-inp" value="${m?.name||''}" placeholder="モデル名" style="font-size:13px;margin-bottom:10px"/>
-<span class="field-lbl">グループ</span>
-<select class="inp" id="mc-grp-sel" style="font-size:13px;margin-bottom:14px">
-<option value="japan" ${grp==='japan'?'selected':''}>iito JAPAN</option>
-<option value="osaka" ${grp==='osaka'?'selected':''}>iito OSAKA</option>
-</select>
 <span class="field-lbl">投票画面での表示</span>
 <select class="inp" id="mc-vis-sel" style="font-size:13px;margin-bottom:14px">
 <option value="show" ${(m&&m.hidden)?'':'selected'}>表示（投票画面に出す）</option>
