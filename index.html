@@ -1013,7 +1013,7 @@ body.ia-open{overflow:hidden}
     </div>
     <div style="overflow-x:auto">
       <table class="tbl">
-        <thead><tr><th>順位</th><th>候補者名</th><th>グループ</th><th>得票数</th></tr></thead>
+        <thead><tr><th>順位</th><th>候補者名</th><th>得票数</th></tr></thead>
         <tbody id="rank-body"></tbody>
       </table>
     </div>
@@ -4293,8 +4293,8 @@ function _renderResultLocal(){
   const rb=document.getElementById('rank-body');rb.innerHTML='';
   const maxScore=Math.max(1,...Object.values(scores));
   Object.entries(scores).sort((a,b)=>b[1]-a[1]).forEach(([mid,score],idx)=>{
-    const m=findMod(mid);const grp=models.japan.find(x=>x.id===mid)?'JAPAN':'OSAKA';
-    const tr=document.createElement('tr');tr.innerHTML=`<td>${idx+1}</td><td>${m?.name||mid}</td><td>iito ${grp}</td><td style="font-weight:500"><div class="rk-cell"><span>${score}</span><div class="rk-bar"><i style="width:${Math.round(score/maxScore*100)}%"></i></div></div></td>`;tr.classList.toggle('rk-top',idx<3&&score>0);rb.appendChild(tr);
+    const m=findMod(mid); // iito OSAKA 廃止に伴い、グループの列は出さない（2026-11-22）
+    const tr=document.createElement('tr');tr.innerHTML=`<td>${idx+1}</td><td>${m?.name||mid}</td><td style="font-weight:500"><div class="rk-cell"><span>${score}</span><div class="rk-bar"><i style="width:${Math.round(score/maxScore*100)}%"></i></div></div></td>`;tr.classList.toggle('rk-top',idx<3&&score>0);rb.appendChild(tr);
   });
 }
 
@@ -4368,10 +4368,10 @@ function exportRankCSV(){
   // 候補者別に得票を合算
   const scores={};allMod().forEach(m=>scores[m.id]=0);
   Object.values(ev).forEach(v=>Object.entries(v).forEach(([mid,c])=>{if(scores[mid]!==undefined)scores[mid]+=Number(c)||0;}));
-  const rows=[['順位','候補者名','グループ','得票数']];
+  const rows=[['順位','候補者名','得票数']];
   Object.entries(scores).sort((a,b)=>b[1]-a[1]).forEach(([mid,score],idx)=>{
-    const m=findMod(mid);const grp=models.japan.find(x=>x.id===mid)?'iito JAPAN':'iito OSAKA';
-    rows.push([idx+1,m?.name||mid,grp,score]);
+    const m=findMod(mid);
+    rows.push([idx+1,m?.name||mid,score]);
   });
   const csv=rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(',')).join('\n');
   const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
@@ -4384,7 +4384,7 @@ function exportRankCSV(){
 function exportVoterCSV(){
   const targetEvs=resultEvId?events.filter(e=>e.id===resultEvId):events.slice();
   const evLabel=resultEvId?(events.find(e=>e.id===resultEvId)?.name||'event'):'全イベント';
-  const rows=[['イベント','期','会員番号','ニックネーム','プラン','メールアドレス','推しモデル','投票先モデル','グループ','投票数','この会員の合計票数']];
+  const rows=[['イベント','期','会員番号','ニックネーム','プラン','メールアドレス','推しモデル','投票先モデル','投票数','この会員の合計票数']];
   targetEvs.forEach(e=>{
     const ev=allVotes[e.id]||{};
     Object.keys(ev).sort((a,b)=>String(a).localeCompare(String(b),'ja')).forEach(nick=>{
@@ -4396,8 +4396,7 @@ function exportVoterCSV(){
       const oshi=oshiNamesFromServer[nick]||(oshiMap[nick]||[]).map(id=>findMod(id)?.name||id).join('／');
       const totalOfNick=entries.reduce((s,[,c])=>s+(Number(c)||0),0);
       entries.forEach(([mid,cnt])=>{
-        const grp=models.japan.find(x=>x.id===mid)?'iito JAPAN':'iito OSAKA';
-        rows.push([e.name||'',e.termId||'',m?.mid||'',nick,m?(PLAN_LBL[m.plan]||m.plan||''):'',m?.email||'',oshi,findMod(mid)?.name||mid,grp,cnt,totalOfNick]);
+        rows.push([e.name||'',e.termId||'',m?.mid||'',nick,m?(PLAN_LBL[m.plan]||m.plan||''):'',m?.email||'',oshi,findMod(mid)?.name||mid,cnt,totalOfNick]);
       });
     });
   });
