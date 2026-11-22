@@ -261,12 +261,15 @@ body.has-tabbar .screen{padding-bottom:120px}
 .user-av{width:26px;height:26px;border-radius:50%;background:var(--ac-l);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:500;color:var(--ac-d)}
 .oshi-edit{font-size:11px;color:var(--ac);text-decoration:underline;cursor:pointer;display:block;text-align:center;margin-bottom:5px}
 .metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0 16px}
-.met-sticky{position:-webkit-sticky;position:sticky;top:var(--met-top,0px);z-index:60;margin:-24px -18px 14px;padding:10px 18px 8px;background:rgba(255,255,255,.55);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);border-bottom:1px solid rgba(0,0,0,.06);box-shadow:0 2px 10px rgba(0,0,0,.04)}
-.met-sticky .metrics{margin:0}
+.met-sticky{position:-webkit-sticky;position:sticky;top:var(--met-top,0px);z-index:60;margin:-24px -18px 14px;padding:10px 18px 6px;background:transparent} /* 白い背景は置かない（2026-11-22）：後ろの画面がそのまま見える */
+.met-sticky .metrics{margin:0;justify-items:center}
+/* 3つの表示は丸にする（2026-11-22） */
+.met-sticky .met{width:92px;height:92px;border-radius:50%;padding:0;display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:0 3px 10px rgba(0,0,0,.08)}
+.met-sticky #term-note{text-shadow:0 0 4px #fff,0 0 8px #fff,0 0 2px #fff}
 /* 半透明（2026-11-21）：後ろの画面がうっすら見えるよう、3つの枠も少し透かす */
-.met-sticky .met{background:rgba(255,247,250,.72)}
-.met-sticky .met.met-lk{background:rgba(224,250,254,.78)}
-.met-sticky .met.met-rm{background:rgba(255,236,236,.78)}
+.met-sticky .met{background:rgba(255,247,250,.88)}
+.met-sticky .met.met-lk{background:rgba(224,250,254,.9)}
+.met-sticky .met.met-rm{background:rgba(255,236,236,.9)}
 .met{background:var(--bg2);border:.5px solid var(--bd);border-radius:10px;padding:10px 4px;text-align:center;transition:border-color .12s,background .12s}
 .met.met-lk{background:var(--bl-l);border:1.5px solid var(--bl-m)}.met.met-lk .n{color:var(--bl)}.met.met-lk .l{color:var(--bl)}
 .met.met-rm{background:var(--rd-l);border:1.5px solid var(--rd-m)}.met.met-rm .n{color:var(--rd)}.met.met-rm .l{color:var(--rd)}
