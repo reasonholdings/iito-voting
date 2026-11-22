@@ -209,7 +209,10 @@ function getMe(data) {
       if (grants[term].indexOf(plan) < 0) grants[term].push(plan);
     });
   }
-  return { ok: true, member: a.member, votes: votes, grants: grants, termPlans: termPlans };
+  const res = { ok: true, member: a.member, votes: votes, grants: grants, termPlans: termPlans };
+  const nt = renewVoterToken_(data.sessionToken);
+  if (nt) res.token = nt;
+  return res;
 }
 
 // ════════════════════════════════════════
@@ -1182,6 +1185,20 @@ function pinProblem_(pin) {
 function issueVoterToken_(email, ver) {
   const payload = normEmail_(email) + '|' + ver + '|' + (Date.now() + VOTER_TOKEN_TTL_MS);
   return Utilities.base64EncodeWebSafe(payload, Utilities.Charset.UTF_8) + '.' + hmac_('tok|' + payload);
+}
+// ログイン証明の期限が近ければ（残り60日未満）、同じ内容で期限を延ばした新しい証明を返す。不要なら null
+//  使っている間はログアウトされないようにするため（2026-11-22）。authVoter_ で確認済みの証明だけを渡すこと
+const VOTER_TOKEN_RENEW_MS = 60 * 24 * 60 * 60 * 1000;
+function renewVoterToken_(token) {
+  if (!token) return null;
+  try {
+    const parts = String(token).split('.');
+    const payload = Utilities.newBlob(Utilities.base64DecodeWebSafe(parts[0])).getDataAsString('UTF-8');
+    if (hmac_('tok|' + payload) !== parts[1]) return null;
+    const f = payload.split('|');
+    if (f.length !== 3 || Number(f[2]) - Date.now() >= VOTER_TOKEN_RENEW_MS) return null;
+    return issueVoterToken_(f[0], f[1]);
+  } catch (e) { return null; }
 }
 // ログイン証明を確かめる。正しければメールアドレス、だめなら null
 function verifyVoterToken_(token) {
