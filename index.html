@@ -315,7 +315,7 @@ body.has-tabbar .screen{padding-bottom:120px}
 .cc.pending .cv{color:var(--ac-d)}.cc.locked .cv{color:var(--sub)}
 .chk-dot{position:absolute;top:4px;right:8px;width:24px;height:24px;border-radius:50%;display:none;align-items:center;justify-content:center;z-index:2;box-shadow:0 1px 4px rgba(0,0,0,.35);border:2px solid #fff}
 .cc.pending .chk-dot{display:flex;background:var(--ac)}
-.oshi-tag{position:absolute;top:2px;left:50%;transform:translateX(-50%);white-space:nowrap;z-index:2;padding:2px 8px;border-radius:999px;background:linear-gradient(135deg,#ff6fa5,#ff4e8b);color:#fff;font-size:10.5px;font-weight:700;line-height:1.5;letter-spacing:.06em;box-shadow:0 1px 4px rgba(216,27,96,.35);border:1.5px solid #fff;pointer-events:none}
+.oshi-tag{display:block;width:fit-content;margin:1px auto 3px;padding:0 8px;border-radius:999px;background:linear-gradient(135deg,#f6dc8a 0%,#d9ad3c 55%,#b8892a 100%);color:#fff;font-size:10px;font-weight:700;line-height:1.6;letter-spacing:.05em;text-shadow:0 1px 1px rgba(120,80,0,.45);box-shadow:0 1px 3px rgba(150,110,20,.35);white-space:nowrap}
 
 /* インライン割り振りパネル */
 .ialloc{border-radius:16px;padding:16px;margin-bottom:10px;border:2px solid var(--ac-m);background:var(--ac-l)}
@@ -2019,8 +2019,9 @@ function buildGrid(grp){
         const m=g.list[j];const d=document.createElement('div');d.className='cc';d.id='cc-'+m.id;
         d.onclick=()=>onCardClick(m.id);
         const avC=m.img?`<img src="${m.img}" alt="${m.name}"/>`:`<span>${m.name.replace(/[a-zA-Z]/g,'').slice(0,1)||m.name[0]}</span>`;
-        const oshiTag=isMyOshi(m)?'<div class="oshi-tag" aria-label="推し">推し</div>':''; // 推しに設定しているモデルには「推し」を出す（2026-11-22）
-        d.innerHTML=`<div class="chk-dot"><i class="ti ti-check" style="font-size:10px;color:white"></i></div>${oshiTag}<div class="cav">${avC}</div><div class="cn">${m.name}</div><div class="cv" id="cv-${m.id}"></div>`;
+        // 推しに設定しているモデルは、名前の下にゴールドの「推し」を出す（写真・名前には重ねない。4列でも名前が折り返さないよう別の行に。2026-11-22）
+        const oshiTag=isMyOshi(m)?'<div class="oshi-tag" aria-label="推し">推し</div>':'';
+        d.innerHTML=`<div class="chk-dot"><i class="ti ti-check" style="font-size:10px;color:white"></i></div><div class="cav">${avC}</div><div class="cn">${m.name}</div>${oshiTag}<div class="cv" id="cv-${m.id}"></div>`;
         row.appendChild(d);
       }
       box.appendChild(row);
