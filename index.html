@@ -2168,10 +2168,15 @@ function updUI(){
       let ppl=0,vv=0;
       Object.keys(curUser.locked).forEach(mid=>{const d=(curUser.locked[mid]||0)-(sentLocked[mid]||0);if(d>0){ppl++;vv+=d;}});
       // 投票期間中は、スクロールしても常に出す（2026-11-22）。送っていない票が無いとき・選択中があるときは押せない
-      const show=getPublicEvents().length>0&&isVotingClosed()==='';
+      // 開始前も出す（押せない・開始日時を表示）。終了後とイベントが無いときは出さない
+      const vc=isVotingClosed();
+      const show=getPublicEvents().length>0&&(vc===''||vc==='before');
       fs.style.display=show?'flex':'none';
-      fs.disabled=!hasUnsent||Object.keys(pending).length>0||over;
-      fs.innerHTML=hasUnsent
+      fs.disabled=vc!==''||!hasUnsent||Object.keys(pending).length>0||over;
+      const st=vc==='before'?getEvStart(getActEv()):null;
+      fs.innerHTML=st
+        ?`<span>投票を確定する</span><span class="fs-n">${st.getMonth()+1}/${st.getDate()} ${st.getHours()}:${pad(st.getMinutes())}から</span>`
+        :hasUnsent
         ?`<span>投票を確定する</span><span class="fs-n">${ppl}人・${vv}票</span>`
         :`<span>投票を確定する</span><span class="fs-n">${Object.keys(pending).length?'票数を決定してください':'票を選ぶと押せます'}</span>`;
       document.getElementById('s-vote')?.classList.toggle('has-float',show);
