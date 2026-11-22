@@ -288,6 +288,10 @@ body.has-tabbar .screen{padding-bottom:120px}
 .rank-hd{font-size:12px;font-weight:700;color:var(--ac-d);background:var(--ac-l);border-radius:8px;padding:5px 12px;margin:6px 0 12px;display:inline-block}
 /* ランク切り替え（専属・1st・2nd・3rd・iito OSAKA）：1列に均等幅で並べる。検索欄と同じ細いピル形で控えめに（人数は出さない） */
 .rank-filter{display:flex;gap:6px;margin:0 0 12px}
+.hist-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 12px;font-size:13px;margin:4px 0 10px}
+.hist-head b{font-size:16px}
+.hist-head span{color:var(--sub);font-size:12px}
+.hist-cands{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
 .gh-adj{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;font-size:12px;color:#1f8a5b;background:#eefaf3;border-radius:8px;padding:6px 10px;margin-top:6px}
 .gh-adj span:last-child{white-space:nowrap;font-weight:700}
 .rank-empty{font-size:13px;color:var(--sub);text-align:center;padding:24px 0}
@@ -940,6 +944,16 @@ body.ia-open{overflow:hidden}
 
   <!-- 会員管理 -->
   <div class="apanel" id="ap-member">
+    <!-- ニックネームで付与・使用履歴を調べる（2026-11-22） -->
+    <div class="sc">
+      <div class="sc-title">付与・使用履歴を調べる</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input class="inp" id="hist-nick" list="hist-nick-list" placeholder="ニックネームを入力" style="font-size:14px;margin:0;flex:1" onkeydown="if(event.key==='Enter')showAdminHistory()" onfocus="fillHistNickList()"/>
+        <button class="btn-sm-out" onclick="showAdminHistory()"><i class="ti ti-search" style="font-size:12px;vertical-align:-1px"></i> 表示</button>
+      </div>
+      <datalist id="hist-nick-list"></datalist>
+      <div id="hist-out" style="margin-top:10px"></div>
+    </div>
     <div class="sc">
       <div class="sc-title">会員リスト読み込み（決済履歴CSV）</div>
       <div class="upload-area" onclick="document.getElementById('csv-inp').click()">
@@ -1486,6 +1500,7 @@ function purgeOthersData(){
   ls(LS.votes, allVotes);
   grants = me&&grants[me] ? {[me]:grants[me]} : {}; ls('iito_grants', grants);
   termPlans = me&&termPlans[me] ? {[me]:termPlans[me]} : {}; ls('iito_termplans', termPlans);
+  adjusts = me&&adjusts[me] ? {[me]:adjusts[me]} : {}; ls('iito_adjusts', adjusts);
   lsDel(LS.pw); lsDel('iito_adm_fail'); // 旧：端末に保存していた管理パスワードとロック情報
 }
 
@@ -1515,6 +1530,7 @@ async function pullGrants(){
     if(r&&r.ok&&r.grants){
       grants = r.grants;
       ls('iito_grants', grants);
+      if(r.adjusts&&typeof r.adjusts==='object'){ adjusts = r.adjusts; ls('iito_adjusts', adjusts); } // 運営が個別に足した票（全員分・管理画面だけ）
     }
   }catch(e){ console.warn('getGrants失敗（前回値を使用）', e); }
 }
@@ -2723,14 +2739,14 @@ function renderGrantHistory(m){
   box.innerHTML=html;
 }
 // すべての履歴（モーダル）
-function openGhModal(){
-  if(!curUser)return;
-  const box=document.getElementById('gh-full');box.innerHTML='';
-  const L=voteLedger(curUser);
+// 付与・使用の履歴（月ごと）のHTML。マイページのモーダルと、管理画面の「付与・使用履歴を調べる」で使う
+function ledgerHtml(m){
+  const L=voteLedger(m);
   const e=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  if(!L.length){box.innerHTML='<div class="mv-empty">まだ記録がありません</div>';}
+  if(!L.length)return '<div class="mv-empty">まだ記録がありません</div>';
+  let out='';
   L.forEach(r=>{
-    if(r.gap){box.insertAdjacentHTML('beforeend',`<div class="gh-month"><div class="gh-mt"><span class="mm">${ghMonthLabel(r.k)}</span></div><div class="gh-line"><span class="k">プランに加入していない月です（それまでの票はなくなりました）</span></div></div>`);return;}
+    if(r.gap){out+=`<div class="gh-month"><div class="gh-mt"><span class="mm">${ghMonthLabel(r.k)}</span></div><div class="gh-line"><span class="k">プランに加入していない月です（それまでの票はなくなりました）</span></div></div>`;return;}
     const pay=isPayGrantTerm(r.t);
     let h=`<div class="gh-month"><div class="gh-mt"><span class="mm">${ghMonthLabel(r.k)}${pay&&r.g?'<span class="gh-ok">本付与済み</span>':''}</span><span class="gh-exp">${r.g?(r.expired?'使える期限を過ぎました':r.expTxt+'使えます'):''}</span></div>`;
     h+=`<div class="gh-line give"><span class="gh-tag">＋ 付与</span><span class="v">${r.g?'＋'+r.g+'票':'なし'}</span></div>`;
@@ -2744,9 +2760,37 @@ function openGhModal(){
     if(r.g)h+=`<div class="gh-line" style="margin-top:4px"><span class="k">この月に付与された票のうち使われた票</span><span class="v">${r.spent}票</span></div>`;
     if(r.g&&r.spent>0&&r.spent>r.u)h+=`<div class="gh-sub" style="padding-left:0"><span>票は古いものから使われるため、あとの月の投票にも使われています</span></div>`;
     if(r.g)h+=`<div class="gh-rest ${r.expired?'dim':''}"><span>この月に付与された票の残り</span><span>${r.expired?(r.rest?r.rest+'票（期限切れ）':'0票'):r.rest+'票'}</span></div>`;
-    box.insertAdjacentHTML('beforeend',h+'</div>');
+    out+=h+'</div>';
   });
+  return out;
+}
+function openGhModal(){
+  if(!curUser)return;
+  document.getElementById('gh-full').innerHTML=ledgerHtml(curUser);
   document.getElementById('gh-modal').classList.add('open');
+}
+// 【管理画面】ニックネームを入れて、その会員の付与・使用履歴を表示する（2026-11-22）
+function adminHistNicks(){return [...new Set([...members.map(m=>m.nick),...Object.keys(grants||{}),...Object.keys(adjusts||{})].filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ja'));}
+function fillHistNickList(){const dl=document.getElementById('hist-nick-list');if(dl)dl.innerHTML=adminHistNicks().map(n=>`<option value="${String(n).replace(/"/g,'&quot;')}"></option>`).join('');}
+function showAdminHistory(){
+  const out=document.getElementById('hist-out');if(!out)return;
+  const q=(document.getElementById('hist-nick')?.value||'').trim();
+  const esc=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  if(!q){out.innerHTML='<div class="mv-empty">ニックネームを入れてください</div>';return;}
+  const all=adminHistNicks();
+  let nick=all.find(n=>n===q);
+  if(!nick){
+    const nq=normName(q),hits=all.filter(n=>normName(n).includes(nq));
+    if(hits.length===1)nick=hits[0];
+    else{out.innerHTML=hits.length?`<div class="mv-empty">候補が${hits.length}人います。選んでください</div><div class="hist-cands">${hits.slice(0,30).map(n=>`<button type="button" class="btn-ghost-sm" onclick="document.getElementById('hist-nick').value=this.textContent;showAdminHistory()">${esc(n)}</button>`).join('')}</div>`:'<div class="mv-empty">見つかりませんでした</div>';return;}
+  }
+  const mem=members.find(m=>m.nick===nick);
+  const m=mem||{nick,plan:''};
+  let head=`<div class="hist-head"><b>${esc(nick)}</b>`;
+  if(mem){head+=`<span>${PLAN_LBL[mem.plan]||mem.plan||''}</span>`;try{const v=calcMemberVotes(mem);if(v)head+=`<span>今月（${v.curTerm||""}）の持ち票 ${v.hold}票・使用 ${v.usedCur}票・残り ${v.remaining}票</span>`;}catch(e){}}
+  else head+='<span style="color:var(--rd)">今の会員リストにはいません</span>';
+  head+='</div>';
+  out.innerHTML=head+ledgerHtml(m);
 }
 function closeGhModal(){document.getElementById('gh-modal').classList.remove('open');}
 
