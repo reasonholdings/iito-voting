@@ -494,6 +494,7 @@ body.ia-open{overflow:hidden}
 .mc-sec-empty{font-size:11px;color:var(--sub);margin:0 0 6px}
 .mc-grp-hd{margin:18px 0 0}
 .mc-grp-hd .grp-lbl{font-size:13px;font-weight:700;color:var(--tx,#333);letter-spacing:.04em;text-transform:none}
+.mc-grp-ct{font-size:11px;font-weight:400;color:var(--sub);margin-left:6px}
 .mc-sticky{position:sticky;top:0;z-index:20;display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 -4px 4px;padding:10px 4px;background:var(--bg);border-bottom:1px solid var(--bd)}
 .grp-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;margin-top:20px}
 .grp-hd:first-of-type{margin-top:0}
@@ -998,9 +999,9 @@ body.ia-open{overflow:hidden}
       <span class="grp-lbl">モデル一覧 <span id="mc-total" style="letter-spacing:0;text-transform:none"></span></span>
       <button class="btn-add" onclick="openMcForm('add','japan')"><i class="ti ti-plus" style="font-size:11px"></i> 新規登録</button>
     </div>
-    <div class="grp-hd mc-grp-hd" id="mc-jp-hd"><span class="grp-lbl">iito JAPAN</span></div>
+    <div class="grp-hd mc-grp-hd" id="mc-jp-hd"><span class="grp-lbl">iito JAPAN <span class="mc-grp-ct" id="mc-jp-ct"></span></span></div>
     <div id="mc-jp"></div>
-    <div class="grp-hd mc-grp-hd" id="mc-os-hd"><span class="grp-lbl">iito OSAKA</span></div>
+    <div class="grp-hd mc-grp-hd" id="mc-os-hd"><span class="grp-lbl">iito OSAKA <span class="mc-grp-ct" id="mc-os-ct"></span></span></div>
     <div id="mc-os"></div>
     <!-- 非表示のモデル：JAPAN・OSAKAとも一番下にまとめる -->
     <div id="mc-hid-wrap" style="display:none">
@@ -4018,7 +4019,9 @@ function restoreOsakaModels(){
 }
 function renderMcGrids(){restoreOsakaModels();renderMcGrid('japan');renderMcGrid('osaka');
   const w=document.getElementById('mc-hid-wrap');if(w)w.style.display=allMod().some(m=>m.hidden)?'':'none';
-const tt=document.getElementById('mc-total');if(tt){const all=allMod();tt.textContent=`（${all.length}名・うち非表示${all.filter(m=>m.hidden).length}名）`;}}
+const cnt=list=>{const v=list.filter(m=>!m.hidden).length;return {all:list.length,show:v,hide:list.length-v};};
+  const tt=document.getElementById('mc-total');if(tt){const c=cnt(allMod());tt.textContent=`（全${c.all}名：表示${c.show}名・非表示${c.hide}名）`;}
+  [['jp','japan'],['os','osaka']].forEach(([g,k])=>{const el=document.getElementById('mc-'+g+'-ct');if(el){const c=cnt(models[k]||[]);el.textContent=`表示${c.show}名`+(c.hide?`（非表示${c.hide}名）`:'');}});}
 function renderMcGrid(grp){
   const gid=grp==='japan'?'jp':'os';
   const box=document.getElementById('mc-'+gid);if(!box)return;box.innerHTML='';
