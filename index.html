@@ -2043,6 +2043,10 @@ function buildLkHTML(mid){
   const tempV=lkV-sentV;           // 今回の仮確定分（変更可能）
   const rem=getTotal()-lkSum()-pdSum();
   // 仮確定分がある（まだ送信していない）→ 変更ボタンを出す
+  // まだ送っていない票（仮確定）だけを取り消すボタン（2026-11-22）。送信済みの票は取り消せない
+  const cancelBtn=tempV>0
+    ?`<button onclick="cancelLocked('${mid}')" style="width:100%;padding:12px;font-size:13px;background:#fff;border:2px solid #C9CDD3;border-radius:12px;color:#5F6670;cursor:pointer;margin-top:10px">この投票をキャンセルする${sentV>0?'（今回の'+tempV+'票）':''}</button>`
+    :'';
   const changeBtn=tempV>0
     ?`<button onclick="unlockCard('${mid}')" style="width:100%;padding:12px;font-size:13px;background:#fff;border:2px solid var(--gr);border-radius:12px;color:var(--gr);cursor:pointer;margin-top:10px">票数を変更する</button>`
     :'';
@@ -2057,7 +2061,7 @@ function buildLkHTML(mid){
     ?`仮確定（送信済み${sentV}票＋仮${tempV}票）`
     :`確定済み`;
   return `<div class="ia-top" style="margin-bottom:10px"><span class="ia-title" style="color:var(--gr);font-size:15px"><i class="ti ti-lock" style="font-size:13px;vertical-align:-1px;margin-right:5px"></i>${m?.name||''}</span><div class="ia-x" style="border-color:var(--gr-m)" onclick="remPanel('${mid}');updUI()"><i class="ti ti-x" style="color:var(--gr)"></i></div></div>
-${addBtn}${changeBtn}
+${addBtn}${changeBtn}${cancelBtn}
 <div style="display:flex;align-items:baseline;justify-content:center;gap:6px;padding:10px 0 2px"><span style="font-size:22px;font-weight:500;color:var(--gr)">${lkV}</span><span style="font-size:13px;color:var(--sub)">票 ${stateLbl}</span></div>`;
 }
 
@@ -2088,6 +2092,15 @@ function decide(mid){
     if(cap)alert(`このイベントは1候補あたり${cap}票までです。${findMod(mid)?.name||''}への投票を${maxAdd}票に調整しました。`);
   }
   curUser.locked[mid]=(curUser.locked[mid]||0)+v;delete pending[mid];remPanel(mid);updUI();
+}
+// 仮確定（まだ送っていない票）を取り消す。送信済みの票は残す
+function cancelLocked(mid){
+  const sentV=sentLocked[mid]||0;
+  const tempV=(curUser.locked[mid]||0)-sentV;
+  if(tempV<=0){remPanel(mid);updUI();return;}
+  if(!confirm(`${findMod(mid)?.name||''}への${tempV}票の投票をキャンセルしますか？`))return;
+  if(sentV>0)curUser.locked[mid]=sentV;else delete curUser.locked[mid];
+  delete pending[mid];remPanel(mid);updUI();
 }
 function unlockCard(mid){
   const sentV=sentLocked[mid]||0;
