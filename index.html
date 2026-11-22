@@ -280,7 +280,7 @@ body.has-tabbar .screen{padding-bottom:120px}
 .cand-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px} /* 列数は colsFor() で行ごとに上書き（そのランクが15名以上なら4列、14名以下なら3列） */
 /* 投票画面のランク別サブ見出し（専属 / 1st） */
 .rank-hd{font-size:12px;font-weight:700;color:var(--ac-d);background:var(--ac-l);border-radius:8px;padding:5px 12px;margin:6px 0 12px;display:inline-block}
-/* ランク切り替え（専属・1st・2nd）：1列に均等幅で並べる。検索欄と同じ細いピル形で控えめに（人数は出さない） */
+/* ランク切り替え（専属・1st・2nd・3rd・iito OSAKA）：1列に均等幅で並べる。検索欄と同じ細いピル形で控えめに（人数は出さない） */
 .rank-filter{display:flex;gap:6px;margin:0 0 12px}
 /* 名前検索（投票画面）：控えめな細い枠。文字は16pxのままにしてiPhoneの自動ズームを防ぐ */
 .name-search{position:relative;margin:-4px 0 10px}
@@ -291,7 +291,9 @@ body.has-tabbar .screen{padding-bottom:120px}
 .name-search .ns-clear{position:absolute;right:2px;top:50%;transform:translateY(-50%);width:34px;height:34px;border:none;background:transparent;color:var(--sub);font-size:15px;cursor:pointer;display:none;align-items:center;justify-content:center}
 .name-search.has-q .ns-clear{display:flex}
 .ns-empty{text-align:center;padding:24px 12px;font-size:13px;color:var(--sub);background:var(--bg2);border:.5px solid var(--bd);border-radius:12px;margin-bottom:14px}
-.rank-filter button{flex:1 1 0;min-width:0;height:32px;padding:0 2px;border-radius:999px;border:1px solid var(--bd);background:#fff;color:var(--tx);font-family:inherit;font-size:13px;font-weight:500;line-height:1.2;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;-webkit-tap-highlight-color:transparent}
+.rank-filter button{flex:1 1 auto;min-width:0;height:32px;padding:0 6px;white-space:nowrap;border-radius:999px;border:1px solid var(--bd);background:#fff;color:var(--tx);font-family:inherit;font-size:13px;font-weight:500;line-height:1.2;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;-webkit-tap-highlight-color:transparent}
+.rank-filter button[data-rank="osaka"]{flex:1.6 1 auto}
+@media (max-width:400px){.rank-filter{gap:4px}.rank-filter button{font-size:12px;padding:0 4px}}
 .rank-filter button.on{background:var(--ac);border-color:var(--ac);color:#fff;font-weight:700}
 .rank-filter button:focus-visible{outline:3px solid var(--ac-m);outline-offset:2px}
 .cc{background:transparent;border:none;padding:6px 2px;cursor:pointer;text-align:center;position:relative;-webkit-tap-highlight-color:transparent}
@@ -1893,7 +1895,7 @@ function buildGrids(){restoreOsakaModels();buildGrid('all');}
 // 投票画面に出すモデル（非表示フラグが立っていないもの）。'all'＝JAPAN→OSAKAの順で全員
 function visibleMods(grp){return (grp==='all'?allMod():(models[grp]||[])).filter(m=>!m.hidden);}
 // モデルランク（管理画面のモデル登録で指定）。この順で表示する。未設定は「その他」
-const RANKS=['専属','1st','2nd'];
+const RANKS=['専属','1st','2nd','3rd']; // 3rd を追加（2026-11-22）
 function rankOf(m){return RANKS.includes(m.rank)?m.rank:'';}
 // iito OSAKA のモデルは、投票画面では「iito OSAKA」ボタンにまとめて表示する（専属・1st・2nd は JAPAN のモデルだけ。2026-11-22）
 const OSAKA_TAB='osaka';
@@ -4125,8 +4127,9 @@ function buildMcFormHTML(mode,grp,m){
 <option value="専属" ${(m&&m.rank==='専属')?'selected':''}>専属</option>
 <option value="1st" ${(m&&m.rank==='1st')?'selected':''}>1st</option>
 <option value="2nd" ${(m&&m.rank==='2nd')?'selected':''}>2nd</option>
+<option value="3rd" ${(m&&m.rank==='3rd')?'selected':''}>3rd</option>
 </select>
-<div style="font-size:11px;color:var(--sub);margin:-8px 0 14px;line-height:1.6">投票画面では「専属」「1st」「2nd」のボタンでランクごとに切り替えて表示されます（未設定は「その他」）。</div>
+<div style="font-size:11px;color:var(--sub);margin:-8px 0 14px;line-height:1.6">投票画面では「専属」「1st」「2nd」「3rd」のボタンでランクごとに切り替えて表示されます（未設定は「その他」）。</div>
 <div style="display:flex;gap:10px;justify-content:flex-end">
 <button class="btn-ghost-sm" onclick="closeMcForm()">キャンセル</button>
 <button class="btn-gold" style="width:auto;padding:9px 20px;margin-top:0" onclick="saveMcForm('${mode}')">保存</button>
@@ -4215,7 +4218,7 @@ function saveMcForm(mode){
   if(mcCrop)applyMcCrop(); // 切り取りの決定を押し忘れても、表示中の範囲で保存する
   const name=(document.getElementById('mc-nm-inp')?.value||'').trim();const grp=document.getElementById('mc-grp-sel')?.value||'japan';
   const hidden=(document.getElementById('mc-vis-sel')?.value==='hide'); // 非表示フラグ
-  const rankSel=document.getElementById('mc-rank-sel')?.value||''; // モデルランク（専属/1st/2nd/未設定）
+  const rankSel=document.getElementById('mc-rank-sel')?.value||''; // モデルランク（専属/1st/2nd/3rd/未設定）
   const rank=RANKS.includes(rankSel)?rankSel:'';
   if(!name){alert('名前を入力してください');return;}
   if(mode==='add'){models[grp].push({id:genId(),name,grp,img:mcImg,hidden,rank});}
