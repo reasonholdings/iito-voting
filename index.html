@@ -156,7 +156,7 @@ html,body{min-height:100vh;background:var(--bg2);font-family:"Zen Maru Gothic","
 /* 投票者向けの下のメニュー（インスタグラム風）：左＝投票、右＝マイページ。ブラウザの下のアドレス欄のすぐ上に置く（下の余白2px） */
 .tabbar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(2px + env(safe-area-inset-bottom));width:calc(100% - 32px);max-width:420px;display:none;justify-content:space-around;align-items:center;padding:6px;background:rgba(255,255,255,.94);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border:1px solid var(--bd);border-radius:999px;box-shadow:0 6px 24px rgba(0,0,0,.12);z-index:150}
 .tabbar.show{display:flex}
-.float-submit{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(82px + env(safe-area-inset-bottom));width:auto;min-width:220px;max-width:calc(100% - 96px);z-index:140;display:flex;align-items:center;justify-content:center;gap:8px;padding:11px 18px;border:none;border-radius:999px;background:rgba(255,78,139,.78);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);color:#fff;font-family:inherit;font-size:15px;font-weight:700;white-space:nowrap;box-shadow:0 6px 18px rgba(216,27,96,.25);cursor:pointer;animation:fs-in .2s ease} /* 横幅は狭め・半透明（2026-11-22） */
+.float-submit{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(82px + env(safe-area-inset-bottom));width:auto;max-width:calc(100% - 96px);z-index:140;display:flex;align-items:center;justify-content:center;gap:8px;padding:11px 28px;border:none;border-radius:999px;background:rgba(255,78,139,.78);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);color:#fff;font-family:inherit;font-size:15px;font-weight:700;white-space:nowrap;box-shadow:0 6px 18px rgba(216,27,96,.25);cursor:pointer;animation:fs-in .2s ease} /* 横幅は狭め・半透明（2026-11-22） */
 .float-submit .fs-n{font-size:11.5px;font-weight:700;background:rgba(255,255,255,.25);border-radius:999px;padding:2px 9px}
 .float-submit:disabled{background:rgba(231,169,191,.6);box-shadow:none;cursor:default}
 @keyframes fs-in{from{opacity:0;transform:translate(-50%,10px)}to{opacity:1;transform:translate(-50%,0)}}
@@ -309,6 +309,13 @@ body.has-tabbar .screen{padding-bottom:120px}
 
 /* インライン割り振りパネル */
 .ialloc{border-radius:16px;padding:16px;margin-bottom:10px;border:2px solid var(--ac-m);background:var(--ac-l)}
+.cf-box{max-width:380px}
+.cf-sec{font-size:12px;font-weight:700;color:var(--ac-d);margin-bottom:6px}
+.cf-m{display:flex;align-items:center;gap:8px;min-width:0}
+.cf-av{width:30px;height:30px;flex:0 0 30px;border-radius:50%;overflow:hidden;background:var(--bg2);display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--sub)}
+.cf-av img{width:100%;height:100%;object-fit:cover}
+.cf-sent{font-size:11.5px;color:var(--sub);line-height:1.6;margin:-4px 0 12px}
+#confirm-modal{z-index:420}
 .ia-ov{display:none;position:fixed;inset:0;z-index:400;background:rgba(0,0,0,.45);align-items:center;justify-content:center;padding:20px}
 .ia-ov.open{display:flex}
 .ia-ov .ialloc{width:100%;max-width:400px;margin:0;max-height:85vh;overflow-y:auto;background:#FFF4F8;box-shadow:0 12px 40px rgba(0,0,0,.25);animation:ia-pop .18s ease}
@@ -677,19 +684,6 @@ body.ia-open{overflow:hidden}
   <p class="hint">各候補の票数を決定してから最終確定してください</p>
   <!-- ログアウトはマイページに移動（2026-11-17） -->
 
-  <!-- 投票確認モーダル -->
-  <div class="overlay" id="confirm-modal">
-    <div class="mbox">
-      <h3><i class="ti ti-clipboard-check" style="font-size:15px;vertical-align:-2px;margin-right:6px;color:var(--ac)"></i>投票内容の最終確認</h3>
-      <p style="font-size:11px;color:var(--sub);margin-bottom:4px">送信後は取り消せません。</p>
-      <div class="clist" id="c-list"></div>
-      <div class="ctotal" id="c-total"></div>
-      <div class="m-btns">
-        <button class="m-back" onclick="closeConfirm()">戻る</button>
-        <button class="m-ok" onclick="doSubmit()">確定して送信</button>
-      </div>
-    </div>
-  </div>
 </div>
 
 <!-- ════════════════════════════════════════
@@ -791,6 +785,23 @@ body.ia-open{overflow:hidden}
         <button class="m-ok" onclick="saveOshi()">保存</button>
       </div>
     </div>
+</div>
+
+
+<!-- 投票内容の確認ポップアップ（2026-11-22）：「投票を確定する」を押すと、画面のまん中に今回の投票先と票数を出す -->
+<div class="overlay" id="confirm-modal" onclick="if(event.target===this)closeConfirm()">
+  <div class="mbox cf-box">
+    <h3 style="text-align:center;margin-bottom:4px">この内容で投票しますか？</h3>
+    <p style="font-size:12px;color:var(--sub);text-align:center;margin-bottom:12px">投票先と票数をご確認ください。<br>送信後は取り消せません。</p>
+    <div class="cf-sec">今回投票する票</div>
+    <div class="clist" id="c-list"></div>
+    <div class="ctotal" id="c-total"></div>
+    <div id="c-sent"></div>
+    <div class="m-btns">
+      <button class="m-back" onclick="closeConfirm()">戻る</button>
+      <button class="m-ok" onclick="doSubmit()">この内容で投票する</button>
+    </div>
+  </div>
 </div>
 
 <!-- 票数を入れる画面（2026-11-21）：モデルを押すと、画面のまん中に出す。外側（暗い部分）を押すと閉じる -->
@@ -2173,12 +2184,7 @@ function updUI(){
       const show=getPublicEvents().length>0&&(vc===''||vc==='before');
       fs.style.display=show?'flex':'none';
       fs.disabled=vc!==''||!hasUnsent||Object.keys(pending).length>0||over;
-      const st=vc==='before'?getEvStart(getActEv()):null;
-      fs.innerHTML=st
-        ?`<span>投票を確定する</span><span class="fs-n">${st.getMonth()+1}/${st.getDate()} ${st.getHours()}:${pad(st.getMinutes())}から</span>`
-        :hasUnsent
-        ?`<span>投票を確定する</span><span class="fs-n">${ppl}人・${vv}票</span>`
-        :`<span>投票を確定する</span><span class="fs-n">${Object.keys(pending).length?'票数を決定してください':'票を選ぶと押せます'}</span>`;
+      fs.textContent='投票を確定する'; // 表示は「投票を確定する」だけ（2026-11-22）
       document.getElementById('s-vote')?.classList.toggle('has-float',show);
     }
   }
@@ -2953,8 +2959,18 @@ function openConfirm(){
   if(closed==='ended'){alert('この投票は終了しました。これ以上の投票はできません。');return;}
   if(closed==='before'){alert('この投票はまだ開始していません。');return;}
   const list=document.getElementById('c-list');list.innerHTML='';let tot=0;
-  Object.entries(curUser.locked).forEach(([mid,v])=>{tot+=v;const m=findMod(mid);const row=document.createElement('div');row.className='crow';row.innerHTML=`<span>${m?.name||mid}</span><span class="cv-pill">${v}票</span>`;list.appendChild(row);});
-  document.getElementById('c-total').innerHTML=`<span style="color:var(--sub)">合計投票数</span><span style="font-weight:500">${tot}票</span>`;
+  const esc2=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  // 今回送る票（まだ送っていない分）
+  Object.entries(curUser.locked).forEach(([mid,v])=>{
+    const d=(v||0)-(sentLocked[mid]||0);if(d<=0)return;tot+=d;const m=findMod(mid);
+    const av=m?.img?`<img src="${m.img}" alt="">`:`<span>${esc2((m?.name||'?').slice(0,1))}</span>`;
+    const row=document.createElement('div');row.className='crow';
+    row.innerHTML=`<span class="cf-m"><span class="cf-av">${av}</span>${esc2(m?.name||mid)}</span><span class="cv-pill">${d}票</span>`;list.appendChild(row);
+  });
+  document.getElementById('c-total').innerHTML=`<span style="color:var(--sub)">今回の合計</span><span style="font-weight:700;font-size:16px">${tot}票</span>`;
+  // すでに送った票（参考）
+  const sent=Object.entries(sentLocked).filter(([,v])=>v>0);
+  document.getElementById('c-sent').innerHTML=sent.length?`<div class="cf-sent">このイベントで送信済み：${sent.map(([mid,v])=>`${esc2(findMod(mid)?.name||mid)} ${v}票`).join('、')}</div>`:'';
   document.getElementById('confirm-modal').classList.add('open');
 }
 function closeConfirm(){document.getElementById('confirm-modal').classList.remove('open');}
