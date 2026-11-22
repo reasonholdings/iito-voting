@@ -288,6 +288,8 @@ body.has-tabbar .screen{padding-bottom:120px}
 .rank-hd{font-size:12px;font-weight:700;color:var(--ac-d);background:var(--ac-l);border-radius:8px;padding:5px 12px;margin:6px 0 12px;display:inline-block}
 /* ランク切り替え（専属・1st・2nd・3rd・iito OSAKA）：1列に均等幅で並べる。検索欄と同じ細いピル形で控えめに（人数は出さない） */
 .rank-filter{display:flex;gap:6px;margin:0 0 12px}
+.gh-adj{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;font-size:12px;color:#1f8a5b;background:#eefaf3;border-radius:8px;padding:6px 10px;margin-top:6px}
+.gh-adj span:last-child{white-space:nowrap;font-weight:700}
 .rank-empty{font-size:13px;color:var(--sub);text-align:center;padding:24px 0}
 /* 名前検索（投票画面）：控えめな細い枠。文字は16pxのままにしてiPhoneの自動ズームを防ぐ */
 .name-search{position:relative;margin:-4px 0 10px}
@@ -1460,6 +1462,7 @@ async function pullMe(nick){
   ls(LS.votes, allVotes);
   grants[n] = r.grants||{}; ls('iito_grants', grants);
   termPlans[n] = r.termPlans||{}; ls('iito_termplans', termPlans);
+  adjusts = {[n]: r.adjusts||{}}; ls('iito_adjusts', adjusts); // 本人の分だけ持つ
   // 推し：サーバーに保存してあれば、それを使う（端末をまたいで同じ推しを出す。2026-11-22）
   if(Array.isArray(r.oshi)){ oshiMap[n]=r.oshi.map(String); ls(LS.oshi,oshiMap); return {member:r.member}; }
   return {member:r.member,noServerOshi:true};
@@ -1504,6 +1507,7 @@ async function pullTermPlans(){
 
 // プラン付与履歴 { nick: { term: [plan,...] } }
 let grants = ls('iito_grants') || {};
+let adjusts = ls('iito_adjusts') || {}; // 運営が個別に足した票（差し戻し等）
 async function pullGrants(){
   if(!GAS_URL) return;
   try{
@@ -1537,8 +1541,11 @@ function grantedTotalFor(nick,term){
   const list=(grants[nick]&&grants[nick][term])||[];
   const counted={};let sum=0;
   list.forEach(p=>{if(!counted[p]){counted[p]=true;sum+=(PLANS[p]||0);}});
-  return sum;
+  return sum+adjustFor(nick,term); // 運営が個別に足した票（差し戻し等）も、その月の付与として数える
 }
+// 運営が個別に足した票（差し戻し等。2026-11-22）{ nick: { 期: [{votes, reason}] } }。GASの me が本人の分だけ返す（変数は grants の隣で宣言）
+function adjustListFor(nick,term){return ((adjusts[nick]||{})[term])||[];}
+function adjustFor(nick,term){return adjustListFor(nick,term).reduce((a,x)=>a+(Number(x.votes)||0),0);}
 
 // 接続テスト（管理者ログイン時に呼ぶ）
 async function pingGAS(){
@@ -1709,7 +1716,8 @@ function getGrantedThisTerm(){
   const base=getBasePlan();
   if(curTerm.startsWith('__solo_'))return base;
   let g=grantedTotalFor(curUser?.nick,curTerm);
-  if(g<base&&!isPayGrantTerm(curTerm))g=base; // 11月期までは、履歴が無い/未記録なら現プランの基本票を保証（12月期からは支払いの記録がある分だけ）
+  const adj=adjustFor(curUser?.nick,curTerm);
+  if(g-adj<base&&!isPayGrantTerm(curTerm))g=base+adj; // 11月期までは、履歴が無い/未記録なら現プランの基本票を保証（12月期からは支払いの記録がある分だけ）
   return g;
 }
 // 【繰越の中核ロジック】票は「古い繰越から先に」使う（2026-11-09 ルールどおりに修正）。
@@ -2665,6 +2673,8 @@ function voteLedger(m){
   const mine=grants[m.nick]||{};
   const G={},U={},D={};
   Object.keys(mine).forEach(t=>{const k=ym(t);if(k==null)return;const ps=[...new Set(mine[t]||[])].filter(p=>PLANS[p]!=null);if(ps.length)G[k]=ps;});
+  const A={}; // 運営が個別に足した票（差し戻し等）
+  Object.keys(adjusts[m.nick]||{}).forEach(t=>{const k=ym(t);if(k==null)return;const l=adjustListFor(m.nick,t).filter(x=>Number(x.votes));if(l.length)A[k]=l;});
   (events||[]).forEach(e=>{
     const k=ym(e.termId);if(k==null)return;
     const v=(allVotes[e.id]||{})[m.nick]||{};
@@ -2673,18 +2683,18 @@ function voteLedger(m){
     U[k]=(U[k]||0)+tot;(D[k]=D[k]||[]).push({ev:e,rows,tot});
   });
   const now=new Date();const cur=now.getFullYear()*12+now.getMonth();
-  const keys=[...Object.keys(G),...Object.keys(U)].map(Number);
+  const keys=[...Object.keys(G),...Object.keys(U),...Object.keys(A)].map(Number);
   if(!keys.length)return [];
   const first=Math.min(...keys);
   const left={},spent={},out=[];let chainStart=first; // spent[月]＝その月に付与された票のうち、使われた票
   for(let k=first;k<=cur;k++){
-    const g=(G[k]||[]).reduce((a,p)=>a+PLANS[p],0),u=U[k]||0;
+    const g=(G[k]||[]).reduce((a,p)=>a+PLANS[p],0)+(A[k]||[]).reduce((a,x)=>a+Number(x.votes),0),u=U[k]||0;
     const member=g>0||u>0;
     if(!member){for(const x in left)left[x]=0;chainStart=k+1;out.push({k,t:tOf(k),g:0,plans:[],u:0,uses:[],gap:true});continue;}
     left[k]=g;
     let need=u;
     for(const w of [k-2,k-1,k]){if(w<chainStart||left[w]==null)continue;const x=Math.min(left[w],need);left[w]-=x;spent[w]=(spent[w]||0)+x;need-=x;}
-    out.push({k,t:tOf(k),g,plans:(G[k]||[]).slice().sort((a,b)=>(PLAN_RANK[a]||0)-(PLAN_RANK[b]||0)),u,uses:D[k]||[]});
+    out.push({k,t:tOf(k),g,plans:(G[k]||[]).slice().sort((a,b)=>(PLAN_RANK[a]||0)-(PLAN_RANK[b]||0)),adj:A[k]||[],u,uses:D[k]||[]});
   }
   out.forEach(r=>{if(r.gap)return;r.rest=left[r.k]||0;r.spent=spent[r.k]||0;r.expired=cur>r.k+2;r.expTxt=(()=>{const e=r.k+2;const y=Math.floor(e/12);return (y!==now.getFullYear()?y+'年':'')+(e%12+1)+'月末まで';})();});
   return out.reverse(); // 新しい月から
@@ -2706,7 +2716,11 @@ function renderGrantHistory(m){
   L.slice(0,3).forEach(r=>{
     html+=`<span class="m">${ghMonthLabel(r.k)}</span><span class="v give">${r.g?'＋'+r.g:'0'}票</span><span class="v use">${r.u?'−'+r.u:'0'}票</span><span class="v ${r.expired?'dim':'rest'}">${r.expired?'期限切れ':r.rest+'票'}</span>`;
   });
-  box.innerHTML=html+'</div>';
+  html+='</div>';
+  // 運営が個別に足した票（差し戻し等）は、付与の内訳として一言そえる
+  const esc3=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  L.slice(0,3).forEach(r=>(r.adj||[]).forEach(x=>{html+=`<div class="gh-adj"><span>${ghMonthLabel(r.k)}の付与に含む：${esc3(x.reason||'運営からの付与')}</span><span>＋${x.votes}票</span></div>`;}));
+  box.innerHTML=html;
 }
 // すべての履歴（モーダル）
 function openGhModal(){
@@ -2721,6 +2735,7 @@ function openGhModal(){
     let h=`<div class="gh-month"><div class="gh-mt"><span class="mm">${ghMonthLabel(r.k)}${pay&&r.g?'<span class="gh-ok">本付与済み</span>':''}</span><span class="gh-exp">${r.g?(r.expired?'使える期限を過ぎました':r.expTxt+'使えます'):''}</span></div>`;
     h+=`<div class="gh-line give"><span class="gh-tag">＋ 付与</span><span class="v">${r.g?'＋'+r.g+'票':'なし'}</span></div>`;
     r.plans.forEach(p=>{h+=`<div class="gh-sub give"><span>${PLAN_LBL[p]}</span><span>${PLANS[p]}票</span></div>`;});
+    (r.adj||[]).forEach(x=>{h+=`<div class="gh-sub give"><span>${e(x.reason||'運営からの付与')}</span><span>${x.votes}票</span></div>`;});
     h+=`<div class="gh-line use"><span class="gh-tag">− 使用</span><span class="v">${r.u?'−'+r.u+'票':'なし'}</span></div>`;
     r.uses.forEach(x=>{
       h+=`<div class="gh-sub use"><span>${e(x.ev.name||'イベント')}</span><span>${x.tot}票</span></div>`;
@@ -2904,7 +2919,8 @@ function calcMemberVotes(m){
   };
   // 今期の付与合計（プラン変更で積み上がった票）。履歴が無ければ現プラン基本票を最低保証
   let grantedThis=grantedTotalFor(nick,curTerm);
-  if(grantedThis<basePlan&&!isPayGrantTerm(curTerm))grantedThis=basePlan; // 12月期からは最低保証なし（支払いの記録がある分だけ）
+  const adjThis=adjustFor(nick,curTerm);
+  if(grantedThis-adjThis<basePlan&&!isPayGrantTerm(curTerm))grantedThis=basePlan+adjThis; // 12月期からは最低保証なし（支払いの記録がある分だけ）
   // 前期繰り越し（直前2期分・連続会員が条件）。投票者側getCarryOver／サーバーと同じ計算を共有する。
   const memberTermSet=new Set();
   Object.keys(grants[nick]||{}).forEach(t=>{if(t)memberTermSet.add(t);}); // 付与履歴のある期＝会員だった証拠

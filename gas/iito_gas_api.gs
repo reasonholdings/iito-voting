@@ -8,6 +8,7 @@ const SHEET_EVENTS  = 'イベント';
 const SHEET_MODELS  = 'モデル';
 const SHEET_GRANTS  = 'プラン付与履歴'; // その月に付与済みのプランを記録
 const SHEET_PAYMENTS = '決済履歴';      // 読み込んだ決済CSVの行をすべてためる（会員リストはここから計算する）
+const SHEET_ADJUST  = '票の調整';      // 運営が個別に足す票（差し戻し等）：ニックネーム／期／票数／理由／記録日時。その期の付与として扱う（2026-11-22）
 const SHEET_OSHI    = '推し設定';      // 会員が選んだ推しモデル（端末をまたいで同じ推しを出すため。2026-11-22）
 const SECRET_KEY    = 'iito2026secret'; // HTMLと合わせること
 
@@ -216,6 +217,7 @@ function getMe(data) {
     });
   }
   const res = { ok: true, member: a.member, votes: votes, grants: grants, termPlans: termPlans };
+  res.adjusts = adjustsForNick_(nick); // 運営が個別に足した票（差し戻し等）
   const os = readOshiRow_(nick);
   if (os) res.oshi = os.ids; // 推しを保存していれば返す（保存していない会員には返さない＝端末の推しを使う）
   const nt = renewVoterToken_(data.sessionToken);
@@ -486,6 +488,7 @@ function calcServerLimit(nick, curTermId, curPlan) {
   // 11月期までは、履歴が無い/現プランがまだ記録されていない場合に現プランの基本票を最低保証する。
   // 2026年12月期からは「支払いが確定した日に付与」のルールなので、最低保証はせず、記録された付与の分だけにする
   if (grantedThis < curBase && termRankGAS(curTermId) < PAY_GRANT_FROM) grantedThis = curBase;
+  grantedThis += adjustVotesInTerm_(nick, curTermId); // 運営が個別に足した票（差し戻し等）
 
   // ② 繰越：前月から、連続して会員だった期を古い方へさかのぼり、1か月ずつ「残り」を計算する
   //  会員実績の判定＝ 付与履歴のある期（未投票でも会員）∪ 投票記録のある期（移行期の救済）。
@@ -501,6 +504,7 @@ function calcServerLimit(nick, curTermId, curPlan) {
   chain.forEach(function(t, i){
     var g = grantedVotesInTerm_(nick, t);
     if (!g) { const p = up.plan[t]; g = (p && PLAN_VOTES[p] != null) ? PLAN_VOTES[p] : 0; } // 付与履歴が無い月は投票時のプランで代用
+    g += adjustVotesInTerm_(nick, t); // 運営が個別に足した票も、その月の付与として繰越の計算に入れる
     left[t] = g;
     var u = up.used[t] || 0;
     // その月に使える財布（古い順）：前々月の残り → 前月の残り → その月の付与
@@ -1072,6 +1076,36 @@ function getGrants() {
 //   返り値: { ok:true, oshi:{ ニックネーム: "モデルID,モデルID" } }
 //   ※投票したことがある会員のみ対象（未投票の会員は取得できない）
 // ════════════════════════════════════════
+// ════════════════════════════════════════
+// 運営が個別に足す票（差し戻し等。2026-11-22）
+//  シート「票の調整」：ニックネーム／期（例 2026年11月期）／票数／理由（マイページに表示）／記録日時
+//  その期の付与として扱う（使える期限も同じ＝翌々月の末日まで）。行の追加は運営がシートに直接書く
+// ════════════════════════════════════════
+function adjustRows_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sh = ss.getSheetByName(SHEET_ADJUST);
+  if (!sh || sh.getLastRow() <= 1) return [];
+  return sh.getRange(2, 1, sh.getLastRow() - 1, 4).getValues();
+}
+function adjustVotesInTerm_(nick, term) {
+  var sum = 0;
+  adjustRows_().forEach(function(r){
+    if (String(r[0]).trim() !== String(nick).trim() || String(r[1]).trim() !== String(term).trim()) return;
+    sum += Number(r[2]) || 0;
+  });
+  return sum;
+}
+function adjustsForNick_(nick) {
+  const out = {};
+  adjustRows_().forEach(function(r){
+    if (String(r[0]).trim() !== String(nick).trim()) return;
+    const term = String(r[1]).trim(), v = Number(r[2]) || 0;
+    if (!term || !v) return;
+    (out[term] = out[term] || []).push({ votes: v, reason: String(r[3] || '').slice(0, 100) });
+  });
+  return out;
+}
+
 // ════════════════════════════════════════
 // 推しの保存（端末をまたいで同じ推しを出す。2026-11-22）
 //  シート「推し設定」：ニックネーム／推しモデルID（JSON）／推しモデル名／更新日時
