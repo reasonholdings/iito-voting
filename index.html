@@ -282,6 +282,7 @@ body.has-tabbar .screen{padding-bottom:120px}
 .rank-hd{font-size:12px;font-weight:700;color:var(--ac-d);background:var(--ac-l);border-radius:8px;padding:5px 12px;margin:6px 0 12px;display:inline-block}
 /* ランク切り替え（専属・1st・2nd・3rd・iito OSAKA）：1列に均等幅で並べる。検索欄と同じ細いピル形で控えめに（人数は出さない） */
 .rank-filter{display:flex;gap:6px;margin:0 0 12px}
+.rank-empty{font-size:13px;color:var(--sub);text-align:center;padding:24px 0}
 /* 名前検索（投票画面）：控えめな細い枠。文字は16pxのままにしてiPhoneの自動ズームを防ぐ */
 .name-search{position:relative;margin:-4px 0 10px}
 .name-search .ti-search{position:absolute;left:11px;top:50%;transform:translateY(-50%);font-size:15px;color:var(--sub);pointer-events:none}
@@ -1918,13 +1919,15 @@ function buildGrid(grp){
   const sec=document.getElementById('g-'+grp);sec.innerHTML='';
   const all=visibleMods(grp);
   // ランク別に分ける：専属 → 1st → 2nd → その他（未設定）
-  const groups=[...[...RANKS,''].map(r=>({rank:r,list:all.filter(m=>!isOsaka(m)&&rankOf(m)===r)})),{rank:OSAKA_TAB,list:all.filter(isOsaka)}].filter(g=>g.list.length);
-  const anyRanked=groups.some(g=>g.rank);
+  // 専属・1st・2nd・3rd のボタンは、そのランクのモデルがいなくても常に出す（2026-11-22）。「その他」「iito OSAKA」はいるときだけ
+  const groups=[...[...RANKS,''].map(r=>({rank:r,list:all.filter(m=>!isOsaka(m)&&rankOf(m)===r)})),{rank:OSAKA_TAB,list:all.filter(isOsaka)}].filter(g=>g.list.length||RANKS.includes(g.rank));
+  const anyRanked=groups.some(g=>g.rank&&g.list.length);
   // 選んでいたランクが無くなっていたら「すべて」に戻す
   // 最初に開いたときは「専属」だけを表示する（専属のモデルがいないイベントでは全員）
   //  （モデル一覧の読み込み前に一度描くことがあるので、ランクのあるモデルが出そろってから決める）
   //  全員を一度に出す表示はない（2026-11-21）。いつも1つのランクを選んでいる状態にする
-  const defRank=groups.some(g=>g.rank==='専属')?'専属':(groups[0]?groups[0].rank:'all');
+  const firstHas=groups.find(g=>g.list.length);
+  const defRank=groups.some(g=>g.rank==='専属'&&g.list.length)?'専属':(firstHas?firstHas.rank:'all');
   if(anyRanked&&(rankFilter[grp]===undefined||rankFilter[grp]==='all'||!groups.some(g=>g.rank===rankFilter[grp])))rankFilter[grp]=defRank;
   // ランクが設定されているときだけ、切り替えボタンを出す
   if(anyRanked){
@@ -1957,6 +1960,7 @@ function buildGrid(grp){
       hd.textContent=rankLabel(g.rank);
       box.appendChild(hd);
     }
+    if(!g.list.length){const em=document.createElement('div');em.className='rank-empty';em.textContent='このランクのモデルは、まだいません。';box.appendChild(em);}
     for(let i=0;i<g.list.length;i+=COL){
       const row=document.createElement('div');row.className='cand-row';row.id='cr-'+grp+'-'+rowIdx;row.style.gridTemplateColumns=`repeat(${COL},1fr)`;
       for(let j=i;j<Math.min(i+COL,g.list.length);j++){
