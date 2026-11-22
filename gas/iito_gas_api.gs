@@ -26,7 +26,11 @@ const ADMIN_LOCK_SEC = 15 * 60;
 const SENDER_ADDR = 'info@reason.holdings';
 const SENDER_NAME = 'iito members';
 const SHEET_PINS  = '暗証番号';                       // メール／ニックネーム／salt／ハッシュ／更新時刻（暗証番号そのものは保存しない）
-const VOTER_TOKEN_TTL_MS = 90 * 24 * 60 * 60 * 1000;  // ログインの有効期間（HTMLの SESSION_TTL と合わせる）
+// ログインの有効期間（2026-11-22 変更）：最後に使ってから30日。
+//  ただし期限が投票期間（イベントの開始〜終了）に重なる場合は、その投票期間の終了の翌日まで延長する。
+//  → 投票期間中は、一度ログインすればログアウトされない
+const VOTER_TOKEN_IDLE_MS = 30 * 24 * 60 * 60 * 1000;
+const VOTER_TOKEN_EV_GRACE_MS = 24 * 60 * 60 * 1000;
 const CODE_TTL_SEC   = 10 * 60;  // 確認コードの有効時間
 const CODE_MAX_TRY   = 5;        // 確認コードの入力ミスの上限（超えたらコードは無効）
 const CODE_SEND_MAX  = 3;        // 同じメールアドレスへ1時間に送れる確認コードの数
@@ -1116,7 +1120,7 @@ function grantedVotesInTerm_(nick, term) {
 //  ① はじめて／忘れたとき：メールアドレスに6桁の確認コードを送る（requestPinCode）
 //  ② コード＋新しい暗証番号を送ると登録され、そのままログインできる（setPin）
 //  ③ 次回からはメールアドレス＋暗証番号でログイン（pinLogin）
-//  ログインに成功すると sessionToken（署名付き・90日有効）を返す。暗証番号を変えると古いtokenは使えなくなる
+//  ログインに成功すると sessionToken（署名付き。有効期間は VOTER_TOKEN_IDLE_MS の説明を参照）を返す。暗証番号を変えると古いtokenは使えなくなる
 // ════════════════════════════════════════
 // 全角（＠・＿など）や空白のゆれをそろえる。会員データ側（CSV）と入力側の両方に同じ処理をかける
 function normEmail_(e) { return String(e || '').normalize('NFKC').replace(/[\s\u200B-\u200D\uFEFF]/g, '').toLowerCase(); }
@@ -1183,12 +1187,42 @@ function pinProblem_(pin) {
 
 // ログイン証明（sessionToken）を作る：メール｜暗証番号の更新時刻｜期限 に署名
 function issueVoterToken_(email, ver) {
-  const payload = normEmail_(email) + '|' + ver + '|' + (Date.now() + VOTER_TOKEN_TTL_MS);
+  const payload = normEmail_(email) + '|' + ver + '|' + voterTokenExp_(Date.now());
   return Utilities.base64EncodeWebSafe(payload, Utilities.Charset.UTF_8) + '.' + hmac_('tok|' + payload);
 }
-// ログイン証明の期限が近ければ（残り60日未満）、同じ内容で期限を延ばした新しい証明を返す。不要なら null
-//  使っている間はログアウトされないようにするため（2026-11-22）。authVoter_ で確認済みの証明だけを渡すこと
-const VOTER_TOKEN_RENEW_MS = 60 * 24 * 60 * 60 * 1000;
+// 投票期間の一覧 [{start,end}]（ミリ秒）。毎回シートを読まないよう5分キャッシュ
+function eventWindows_() {
+  const cache = CacheService.getScriptCache();
+  const hit = cache.get('ev_windows');
+  if (hit) { try { return JSON.parse(hit); } catch (e) {} }
+  var out = [];
+  try {
+    const events = readBigJson(SHEET_EVENTS);
+    if (Array.isArray(events)) events.forEach(function(ev){
+      if (!ev || !ev.startDate || !ev.startTime || !ev.endDate || !ev.endTime) return;
+      const s = new Date(ev.startDate + 'T' + ev.startTime + ':00+09:00').getTime();
+      const e = new Date(ev.endDate + 'T' + ev.endTime + ':00+09:00').getTime();
+      if (s && e && e > s) out.push({ start: s, end: e });
+    });
+  } catch (e) { out = []; }
+  cache.put('ev_windows', JSON.stringify(out), 300);
+  return out;
+}
+// ログイン証明の期限を決める：今から30日。期限が投票期間に重なれば、その終了の翌日まで延ばす
+function voterTokenExp_(nowMs) {
+  var exp = nowMs + VOTER_TOKEN_IDLE_MS;
+  const wins = eventWindows_();
+  for (var loop = 0; loop < 10; loop++) {
+    var moved = false;
+    wins.forEach(function(w){
+      if (w.start <= exp && exp < w.end + VOTER_TOKEN_EV_GRACE_MS) { exp = w.end + VOTER_TOKEN_EV_GRACE_MS; moved = true; }
+    });
+    if (!moved) break;
+  }
+  return exp;
+}
+// 使うたびに、ログイン証明の期限を上のルールで付け直した新しい証明を返す（1時間以上ずれるときだけ）。不要なら null
+//  authVoter_ で確認済みの証明だけを渡すこと（2026-11-22）
 function renewVoterToken_(token) {
   if (!token) return null;
   try {
@@ -1196,7 +1230,8 @@ function renewVoterToken_(token) {
     const payload = Utilities.newBlob(Utilities.base64DecodeWebSafe(parts[0])).getDataAsString('UTF-8');
     if (hmac_('tok|' + payload) !== parts[1]) return null;
     const f = payload.split('|');
-    if (f.length !== 3 || Number(f[2]) - Date.now() >= VOTER_TOKEN_RENEW_MS) return null;
+    if (f.length !== 3) return null;
+    if (Math.abs(voterTokenExp_(Date.now()) - Number(f[2])) < 60 * 60 * 1000) return null;
     return issueVoterToken_(f[0], f[1]);
   } catch (e) { return null; }
 }

@@ -1116,7 +1116,15 @@ body.ia-open{overflow:hidden}
 const PLANS={supporter:12,partner:40,producer:150};
 const PLAN_LBL={supporter:'サポーター',partner:'パートナー',producer:'プロデューサー'};
 const PLAN_MAP={'サポーター':'supporter','パートナー':'partner','プロデューサー':'producer'};
-const SESSION_TTL=90*24*60*60*1000; // セッション有効期間：90日（ログイン時刻から）
+const SESSION_TTL=90*24*60*60*1000; // 旧方式（メールリンク）のセッション有効期間：90日
+// ログインが有効か。パスコードログインは、GASが発行した証明の期限（最後に使ってから30日。投票期間中は期間終了の翌日まで延長）で判定する
+function tokenExp(tok){try{const p=String(tok||'').split('.')[0].replace(/-/g,'+').replace(/_/g,'/');const s=atob(p+'==='.slice((p.length+3)%4));return Number(s.split('|')[2])||0;}catch(e){return 0;}}
+function sessionAlive(sess){
+  if(!(sess&&sess.nick))return false;
+  const tok=ls(LS.pinTok);
+  if(tok){const exp=tokenExp(tok);return exp?Date.now()<exp:true;}
+  return (Date.now()-(sess.ts||0))<=SESSION_TTL;
+}
 // 投票画面のモデル一覧の列数：「すべて」は4列、ランク（専属・1st・2nd・その他）を選んだときは3列
 // 列数：そのランクの人数が15名以上なら4列、14名以下なら3列（2026-11-21）
 function colsFor(count){return count>=15?4:3;}
@@ -1124,7 +1132,7 @@ function colsFor(count){return count>=15?4:3;}
 // localStorage キー（v2 = 固定IDバージョン）
 const LS={
   sess:'iito_sess',
-  pinTok:'iito_pin_tok', // パスコードログインの証明（GASが発行、90日有効）
+  pinTok:'iito_pin_tok', // パスコードログインの証明（GASが発行。最後に使ってから30日、投票期間中は期間終了の翌日まで有効）
   members:'iito_m',
   votes:'iito_av',
   oshi:'iito_o_v2',
@@ -2812,9 +2820,8 @@ function refreshResumeCard(){
     document.getElementById('login-area').style.display='block';
     return;
   }
-  // 有効期限チェック（ログイン時刻から90日）
-  const sessAge=Date.now()-(sess.ts||0);
-  const expired=sessAge>SESSION_TTL;
+  // 有効期限チェック（パスコードログインは証明の期限、旧方式はログイン時刻から90日）
+  const expired=!sessionAlive(sess);
   if(expired){lsDel(LS.sess);document.getElementById('login-area').style.display='block';document.getElementById('resume-area').style.display='none';return;}
   // 会員リストは持たないので、前回ログイン時に保存した本人の情報で表示する
   const m=sess.me||{nick:sess.nick};
@@ -4437,7 +4444,7 @@ function resetAllData(){
   // 自動ログイン：管理画面でない かつ メールリンク未ログイン かつ 有効なセッションがあれば投票画面へ
   if(!handledAdmin && !curUser){
     const sess=ls(LS.sess);
-    const sessValid=sess&&sess.nick&&((Date.now()-(sess.ts||0))<=SESSION_TTL);
+    const sessValid=sessionAlive(sess);
     if(sessValid){
       await resumeSession(); // 自動ログイン（ボタンを押さなくても投票画面へ）
     }else{
