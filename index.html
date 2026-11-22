@@ -109,6 +109,11 @@ html,body{min-height:100vh;background:var(--bg2);font-family:"Zen Maru Gothic","
 .sr-lock .ti{font-size:22px;opacity:.85}
 .sr-need{font-size:15px;font-weight:700;color:#FFD86B}
 .sr-ft{font-size:10px;opacity:.75;margin-top:3px;text-align:right}
+.sr-open.two{flex-direction:column;align-items:flex-end;gap:2px;border-radius:12px;padding:6px 12px}
+.sr-open-sum{font-size:11px;white-space:nowrap}.sr-open-sum b{font-size:14px;color:#FFD86B}
+.sr-open-ln{display:flex;align-items:center;gap:4px;font-size:11px;white-space:nowrap}
+.sr-sum{display:flex;align-items:baseline;justify-content:space-between;gap:6px;font-size:11px;margin:3px 0 1px;padding:3px 8px;border-radius:8px;background:rgba(255,255,255,.12)}
+.sr-sum b{font-size:15px;color:#FFD86B;letter-spacing:.02em}
 .sr-open{position:absolute;top:8px;right:8px;z-index:3;display:flex;align-items:center;gap:6px;border:none;background:rgba(18,20,28,.62);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);color:#fff;font-family:inherit;font-size:12px;font-weight:700;border-radius:999px;padding:6px 12px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.18)}
 .sr-open .me{color:#FFD86B}
 .sr-open .ti{font-size:14px}
@@ -1046,8 +1051,18 @@ body.ia-open{overflow:hidden}
     <select class="inp" id="result-ev-sel" style="font-size:13px;margin-bottom:14px" onchange="onResultEvChange()"></select>
     <div class="met3">
       <div class="met3c"><div class="n" id="r-vot">0</div><div class="l">投票済み人数</div></div>
-      <div class="met3c"><div class="n" id="r-tot">0</div><div class="l">総投票数</div></div>
+      <div class="met3c"><div class="n" id="r-tot">0</div><div class="l">総投票数（プラン＋有料）</div></div>
       <div class="met3c"><div class="n" id="r-rem">0</div><div class="l">未投票会員</div></div>
+    </div>
+    <div style="font-size:12px;color:var(--sub);margin:-6px 0 10px" id="r-split"></div>
+    <div style="border:1px solid var(--bd);border-radius:10px;padding:10px 12px;margin-bottom:14px">
+      <p style="font-size:13px;font-weight:600;margin:0 0 4px">投票券（有料）の票を足す</p>
+      <p style="font-size:11px;color:var(--sub);margin:0 0 8px;line-height:1.6">FaveConnectの「商品購入」CSVを読み込みます。決済日が各イベントの投票期間（開始〜終了）に入っている購入を、そのイベントの票として数えます。読み込んだイベントの有料票は、前回の分とまるごと入れ替わります（同じCSVを2回読んでも二重になりません）。そのイベント期間の購入がすべて入ったCSVを読み込んでください。保存するのはニックネーム・モデル・票数だけです。</p>
+      <input type="file" id="paid-inp" accept=".csv" multiple style="display:none" onchange="loadPaidCSV(this)"/>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <button class="btn-sm-out" onclick="document.getElementById('paid-inp').click()"><i class="ti ti-upload" style="font-size:12px;vertical-align:-1px"></i> 商品購入CSVを読み込む</button>
+        <span id="paid-status" style="font-size:12px;color:var(--sub);line-height:1.6"></span>
+      </div>
     </div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
       <p style="font-size:14px;font-weight:500;margin:0">候補者別集計（得票順）</p>
@@ -1058,7 +1073,7 @@ body.ia-open{overflow:hidden}
     </div>
     <div style="overflow-x:auto">
       <table class="tbl">
-        <thead><tr><th>順位</th><th>候補者名</th><th>得票数</th></tr></thead>
+        <thead><tr><th>順位</th><th>候補者名</th><th>プラン票</th><th>有料票</th><th>合計</th></tr></thead>
         <tbody id="rank-body"></tbody>
       </table>
     </div>
@@ -1201,6 +1216,7 @@ const LS={
   models:'iito_mod_v2',
   pw:'iito_adm_pw',
   admLogin:'iito_adm_login',
+  paid:'iito_paid', // 投票券（有料）の票 {イベントID:{ニックネーム:{モデルID:票数}}}（管理画面の集計用。2026-11-22）
 };
 
 // ════════════════════════════════════════
@@ -1367,11 +1383,12 @@ function demoGas(action,payload){
       const mine=votes[payload.evId]||{};
       const fake=[['🌼香川産レタス🍐もう梨渚だけ！',441],['ふくしき🍰WeddingMuse支援中',127],['ららパパ',98],['ありあり',88],['なかちゃん@れもん🍋',78],['てつぞー@桜花',66]];
       const models=Object.entries(mine).filter(([,c])=>c>0).map(([mid,c])=>{
-        if(c<10)return {modelId:mid,name:mid,locked:true,mine:c,need:10-c,top:[],me:{rank:0,count:c}};
+        const votesAll=fake.reduce((a,[,v])=>a+v,0)+c+2000; // 架空の総投票数（プラン票＋有料票）
+        if(c<10)return {modelId:mid,name:mid,votes:votesAll,locked:true,mine:c,need:10-c,top:[],me:{rank:0,count:c}};
         const list=fake.map(([n,v])=>({nick:n,count:v})).concat([{nick:DEMO_NICK,count:c,me:true}]).sort((a,b)=>b.count-a.count);
         list.forEach((x,i)=>x.rank=i+1);
         const me=list.find(x=>x.me);
-        return {modelId:mid,name:mid,total:list.length,top:list.slice(0,5).map(x=>({nick:x.nick,count:x.count,rank:x.rank,me:!!x.me})),me:{rank:me.rank,count:me.count}};
+        return {modelId:mid,name:mid,votes:votesAll,total:list.length,top:list.slice(0,5).map(x=>({nick:x.nick,count:x.count,rank:x.rank,me:!!x.me})),me:{rank:me.rank,count:me.count}};
       });
       return ok({models,min:10,at:Date.now()});
     }
@@ -1630,6 +1647,7 @@ let oshiNamesFromServer={};
 let events=ls(LS.events)||[];
 let curEvId=getActiveEvId();
 let resultEvId=''; // 集計タブで選択中のイベントID（''=全イベント合算）
+let paidVotes=ls(LS.paid)||{}; // 投票券（有料）の票（管理画面の集計用）
 // 集計タブのイベントを管理者が自分で選んだか。falseの間は「開催中のイベント」を自動選択する
 let resultEvPicked=false;
 let curUser=null,pending={},selNick=null,loginOshi=[],modalOshi=[];
@@ -3095,11 +3113,14 @@ function renderSupporterRank(){
   if(models.every(x=>x.locked)){
     // どのモデルにも10票未満：ランキングの中身は出さず、「あと何票で見られるか」を小さく出す
     const x=models.slice().sort((a,b)=>a.need-b.need)[0];
-    ob.innerHTML=`<i class="ti ti-lock"></i>応援ランキングは${minV}票以上で表示 <span class="me">あと${x.need}票</span>`;
+    // 投票したモデルが1人だけなら、そのモデルの総投票数（プラン票＋投票券）も上の行に出す
+    const vt=models.length===1&&Number(x.votes)>0?`<span class="sr-open-sum">総投票数 <b>${Number(x.votes).toLocaleString()}</b>票</span>`:'';
+    ob.innerHTML=vt?`${vt}<span class="sr-open-ln"><i class="ti ti-lock"></i>応援ランキングは${minV}票以上で表示 <span class="me">あと${x.need}票</span></span>`:`<i class="ti ti-lock"></i>応援ランキングは${minV}票以上で表示 <span class="me">あと${x.need}票</span>`;
+    ob.classList.toggle('two',!!vt);
     ob.onclick=null;ob.style.cursor='default';
     p.style.display='none';ob.style.display='flex';if(bn)bn.style.minHeight='';return;
   }
-  ob.onclick=()=>setSrHidden(false);ob.style.cursor='pointer';
+  ob.onclick=()=>setSrHidden(false);ob.style.cursor='pointer';ob.classList.remove('two');
   if(srHidden()){
     // 最小化中：右上に小さなボタンだけ出す（自分の順位も一緒に見せる）。押すと元に戻る
     const top=models.find(x=>x.modelId===srSel&&!x.locked)||models.find(x=>!x.locked);
@@ -3118,6 +3139,7 @@ function renderSupporterRank(){
   const meLine=(!m.locked&&m.me&&!m.top.some(r=>r.me))?`<div class="sr-me">あなた：${m.me.rank}位　${Number(m.me.count).toLocaleString()}票</div>`:'';
   p.innerHTML=`<div class="sr-hd"><span class="sr-ttl"><i class="ti ti-trophy"></i> 応援ランキング</span><button type="button" class="sr-x" aria-label="最小化する" onclick="setSrHidden(true)"><i class="ti ti-minus"></i>最小化</button></div>`
     +tabs+(models.length>1?'':`<div class="sr-model">${nm}</div>`)
+    +(Number(m.votes)>0?`<div class="sr-sum"><span>総投票数</span><span><b>${Number(m.votes).toLocaleString()}</b>票</span></div>`:'')
     +`<div class="sr-list">${rows}</div>`+meLine
     +(m.locked?'':`<div class="sr-ft">${m.total}人が投票${srData.at?`・最終更新 ${pad(new Date(srData.at).getHours())}:${pad(new Date(srData.at).getMinutes())}`:''}</div>`);
   p.style.display='flex';
@@ -4440,6 +4462,7 @@ function _resultVotes(){
 function renderResult(){
   populateResultEvSel();
   _renderResultLocal(); // まずローカルで表示
+  syncPaidVotes().then(ok=>{if(ok)_renderResultLocal();}); // 有料票もサーバーの最新を反映
   if(!GAS_URL){
     const el=document.getElementById('result-sync-lbl');
     if(el)el.textContent=resultEvId?'':'全イベント合算を表示中';
@@ -4467,18 +4490,110 @@ function renderResult(){
   }
 }
 function _renderResultLocal(){
-  const ev=_resultVotes();
+  const ev=_resultVotes(),pv=_resultPaid();
   const vc=Object.keys(ev).filter(n=>Object.keys(ev[n]||{}).length>0).length;
-  const tot=Object.values(ev).reduce((s,v)=>s+Object.values(v).reduce((a,b)=>a+b,0),0);
-  document.getElementById('r-vot').textContent=vc;document.getElementById('r-tot').textContent=tot;document.getElementById('r-rem').textContent=Math.max(0,members.length-vc);
-  const scores={};allMod().forEach(m=>scores[m.id]=0);
-  Object.values(ev).forEach(v=>Object.entries(v).forEach(([mid,c])=>{if(scores[mid]!==undefined)scores[mid]+=Number(c)||0;}));
+  const sc=_resultScores();
+  const planTot=Object.values(sc).reduce((a,x)=>a+x.plan,0),paidTot=Object.values(sc).reduce((a,x)=>a+x.paid,0);
+  document.getElementById('r-vot').textContent=vc;document.getElementById('r-tot').textContent=(planTot+paidTot).toLocaleString();document.getElementById('r-rem').textContent=Math.max(0,members.length-vc);
+  const sp=document.getElementById('r-split');if(sp)sp.textContent=`内訳：プラン票 ${planTot.toLocaleString()}票／有料票 ${paidTot.toLocaleString()}票（有料で投票した人 ${Object.keys(pv).length}人）`;
   const rb=document.getElementById('rank-body');rb.innerHTML='';
-  const maxScore=Math.max(1,...Object.values(scores));
-  Object.entries(scores).sort((a,b)=>b[1]-a[1]).forEach(([mid,score],idx)=>{
-    const m=findMod(mid); // 集計にはグループの列は出さない（2026-11-22）
-    const tr=document.createElement('tr');tr.innerHTML=`<td>${idx+1}</td><td>${m?.name||mid}</td><td style="font-weight:500"><div class="rk-cell"><span>${score}</span><div class="rk-bar"><i style="width:${Math.round(score/maxScore*100)}%"></i></div></div></td>`;tr.classList.toggle('rk-top',idx<3&&score>0);rb.appendChild(tr);
+  const list=Object.entries(sc).sort((a,b)=>(b[1].plan+b[1].paid)-(a[1].plan+a[1].paid));
+  const maxScore=Math.max(1,...list.map(([,x])=>x.plan+x.paid));
+  list.forEach(([mid,x],idx)=>{
+    const m=findMod(mid),score=x.plan+x.paid; // 集計にはグループの列は出さない（2026-11-22）
+    const tr=document.createElement('tr');tr.innerHTML=`<td>${idx+1}</td><td>${m?.name||x.name||mid}</td><td>${x.plan.toLocaleString()}</td><td>${x.paid.toLocaleString()}</td><td style="font-weight:500"><div class="rk-cell"><span>${score.toLocaleString()}</span><div class="rk-bar"><i style="width:${Math.round(score/maxScore*100)}%"></i></div></div></td>`;tr.classList.toggle('rk-top',idx<3&&score>0);rb.appendChild(tr);
   });
+}
+// 集計対象の有料票（''なら全イベント合算） {ニックネーム:{モデルID:票数}}
+function _resultPaid(){
+  const src=resultEvId?[paidVotes[resultEvId]||{}]:Object.values(paidVotes||{});
+  const out={};
+  src.forEach(ev=>Object.entries(ev||{}).forEach(([nick,v])=>Object.entries(v||{}).forEach(([mid,c])=>{(out[nick]=out[nick]||{})[mid]=(out[nick][mid]||0)+(Number(c)||0);})));
+  return out;
+}
+// モデルごとの {plan,paid,name}
+function _resultScores(){
+  const sc={};allMod().forEach(m=>sc[m.id]={plan:0,paid:0,name:m.name});
+  Object.values(_resultVotes()).forEach(v=>Object.entries(v||{}).forEach(([mid,c])=>{if(sc[mid])sc[mid].plan+=Number(c)||0;}));
+  Object.values(_resultPaid()).forEach(v=>Object.entries(v||{}).forEach(([mid,c])=>{(sc[mid]=sc[mid]||{plan:0,paid:0,name:mid}).paid+=Number(c)||0;}));
+  return sc;
+}
+// サーバーに保存された有料票を取得
+async function syncPaidVotes(){
+  if(!GAS_URL)return false;
+  const r=await gasPost('getPaidVotes',{}).catch(()=>null);
+  if(!r||!r.ok||!Array.isArray(r.rows))return false;
+  const pv={};r.rows.forEach(x=>{((pv[x.evId]=pv[x.evId]||{})[x.nick]=pv[x.evId][x.nick]||{})[x.modelId]=(pv[x.evId][x.nick][x.modelId]||0)+(Number(x.votes)||0);});
+  paidVotes=pv;ls(LS.paid,paidVotes);return true;
+}
+// 商品名の「】」の後ろからモデルを探す（「10票分」などの表記や空白・全角半角の違いは無視）
+function _normName(s){return String(s||'').normalize('NFKC').replace(/[（(]?\d+票分[)）]?/g,'').replace(/[\s　・]/g,'').toLowerCase();}
+function _findModelByItemName(name){
+  const n=_normName(name);if(!n)return null;
+  const ms=allMod();
+  const exact=ms.find(m=>_normName(m.name)===n);if(exact)return exact;
+  // 部分一致は、いちばん長い名前を優先（「もも」と「ももか」の取り違えを防ぐ）
+  const part=ms.filter(m=>{const k=_normName(m.name);return k&&(n.startsWith(k)||n.endsWith(k));}).sort((a,b)=>_normName(b.name).length-_normName(a.name).length);
+  return part[0]||null;
+}
+// 決済日の文字（2026/11/23 12:34 や 2026-11-23 12:34:56、2026年11月23日 など）を日時にする
+function _parsePayDate(s){
+  const m=String(s||'').normalize('NFKC').match(/(\d{4})\D(\d{1,2})\D(\d{1,2})\D*(?:(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+  if(!m)return null;
+  return new Date(+m[1],+m[2]-1,+m[3],+(m[4]||0),+(m[5]||0),+(m[6]||0));
+}
+async function loadPaidCSV(input){
+  const files=[...(input.files||[])];input.value='';if(!files.length)return;
+  const st=document.getElementById('paid-status');
+  const per={}; // {evId:{nick:{modelId:票数}}}
+  const marks={},unknownModel={},noEvent={n:0,v:0};
+  let rowsOk=0,dup=0,bad=0,noDate=0;
+  for(const f of files){
+    const text=(await f.text()).replace(/^\uFEFF/,'');
+    const lines=text.split(/\r?\n/).filter(l=>l.trim());if(lines.length<2){bad++;continue;}
+    const h=parseCSVLine(lines[0]);const col=k=>h.findIndex(x=>x.trim()===k);
+    const ix={item:col('商品名'),qty:col('購入数'),amount:col('合計金額'),date:col('決済日'),email:col('メールアドレス'),nick:col('ニックネーム'),status:col('ステータス')};
+    if(ix.item<0||ix.qty<0||ix.nick<0||ix.date<0){bad++;continue;}
+    lines.slice(1).forEach(line=>{
+      const c=parseCSVLine(line);const item=(c[ix.item]||'').trim();
+      const mm=item.match(/】\s*(.+)$/);if(!mm)return;            // 投票券以外の商品は数えない
+      const status=ix.status>=0?(c[ix.status]||''):'';if(/キャンセル|返金|取消/.test(status))return;
+      const qty=parseInt(c[ix.qty])||0;const each=parseInt((item.match(/(\d+)票分/)||[])[1])||1;const votes=qty*each;if(votes<=0)return;
+      const email=ix.email>=0?(c[ix.email]||'').trim().toLowerCase():'';const dateS=(c[ix.date]||'').trim();
+      const mark=rowMark([dateS,email,item,qty,ix.amount>=0?c[ix.amount]:''].join('|'));
+      if(marks[mark]){dup++;return;}marks[mark]=1;
+      const d=_parsePayDate(dateS);if(!d){noDate++;return;}
+      const ev=events.find(e=>{const a=getEvStart(e),b=getEvEnd(e);return a&&b&&d>=a&&d<=b;});
+      if(!ev){noEvent.n++;noEvent.v+=votes;return;}
+      const mod=_findModelByItemName(mm[1]);
+      if(!mod){unknownModel[mm[1].trim()]=(unknownModel[mm[1].trim()]||0)+votes;return;}
+      const mem=email&&members.find(x=>String(x.email||'').toLowerCase()===email);
+      const who=mem?mem.nick:((c[ix.nick]||'').trim());if(!who)return;
+      const p=(per[ev.id]=per[ev.id]||{});(p[who]=p[who]||{})[mod.id]=(p[who][mod.id]||0)+votes;
+      rowsOk++;
+    });
+  }
+  const evIds=Object.keys(per);
+  const unk=Object.entries(unknownModel);
+  const notes=[];
+  if(dup)notes.push(`同じ購入の重複 ${dup}件は1回だけ数えました`);
+  if(noEvent.n)notes.push(`投票期間外の購入 ${noEvent.n}件（${noEvent.v}票）は数えていません`);
+  if(noDate)notes.push(`決済日が読めない ${noDate}件は数えていません`);
+  if(unk.length)notes.push(`モデルが見つからない商品：${unk.map(([k,v])=>k+'（'+v+'票）').join('、')}`);
+  if(bad)notes.push(`読めなかったファイル ${bad}件（「商品名」「購入数」「決済日」「ニックネーム」の列が必要です）`);
+  if(!evIds.length){if(st)st.textContent='投票期間内の投票券の購入が見つかりませんでした。'+(notes.length?notes.join('／'):'');return;}
+  const summary=evIds.map(id=>{const e=events.find(x=>x.id===id);const v=Object.values(per[id]).reduce((a,o)=>a+Object.values(o).reduce((x,y)=>x+y,0),0);return `・${e?.name||id}：${Object.keys(per[id]).length}人／${v}票`;}).join('\n');
+  if(!confirm('次のイベントの有料票を、このCSVの内容で入れ替えます。\n\n'+summary+(unk.length?'\n\n※モデルが見つからない商品は数えていません（モデル名を確認してください）':'')+'\n\nよろしいですか？'))return;
+  if(st)st.textContent='保存中...';
+  let ok=0,ng=0;
+  for(const id of evIds){
+    const rows=[];Object.entries(per[id]).forEach(([nick,o])=>Object.entries(o).forEach(([mid,v])=>rows.push({nick,modelId:mid,name:findMod(mid)?.name||'',votes:v})));
+    paidVotes[id]=per[id];
+    if(GAS_URL){const r=await gasPost('savePaidVotes',{evId:id,rows}).catch(()=>null);if(r&&r.ok)ok++;else ng++;}else ok++;
+  }
+  ls(LS.paid,paidVotes);
+  if(st)st.textContent=`${rowsOk}件の購入を数えました（${evIds.length}イベント）`+(ng?`／サーバーへの保存に失敗 ${ng}件（もう一度読み込んでください）`:'')+(notes.length?'。'+notes.join('／'):'');
+  _renderResultLocal();
 }
 
 // GASから「全イベント」の投票データを取得して allVotes に反映
@@ -4548,13 +4663,11 @@ function exportCSV(){
 function exportRankCSV(){
   const ev=_resultVotes();
   const evName=resultEvId?(events.find(e=>e.id===resultEvId)?.name||'event'):'全イベント合算';
-  // 候補者別に得票を合算
-  const scores={};allMod().forEach(m=>scores[m.id]=0);
-  Object.values(ev).forEach(v=>Object.entries(v).forEach(([mid,c])=>{if(scores[mid]!==undefined)scores[mid]+=Number(c)||0;}));
-  const rows=[['順位','候補者名','得票数']];
-  Object.entries(scores).sort((a,b)=>b[1]-a[1]).forEach(([mid,score],idx)=>{
+  // 候補者別に得票を合算（プラン票・有料票・合計）
+  const rows=[['順位','候補者名','プラン票','有料票','合計']];
+  Object.entries(_resultScores()).sort((a,b)=>(b[1].plan+b[1].paid)-(a[1].plan+a[1].paid)).forEach(([mid,x],idx)=>{
     const m=findMod(mid);
-    rows.push([idx+1,m?.name||mid,score]);
+    rows.push([idx+1,m?.name||x.name||mid,x.plan,x.paid,x.plan+x.paid]);
   });
   const csv=rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(',')).join('\n');
   const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
