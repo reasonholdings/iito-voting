@@ -1950,6 +1950,9 @@ function rankOf(m){return RANKS.includes(m.rank)?m.rank:'';}
 // iito OSAKA のモデルは、投票画面では「iito OSAKA」ボタンにまとめて表示する（専属・1st・2nd は JAPAN のモデルだけ。2026-11-22）
 const OSAKA_TAB='osaka';
 function isOsaka(m){return (models.osaka||[]).some(x=>x.id===m.id);}
+// 管理画面と同じ並び順にする：ランク順（専属→1st→2nd→3rd→未設定）、同じランクの中は管理画面で並べた順（2026-11-22）
+//  iito OSAKA のボタンでは OSAKA のモデルをランクに関係なく1つにまとめて出すため、管理画面の見た目の順に並べ直す
+function adminOrder(list){const idx=m=>{const r=rankOf(m);return r?RANKS.indexOf(r):RANKS.length;};return list.map((m,i)=>({m,i})).sort((a,b)=>idx(a.m)-idx(b.m)||a.i-b.i).map(x=>x.m);}
 function rankLabel(r){return r===OSAKA_TAB?'iito OSAKA':(r||'その他');}
 // 投票画面で選んでいるランク（グループごと）。'all'＝すべて表示
 const rankFilter={}; // 最初は「専属」だけを表示する（2026-11-21）。専属のモデルがいなければ全員
@@ -1969,7 +1972,7 @@ function buildGrid(grp){
   const all=visibleMods(grp);
   // ランク別に分ける：専属 → 1st → 2nd → その他（未設定）
   // 専属・1st・2nd・3rd のボタンは、そのランクのモデルがいなくても常に出す（2026-11-22）。「その他」「iito OSAKA」はいるときだけ
-  const groups=[...[...RANKS,''].map(r=>({rank:r,list:all.filter(m=>!isOsaka(m)&&rankOf(m)===r)})),{rank:OSAKA_TAB,list:all.filter(isOsaka)}].filter(g=>g.list.length||RANKS.includes(g.rank));
+  const groups=[...[...RANKS,''].map(r=>({rank:r,list:all.filter(m=>!isOsaka(m)&&rankOf(m)===r)})),{rank:OSAKA_TAB,list:adminOrder(all.filter(isOsaka))}].filter(g=>g.list.length||RANKS.includes(g.rank));
   const anyRanked=groups.some(g=>g.rank&&g.list.length);
   // 選んでいたランクが無くなっていたら「すべて」に戻す
   // 最初に開いたときは「専属」だけを表示する（専属のモデルがいないイベントでは全員）
