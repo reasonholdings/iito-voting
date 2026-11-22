@@ -924,6 +924,7 @@ body.ia-open{overflow:hidden}
   <div class="adm-tabs">
     <button class="atab on" onclick="switchATab('event')"><i class="ti ti-calendar-event atab-ic"></i><span>イベント</span></button>
     <button class="atab" onclick="switchATab('member')"><i class="ti ti-users atab-ic"></i><span>会員管理</span></button>
+    <button class="atab" onclick="switchATab('history')"><i class="ti ti-history atab-ic"></i><span>票の付与・使用履歴</span></button>
     <button class="atab" onclick="switchATab('carry')"><i class="ti ti-arrow-forward-up atab-ic"></i><span>繰越</span></button>
     <button class="atab" onclick="switchATab('model')"><i class="ti ti-user-star atab-ic"></i><span>モデル管理</span></button>
     <button class="atab" onclick="switchATab('result')"><i class="ti ti-chart-bar atab-ic"></i><span>集計</span></button>
@@ -943,10 +944,11 @@ body.ia-open{overflow:hidden}
   </div>
 
   <!-- 会員管理 -->
-  <div class="apanel" id="ap-member">
-    <!-- ニックネームで付与・使用履歴を調べる（2026-11-22） -->
+  <div class="apanel" id="ap-history">
+    <!-- ニックネームで付与・使用履歴を調べる（2026-11-22。専用タブ） -->
     <div class="sc">
-      <div class="sc-title">付与・使用履歴を調べる</div>
+      <div class="sc-title">票の付与・使用履歴</div>
+      <div style="font-size:12px;color:var(--sub);margin:-4px 0 10px;line-height:1.6">ニックネームを入れて「表示」を押すと、その会員の月ごとの付与（プラン・差し戻しなど）、使用（イベント・モデル別）、残りを表示します。名前の一部だけでも探せます。</div>
       <div style="display:flex;gap:8px;align-items:center">
         <input class="inp" id="hist-nick" list="hist-nick-list" placeholder="ニックネームを入力" style="font-size:14px;margin:0;flex:1" onkeydown="if(event.key==='Enter')showAdminHistory()" onfocus="fillHistNickList()"/>
         <button class="btn-sm-out" onclick="showAdminHistory()"><i class="ti ti-search" style="font-size:12px;vertical-align:-1px"></i> 表示</button>
@@ -954,6 +956,9 @@ body.ia-open{overflow:hidden}
       <datalist id="hist-nick-list"></datalist>
       <div id="hist-out" style="margin-top:10px"></div>
     </div>
+  </div>
+
+  <div class="apanel" id="ap-member">
     <div class="sc">
       <div class="sc-title">会員リスト読み込み（決済履歴CSV）</div>
       <div class="upload-area" onclick="document.getElementById('csv-inp').click()">
@@ -3373,7 +3378,7 @@ function exitAdmin(){
   if(curUser){SS('s-vote');}else{SS('s-login');refreshResumeCard();}
 }
 function switchATab(tab){
-  document.querySelectorAll('.atab').forEach((b,i)=>{const ts=['event','member','carry','model','result','fan','setting'];b.classList.toggle('on',ts[i]===tab);});
+  document.querySelectorAll('.atab').forEach((b,i)=>{const ts=['event','member','history','carry','model','result','fan','setting'];b.classList.toggle('on',ts[i]===tab);});
   document.querySelectorAll('.apanel').forEach(p=>p.classList.remove('active'));
   document.getElementById('ap-'+tab).classList.add('active');
   if(tab==='result')renderResult();
