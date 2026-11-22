@@ -995,6 +995,12 @@ body.ia-open{overflow:hidden}
       <button class="btn-add" onclick="openMcForm('add','osaka')"><i class="ti ti-plus" style="font-size:11px"></i> 新規登録</button>
     </div>
     <div id="mc-os"></div>
+    <!-- 非表示のモデル：JAPAN・OSAKAとも、表示するモデルの下（一番下）にまとめる（2026-11-22） -->
+    <div id="mc-hid-wrap" style="display:none">
+      <div class="grp-hd"><span class="grp-lbl"><i class="ti ti-eye-off" style="font-size:12px;vertical-align:-1px;margin-right:4px"></i>非表示</span></div>
+      <div id="mc-hid-jp"></div>
+      <div id="mc-hid-os"></div>
+    </div>
   </div>
 
   <!-- 集計 -->
@@ -3990,19 +3996,21 @@ function renderMember(){
 function changePlan(i,plan){members[i].plan=plan;ls(LS.members,members);renderMember();}
 
 // モデル管理
-function renderMcGrids(){renderMcGrid('japan');renderMcGrid('osaka');}
+function renderMcGrids(){renderMcGrid('japan');renderMcGrid('osaka');const w=document.getElementById('mc-hid-wrap');if(w)w.style.display=allMod().some(m=>m.hidden)?'':'none';}
 function renderMcGrid(grp){
   const gid=grp==='japan'?'jp':'os';
   const box=document.getElementById('mc-'+gid);if(!box)return;box.innerHTML='';
-  // モデルランクごとに分けて表示し、非表示のモデルはランクに関係なく一番下にまとめる（2026-11-22）
+  const hbox=document.getElementById('mc-hid-'+gid);if(hbox)hbox.innerHTML='';
+  // モデルランクごとに分けて表示し、非表示のモデルはランクに関係なく、OSAKAの下の「非表示」欄にまとめる（2026-11-22）
   const secs=[...RANKS.map(r=>({key:r,label:r,list:models[grp].filter(m=>!m.hidden&&rankOf(m)===r)})),
     {key:'none',label:'ランク未設定',list:models[grp].filter(m=>!m.hidden&&!rankOf(m))},
-    {key:'hidden',label:'非表示',list:models[grp].filter(m=>m.hidden)}].filter(s=>s.list.length);
+    {key:'hidden',label:grp==='japan'?'iito JAPAN':'iito OSAKA',list:models[grp].filter(m=>m.hidden)}].filter(s=>s.list.length);
   secs.forEach(sec=>{
+  const tgt=(sec.key==='hidden'&&hbox)?hbox:box;
   const hd=document.createElement('div');hd.className='mc-sec-hd'+(sec.key==='hidden'?' hid':'');
   hd.innerHTML=`<i class="ti ${sec.key==='hidden'?'ti-eye-off':'ti-star'}" style="font-size:13px"></i>${sec.label}<span class="ct">${sec.list.length}名</span>`;
-  box.appendChild(hd);
-  const grid=document.createElement('div');grid.className='mc-grid';grid.setAttribute('data-sec',sec.key);box.appendChild(grid);
+  tgt.appendChild(hd);
+  const grid=document.createElement('div');grid.className='mc-grid';grid.setAttribute('data-sec',sec.key);tgt.appendChild(grid);
   sec.list.forEach(m=>{
     const card=document.createElement('div');card.className='mc-card'+(mcEditId===m.id?' mc-ed':'');
     card.setAttribute('data-mid',m.id);card.setAttribute('data-grp',grp);
@@ -4013,11 +4021,11 @@ function renderMcGrid(grp){
     grid.appendChild(card);
   });
   // ドラッグ並べ替えを有効化（同じランクの中だけで並べ替え）
-  enableMcDrag(grp,grid,box);
+  enableMcDrag(grp,grid,[box,hbox]);
   });
 }
 // モデルカードのドラッグ並べ替え（マウス・タッチ両対応）
-function enableMcDrag(grp,grid,box){
+function enableMcDrag(grp,grid,boxes){
   grid.querySelectorAll('.mc-drag').forEach(handle=>{
     handle.addEventListener('pointerdown',e=>{
       e.preventDefault();
@@ -4044,7 +4052,7 @@ function enableMcDrag(grp,grid,box){
         document.removeEventListener('pointermove',moveHandler);
         document.removeEventListener('pointerup',upHandler);
         // 新しい並び順をmodelsに反映して保存
-        const newOrder=[...(box||grid).querySelectorAll('.mc-card')].map(c=>c.getAttribute('data-mid'));
+        const newOrder=(boxes||[grid]).filter(Boolean).flatMap(bx=>[...bx.querySelectorAll('.mc-card')]).map(c=>c.getAttribute('data-mid'));
         const reordered=[];
         newOrder.forEach(id=>{const m=models[grp].find(x=>x.id===id);if(m)reordered.push(m);});
         // 万一漏れがあれば元の順で末尾に追加（安全策）
