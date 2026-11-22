@@ -1212,18 +1212,22 @@ function genId(){return Date.now().toString(36)+Math.random().toString(36).slice
 function SS(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active');document.body.classList.toggle('in-admin',id==='s-admin');window.scrollTo(0,0);updateTabbar(id);}
 // 下のメニューは、投票者がログインしているときの「投票・マイページ」の画面だけに出す
 const TAB_SCREENS={'s-vote':'vote','s-mypage':'mypage'};
-// スクロールの向きでメニューを出し入れする。小さな揺れ（8px未満）は無視。ページの一番上付近では常に出す
-let tbLastY=0;
+// スクロールの向きでメニューを出し入れする（2026-11-22）
+//  ・下へ8px以上動いたら隠す
+//  ・上へは「一定の距離」をまとめて動かしたときだけ出す（すぐには出さない）。
+//    その距離は、スクロールできる長さに合わせて変える：長いページは120px、短いページ（専属だけ表示など）はその2割（最低30px）
+//  ・ページの一番上付近（40px以内）では常に出す
+let tbLastY=0,tbUpAcc=0,tbDownAcc=0;
+function tbUpNeed(){const max=Math.max(0,document.documentElement.scrollHeight-window.innerHeight);return Math.max(30,Math.min(120,max*0.2));}
 function onTbScroll(){
-  const y=Math.max(0,window.scrollY||0),dy=y-tbLastY;
-  if(y<40){document.body.classList.remove('tb-hide');tbLastY=y;return;}
-  if(Math.abs(dy)<8)return;
-  document.body.classList.toggle('tb-hide',dy>0);
-  tbLastY=y;
+  const y=Math.max(0,window.scrollY||0),dy=y-tbLastY;tbLastY=y;
+  if(y<40){document.body.classList.remove('tb-hide');tbUpAcc=tbDownAcc=0;return;}
+  if(dy>0){tbUpAcc=0;tbDownAcc+=dy;if(tbDownAcc>=8)document.body.classList.add('tb-hide');}
+  else if(dy<0){tbDownAcc=0;tbUpAcc+=-dy;if(tbUpAcc>=tbUpNeed())document.body.classList.remove('tb-hide');}
 }
 window.addEventListener('scroll',onTbScroll,{passive:true});
 function updateTabbar(id){
-  document.body.classList.remove('tb-hide');tbLastY=0; // 画面を切り替えたら、メニューは出した状態から
+  document.body.classList.remove('tb-hide');tbLastY=0;tbUpAcc=tbDownAcc=0; // 画面を切り替えたら、メニューは出した状態から
   const t=TAB_SCREENS[id];const show=!!(t&&curUser);
   const bar=document.getElementById('tabbar');if(!bar)return;
   bar.classList.toggle('show',show);document.body.classList.toggle('has-tabbar',show);
