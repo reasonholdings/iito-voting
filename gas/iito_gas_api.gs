@@ -1065,7 +1065,14 @@ function getGrants() {
       if (result[nick][term].indexOf(plan) < 0) result[nick][term].push(plan);
     });
   }
-  return { ok: true, grants: result };
+  // 運営が個別に足した票（差し戻し等）も全員分を返す（管理画面の履歴表示・繰越の計算用）
+  const adjusts = {};
+  adjustRows_().forEach(function(r){
+    const nick = String(r[0]).trim(), term = String(r[1]).trim(), v = Number(r[2]) || 0;
+    if (!nick || !term || !v) return;
+    ((adjusts[nick] = adjusts[nick] || {})[term] = adjusts[nick][term] || []).push({ votes: v, reason: String(r[3] || '').slice(0, 100) });
+  });
+  return { ok: true, grants: result, adjusts: adjusts };
 }
 
 // ════════════════════════════════════════
