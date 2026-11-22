@@ -292,9 +292,9 @@ body.has-tabbar .screen{padding-bottom:120px}
 .name-search .ns-clear{position:absolute;right:2px;top:50%;transform:translateY(-50%);width:34px;height:34px;border:none;background:transparent;color:var(--sub);font-size:15px;cursor:pointer;display:none;align-items:center;justify-content:center}
 .name-search.has-q .ns-clear{display:flex}
 .ns-empty{text-align:center;padding:24px 12px;font-size:13px;color:var(--sub);background:var(--bg2);border:.5px solid var(--bd);border-radius:12px;margin-bottom:14px}
-.rank-filter button{flex:1 1 auto;min-width:0;height:32px;padding:0 6px;white-space:nowrap;border-radius:999px;border:1px solid var(--bd);background:#fff;color:var(--tx);font-family:inherit;font-size:13px;font-weight:500;line-height:1.2;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;-webkit-tap-highlight-color:transparent}
+.rank-filter button{flex:1 1 auto;min-width:0;height:calc(var(--rfs,13px)*2.2);min-height:32px;padding:0 calc(var(--rfs,13px)*.55);white-space:nowrap;border-radius:999px;border:1px solid var(--bd);background:#fff;color:var(--tx);font-family:inherit;font-size:var(--rfs,13px);font-weight:500;line-height:1.2;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;-webkit-tap-highlight-color:transparent}
 .rank-filter button[data-rank="osaka"]{flex:1.6 1 auto}
-@media (max-width:400px){.rank-filter{gap:4px}.rank-filter button{font-size:12px;padding:0 4px}}
+@media (max-width:400px){.rank-filter{gap:4px}}
 .rank-filter button.on{background:var(--ac);border-color:var(--ac);color:#fff;font-weight:700}
 .rank-filter button:focus-visible{outline:3px solid var(--ac-m);outline-offset:2px}
 .cc{background:transparent;border:none;padding:6px 2px;cursor:pointer;text-align:center;position:relative;-webkit-tap-highlight-color:transparent}
@@ -1944,7 +1944,7 @@ function buildGrid(grp){
       b.onclick=()=>setRankFilter(grp,o.rank);
       bar.appendChild(b);
     });
-    sec.appendChild(bar);
+    sec.appendChild(bar);fitRankBar(bar);
   }
   let rowIdx=0; // 行の通し番号（見出しをまたいでも連番）
   // 名前検索中は、名前に検索文字を含むモデルだけを並べる（ランクのボタンは検索前のまま）
@@ -1981,6 +1981,25 @@ function buildGrid(grp){
   applyRankFilter(grp);
 }
 // ランクの切り替え。選択中（未確定）の票は消さずに残す
+// ランクのボタンの文字を、1行に収まるぎりぎりまで大きくする（最大20px・最小12px。2026-11-22）
+//  画面幅とボタンの数に合わせて自動で決める。画面に出たとき・幅が変わったときにも計り直す
+const RANK_FS_MAX=20,RANK_FS_MIN=12;
+let rankBarRO=null;
+function fitRankBar(bar){
+  if(!bar)return;
+  if(typeof ResizeObserver!=='undefined'){
+    if(!rankBarRO)rankBarRO=new ResizeObserver(es=>es.forEach(e=>applyRankFs(e.target)));
+    rankBarRO.observe(bar);
+  }
+  applyRankFs(bar);
+}
+function applyRankFs(bar){
+  if(!bar||!bar.isConnected||!bar.clientWidth)return;
+  const bs=[...bar.querySelectorAll('button')];if(!bs.length)return;
+  const set=fs=>{bar.style.setProperty('--rfs',fs+'px');};
+  let fs=RANK_FS_MAX;set(fs);
+  while(fs>RANK_FS_MIN&&(bar.scrollWidth>bar.clientWidth+0.5||bs.some(b=>b.scrollWidth>b.clientWidth+0.5))){fs-=0.5;set(fs);}
+}
 function setRankFilter(grp,rank){
   if(rankFilter[grp]===rank)return; // 選んでいるランクをもう一度押しても何もしない（全員を出す表示はない）
   const reflow=false; // 列数はランクごとに決まっているので、切り替えで並べ直す必要はない
@@ -2001,6 +2020,7 @@ function applyRankFilter(grp){
     const on=b.dataset.rank===cur;
     b.classList.toggle('on',on);b.setAttribute('aria-pressed',on?'true':'false');
   });
+  applyRankFs(sec.querySelector('.rank-filter')); // 選んだボタンは太字で幅が変わるので計り直す
   const boxes=[...sec.querySelectorAll('.rank-sec')];
   // 名前で検索しているあいだは、ランクに関係なく当てはまるモデルを全部出す（全員表示のボタンが無いため、ほかのランクのモデルも探せるように）
   const searching=!!nameQuery.trim();
