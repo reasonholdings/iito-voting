@@ -1216,14 +1216,29 @@ const TAB_SCREENS={'s-vote':'vote','s-mypage':'mypage'};
 //  ・下へ8px以上動いたら隠す
 //  ・上へは「一定の距離」をまとめて動かしたときだけ出す（すぐには出さない）。
 //    その距離は、スクロールできる長さに合わせて変える：長いページは120px、短いページ（専属だけ表示など）はその2割（最低30px）
-//  ・ページの一番上付近（40px以内）では常に出す
-let tbLastY=0,tbUpAcc=0,tbDownAcc=0;
-function tbUpNeed(){const max=Math.max(0,document.documentElement.scrollHeight-window.innerHeight);return Math.max(30,Math.min(120,max*0.2));}
+//  ・ページの一番上付近（40px以内）まで上へ戻したときも出す
+//  ・一度隠したら、利用者が自分で上へスクロールするまでは出さない（2026-11-22）。
+//    次の動きでは出さない：iPhoneの端での跳ね返り（はみ出した分は数えない）、画面の中身が縮んだときの位置のずれ、プログラムによる移動
+let tbLastY=0,tbUpAcc=0,tbDownAcc=0,tbTouching=false,tbInputAt=0;
+function tbMaxY(){return Math.max(0,document.documentElement.scrollHeight-window.innerHeight);}
+function tbUpNeed(){return Math.max(30,Math.min(120,tbMaxY()*0.2));}
+// 利用者の操作によるスクロールか：指で触れている間、または指を離した・ホイールを回した直後（慣性で動く1.5秒）
+function tbByUser(){return tbTouching||Date.now()-tbInputAt<1500;}
+['touchstart','touchmove'].forEach(ev=>window.addEventListener(ev,()=>{tbTouching=true;tbInputAt=Date.now();},{passive:true}));
+['touchend','touchcancel'].forEach(ev=>window.addEventListener(ev,()=>{tbTouching=false;tbInputAt=Date.now();},{passive:true}));
+window.addEventListener('wheel',()=>{tbInputAt=Date.now();},{passive:true});
+window.addEventListener('keydown',()=>{tbInputAt=Date.now();});
 function onTbScroll(){
-  const y=Math.max(0,window.scrollY||0),dy=y-tbLastY;tbLastY=y;
-  if(y<40){document.body.classList.remove('tb-hide');tbUpAcc=tbDownAcc=0;return;}
-  if(dy>0){tbUpAcc=0;tbDownAcc+=dy;if(tbDownAcc>=8)document.body.classList.add('tb-hide');}
-  else if(dy<0){tbDownAcc=0;tbUpAcc+=-dy;if(tbUpAcc>=tbUpNeed())document.body.classList.remove('tb-hide');}
+  const y=Math.min(tbMaxY(),Math.max(0,window.scrollY||0)),dy=y-tbLastY;tbLastY=y; // 端からはみ出した分（跳ね返り）は数えない
+  const hidden=document.body.classList.contains('tb-hide');
+  if(dy>0){tbUpAcc=0;tbDownAcc+=dy;if(y>=40&&tbDownAcc>=8)document.body.classList.add('tb-hide');return;}
+  if(dy<0){
+    tbDownAcc=0;
+    if(!hidden)return;
+    if(!tbByUser()){tbUpAcc=0;return;} // 利用者の操作ではない上方向の動きでは出さない
+    tbUpAcc+=-dy;
+    if(tbUpAcc>=tbUpNeed()||y<40)document.body.classList.remove('tb-hide');
+  }
 }
 window.addEventListener('scroll',onTbScroll,{passive:true});
 function updateTabbar(id){
