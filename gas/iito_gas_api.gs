@@ -8,6 +8,7 @@ const SHEET_EVENTS  = 'イベント';
 const SHEET_MODELS  = 'モデル';
 const SHEET_GRANTS  = 'プラン付与履歴'; // その月に付与済みのプランを記録
 const SHEET_PAYMENTS = '決済履歴';      // 読み込んだ決済CSVの行をすべてためる（会員リストはここから計算する）
+const SHEET_OSHI    = '推し設定';      // 会員が選んだ推しモデル（端末をまたいで同じ推しを出すため。2026-11-22）
 const SECRET_KEY    = 'iito2026secret'; // HTMLと合わせること
 
 // ── 本人確認・管理者確認（2026-09 セキュリティ強化） ──
@@ -80,7 +81,7 @@ function doGet(e) {
 
 // doPost / doGet 共通のアクション振り分け
 //  ・だれでも使える：ping / getEvents / getModels / checkMember / adminLogin / requestPinCode / setPin / pinLogin
-//  ・投票者本人（パスコードログインの sessionToken、または旧方式のFirebaseの idToken が必要）：me / saveVote
+//  ・投票者本人（パスコードログインの sessionToken、または旧方式のFirebaseの idToken が必要）：me / saveVote / supporterRank / saveOshi
 //  ・管理者（adminLogin で受け取った adminToken が必要）：それ以外すべて
 function handleAction(action, data) {
   // だれでも使える
@@ -96,6 +97,7 @@ function handleAction(action, data) {
   if (action === 'me')          return getMe(data);
   if (action === 'supporterRank') return supporterRank(data);
   if (action === 'saveVote')    return saveVote(data);
+  if (action === 'saveOshi')    return saveMyOshi(data);
   // 管理者
   const ADMIN_ACTIONS = {
     getResults: getResults, getTermPlans: getTermPlans, saveMembers: saveMembers, getMembers: getMembers,
@@ -214,6 +216,8 @@ function getMe(data) {
     });
   }
   const res = { ok: true, member: a.member, votes: votes, grants: grants, termPlans: termPlans };
+  const os = readOshiRow_(nick);
+  if (os) res.oshi = os.ids; // 推しを保存していれば返す（保存していない会員には返さない＝端末の推しを使う）
   const nt = renewVoterToken_(data.sessionToken);
   if (nt) res.token = nt;
   return res;
@@ -1068,6 +1072,47 @@ function getGrants() {
 //   返り値: { ok:true, oshi:{ ニックネーム: "モデルID,モデルID" } }
 //   ※投票したことがある会員のみ対象（未投票の会員は取得できない）
 // ════════════════════════════════════════
+// ════════════════════════════════════════
+// 推しの保存（端末をまたいで同じ推しを出す。2026-11-22）
+//  シート「推し設定」：ニックネーム／推しモデルID（JSON）／推しモデル名／更新日時
+// ════════════════════════════════════════
+function getOshiSheet_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sh = ss.getSheetByName(SHEET_OSHI);
+  if (!sh) { sh = ss.insertSheet(SHEET_OSHI); sh.appendRow(['ニックネーム', '推しモデルID', '推しモデル名', '更新日時']); }
+  return sh;
+}
+function readOshiRow_(nick) {
+  const sh = getOshiSheet_();
+  if (sh.getLastRow() <= 1) return null;
+  const rows = sh.getRange(2, 1, sh.getLastRow() - 1, 4).getValues();
+  for (var i = 0; i < rows.length; i++) {
+    if (String(rows[i][0]).trim() !== nick) continue;
+    var ids = [];
+    try { ids = JSON.parse(String(rows[i][1] || '[]')); } catch (e) { ids = []; }
+    return { row: i + 2, ids: Array.isArray(ids) ? ids.map(String) : [], names: String(rows[i][2] || '') };
+  }
+  return null;
+}
+function saveMyOshi(data) {
+  const a = authVoter_(data);
+  if (a.error) return { ok: false, error: a.error };
+  const nick = a.member.nick;
+  var ids = Array.isArray(data.oshi) ? data.oshi : [];
+  ids = ids.map(function(x){ return String(x).slice(0, 64); }).filter(function(x){ return x; }).slice(0, 30);
+  const names = String(data.names || '').slice(0, 500);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const sh = getOshiSheet_();
+    const cur = readOshiRow_(nick);
+    const row = [nick, JSON.stringify(ids), names, new Date()];
+    if (cur) sh.getRange(cur.row, 1, 1, 4).setValues([row]);
+    else sh.appendRow(row);
+  } finally { lock.releaseLock(); }
+  return { ok: true, oshi: ids };
+}
+
 function getOshi() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheets = ss.getSheets();
@@ -1091,6 +1136,14 @@ function getOshi() {
   });
   const result = {};
   Object.keys(latest).forEach(function(n){ result[n] = latest[n].oshi; });
+  // 推し設定シートに保存された推し（端末をまたいだ最新の設定）があれば、そちらを優先する
+  const osh = getOshiSheet_();
+  if (osh.getLastRow() > 1) {
+    osh.getRange(2, 1, osh.getLastRow() - 1, 3).getValues().forEach(function(r){
+      const n = String(r[0]).trim(), names = String(r[2] || '').trim();
+      if (n && names) result[n] = names;
+    });
+  }
   return { ok: true, oshi: result };
 }
 
