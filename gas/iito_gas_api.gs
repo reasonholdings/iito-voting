@@ -10,6 +10,7 @@ const SHEET_GRANTS  = 'プラン付与履歴'; // その月に付与済みのプ
 const SHEET_PAYMENTS = '決済履歴';      // 読み込んだ決済CSVの行をすべてためる（会員リストはここから計算する）
 const SHEET_ADJUST  = '票の調整';      // 運営が個別に足す票（差し戻し等）：ニックネーム／期／票数／理由／記録日時。その期の付与として扱う（2026-11-22）
 const SHEET_OSHI    = '推し設定';      // 会員が選んだ推しモデル（端末をまたいで同じ推しを出すため。2026-11-22）
+const SHEET_PAID    = '有料投票';      // 投票券（有料）の票：イベントID／ニックネーム／モデルID／モデル名／票数／記録日時。管理画面で商品購入CSVを読み込んで保存（2026-11-22）
 const SECRET_KEY    = 'iito2026secret'; // HTMLと合わせること
 
 // ── 本人確認・管理者確認（2026-09 セキュリティ強化） ──
@@ -105,7 +106,8 @@ function handleAction(action, data) {
     saveEvents: saveEvents, saveModels: saveModels, recordGrants: recordGrants, getGrants: getGrants,
     getOshi: getOshi, changeAdminPw: changeAdminPw, adminLogout: adminLogout,
     appendPayments: appendPayments, getPayments: getPayments,
-    getFanOverrides: getFanOverrides, saveFanOverride: saveFanOverride
+    getFanOverrides: getFanOverrides, saveFanOverride: saveFanOverride,
+    savePaidVotes: savePaidVotes, getPaidVotes: getPaidVotes
   };
   if (ADMIN_ACTIONS[action]) {
     if (!isLegacy_() && !isAdmin_(data)) return { ok: false, error: 'admin_required' };
@@ -553,9 +555,12 @@ function supporterRank(data) {
     const m = agg[modelId];
     const mine = m.by[me] || 0;
     if (mine <= 0) return; // 本人が票を入れていないモデルは返さない
+    // そのモデルの総投票数（全員のプラン票＋有料票の合計）
+    var votes = 0;
+    Object.keys(m.by).forEach(function(n){ votes += Number(m.by[n]) || 0; });
     if (mine < SUPPORTER_MIN_VOTES) {
       // 10票未満：ランキングの中身は返さず、「あと何票で見られるか」だけ返す
-      out.push({ modelId: modelId, name: m.name, locked: true, mine: mine, need: SUPPORTER_MIN_VOTES - mine, top: [], me: { rank: 0, count: mine } });
+      out.push({ modelId: modelId, name: m.name, votes: votes, locked: true, mine: mine, need: SUPPORTER_MIN_VOTES - mine, top: [], me: { rank: 0, count: mine } });
       return;
     }
     const list = Object.keys(m.by).map(function(n){ return { nick: n, count: m.by[n] }; })
@@ -565,7 +570,7 @@ function supporterRank(data) {
     var rank = 0, prev = null;
     list.forEach(function(x, i){ if (x.count !== prev) { rank = i + 1; prev = x.count; } x.rank = rank; });
     const meRow = list.filter(function(x){ return x.nick === me; })[0];
-    out.push({ modelId: modelId, name: m.name, total: list.length,
+    out.push({ modelId: modelId, name: m.name, votes: votes, total: list.length,
                top: list.slice(0, SUPPORTER_TOP_N).map(function(x){ return { nick: x.nick, count: x.count, rank: x.rank, me: x.nick === me }; }),
                me: meRow ? { rank: meRow.rank, count: meRow.count } : null });
   });
@@ -588,8 +593,69 @@ function supporterAgg_(evId) {
       agg[modelId].by[nick] = (agg[modelId].by[nick] || 0) + c;
     });
   }
+  // 投票券（有料）の票も足す（プラン票＋有料票の合計でランキング・10票の条件を数える。2026-11-22）
+  paidRows_(evId).forEach(function(p){
+    if (!agg[p.modelId]) agg[p.modelId] = { name: p.name || p.modelId, by: {} };
+    agg[p.modelId].by[p.nick] = (agg[p.modelId].by[p.nick] || 0) + p.votes;
+  });
   try { cache.put(key, JSON.stringify(agg), 20); } catch (e) {} // 大きすぎて入らないときはキャッシュしない
   return agg;
+}
+
+// ════════════════════════════════════════
+// 投票券（有料）の票（2026-11-22 追加）
+//  管理画面で商品購入CSVを読み込み、決済日がイベントの投票期間内の購入を、そのイベントの票として保存する
+//  ・保存するのは イベントID／ニックネーム／モデル／票数 だけ（メールアドレス・氏名・住所などは保存しない）
+//  ・同じイベントを保存し直すと、そのイベントの行をまるごと入れ替える（二重に足されない）
+// ════════════════════════════════════════
+function paidSheet_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sh = ss.getSheetByName(SHEET_PAID);
+  if (!sh) {
+    sh = ss.insertSheet(SHEET_PAID);
+    sh.getRange(1, 1, 1, 6).setValues([['イベントID', 'ニックネーム', 'モデルID', 'モデル名', '票数', '記録日時']]);
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+function paidRows_(evId) {
+  const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_PAID);
+  if (!sh || sh.getLastRow() <= 1) return [];
+  const out = [];
+  sh.getRange(2, 1, sh.getLastRow() - 1, 5).getValues().forEach(function(r){
+    const ev = String(r[0]).trim(), nick = String(r[1]).trim(), modelId = String(r[2]).trim(), v = Number(r[4]) || 0;
+    if (!ev || !nick || !modelId || v <= 0) return;
+    if (evId && ev !== String(evId)) return;
+    out.push({ evId: ev, nick: nick, modelId: modelId, name: String(r[3] || ''), votes: v });
+  });
+  return out;
+}
+function savePaidVotes(data) {
+  const evId = String(data.evId || '').trim();
+  if (!evId) return { ok: false, error: 'no_event' };
+  const rows = (data.rows || []).map(function(x){
+    return [evId, String(x.nick || '').trim().slice(0, 100), String(x.modelId || '').trim().slice(0, 100),
+            String(x.name || '').trim().slice(0, 100), Math.max(0, Math.floor(Number(x.votes) || 0)), new Date()];
+  }).filter(function(r){ return r[1] && r[2] && r[4] > 0; });
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const sh = paidSheet_();
+    let keep = [];
+    if (sh.getLastRow() > 1) {
+      keep = sh.getRange(2, 1, sh.getLastRow() - 1, 6).getValues().filter(function(r){ return String(r[0]).trim() !== evId; });
+      sh.getRange(2, 1, sh.getLastRow() - 1, 6).clearContent();
+    }
+    const all = keep.concat(rows);
+    if (all.length) sh.getRange(2, 1, all.length, 6).setValues(all);
+  } finally { lock.releaseLock(); }
+  // 応援ランキングのキャッシュを消して、すぐ反映させる
+  const safeId = evId.replace(/[\\\/\?\*\[\]:]/g, '_').slice(0, 80);
+  try { CacheService.getScriptCache().remove('srk_' + Utilities.base64EncodeWebSafe(safeId).slice(0, 200)); } catch (e) {}
+  return { ok: true, saved: rows.length };
+}
+function getPaidVotes(data) {
+  return { ok: true, rows: paidRows_(data && data.evId ? String(data.evId) : '') };
 }
 
 function saveVote(data) {
