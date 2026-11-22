@@ -315,6 +315,7 @@ body.has-tabbar .screen{padding-bottom:120px}
 .cc.pending .cv{color:var(--ac-d)}.cc.locked .cv{color:var(--sub)}
 .chk-dot{position:absolute;top:4px;right:8px;width:24px;height:24px;border-radius:50%;display:none;align-items:center;justify-content:center;z-index:2;box-shadow:0 1px 4px rgba(0,0,0,.35);border:2px solid #fff}
 .cc.pending .chk-dot{display:flex;background:var(--ac)}
+.oshi-tag{position:absolute;top:2px;left:50%;transform:translateX(-50%);white-space:nowrap;z-index:2;padding:2px 8px;border-radius:999px;background:linear-gradient(135deg,#ff6fa5,#ff4e8b);color:#fff;font-size:10.5px;font-weight:700;line-height:1.5;letter-spacing:.06em;box-shadow:0 1px 4px rgba(216,27,96,.35);border:1.5px solid #fff;pointer-events:none}
 
 /* インライン割り振りパネル */
 .ialloc{border-radius:16px;padding:16px;margin-bottom:10px;border:2px solid var(--ac-m);background:var(--ac-l)}
@@ -1934,6 +1935,8 @@ function applyEvUI(){
 // 候補者グリッド
 // ════════════════════════════════════════
 // 投票画面は1つの一覧。JAPANは専属・1st・2nd、OSAKAは「iito OSAKA」ボタンで切り替えて表示する
+// ログイン中の会員が「推し」に選んでいるモデルか（推しはモデルIDで保存。古いデータの名前にも対応）
+function isMyOshi(m){const ids=(curUser&&oshiMap[curUser.nick])||[];return ids.includes(m.id)||ids.includes(m.name);}
 function buildGrids(){restoreOsakaModels();buildGrid('all');}
 // 投票画面に出すモデル（非表示フラグが立っていないもの）。'all'＝JAPAN→OSAKAの順で全員
 function visibleMods(grp){return (grp==='all'?allMod():(models[grp]||[])).filter(m=>!m.hidden);}
@@ -2009,7 +2012,8 @@ function buildGrid(grp){
         const m=g.list[j];const d=document.createElement('div');d.className='cc';d.id='cc-'+m.id;
         d.onclick=()=>onCardClick(m.id);
         const avC=m.img?`<img src="${m.img}" alt="${m.name}"/>`:`<span>${m.name.replace(/[a-zA-Z]/g,'').slice(0,1)||m.name[0]}</span>`;
-        d.innerHTML=`<div class="chk-dot"><i class="ti ti-check" style="font-size:10px;color:white"></i></div><div class="cav">${avC}</div><div class="cn">${m.name}</div><div class="cv" id="cv-${m.id}"></div>`;
+        const oshiTag=isMyOshi(m)?'<div class="oshi-tag" aria-label="推し">推し</div>':''; // 推しに設定しているモデルには「推し」を出す（2026-11-22）
+        d.innerHTML=`<div class="chk-dot"><i class="ti ti-check" style="font-size:10px;color:white"></i></div>${oshiTag}<div class="cav">${avC}</div><div class="cn">${m.name}</div><div class="cv" id="cv-${m.id}"></div>`;
         row.appendChild(d);
       }
       box.appendChild(row);
@@ -2359,7 +2363,7 @@ function renderPills(cid,ids,rmFn){
 function rmLoginOshi(id){loginOshi=loginOshi.filter(x=>x!==id);buildMsBox('oshi-box',()=>loginOshi,v=>{loginOshi=v;renderPills('oshi-pills',loginOshi,'rmLoginOshi');});renderPills('oshi-pills',loginOshi,'rmLoginOshi');}
 function openOshiModal(){modalOshi=[...(oshiMap[curUser.nick]||[])];buildMsBox('oshi-modal-box',()=>modalOshi,v=>{modalOshi=v;});document.getElementById('oshi-modal').classList.add('open');}
 function closeOshiModal(){document.getElementById('oshi-modal').classList.remove('open');}
-function saveOshi(){oshiMap[curUser.nick]=modalOshi;ls(LS.oshi,oshiMap);renderPills('v-oshi-pills',oshiMap[curUser.nick]||[],null);renderPills('mp-oshi',oshiMap[curUser.nick]||[],null);closeOshiModal();}
+function saveOshi(){oshiMap[curUser.nick]=modalOshi;ls(LS.oshi,oshiMap);try{buildGrids();updUI();}catch(e){}renderPills('v-oshi-pills',oshiMap[curUser.nick]||[],null);renderPills('mp-oshi',oshiMap[curUser.nick]||[],null);closeOshiModal();}
 
 // ════════════════════════════════════════
 // ログイン
