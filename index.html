@@ -487,6 +487,8 @@ body.ia-open{overflow:hidden}
 .mc-edit{padding:5px 9px;font-size:11px;background:#fff;border:1px solid var(--ac-m);border-radius:6px;color:var(--ac-d);cursor:pointer}
 .mc-del{padding:5px 9px;font-size:11px;background:#fff;border:1px solid #F5C4B3;border-radius:6px;color:var(--rd);cursor:pointer}
 .mc-sec-hd{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--ac-d);margin:14px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--bd)}
+.mc-sec-add{margin-left:auto;padding:3px 10px;font-size:11px;font-family:inherit;background:#fff;color:var(--ac-d);border:1px solid var(--ac-m);border-radius:999px;cursor:pointer;display:inline-flex;align-items:center;gap:3px;white-space:nowrap}
+.mc-sec-add:hover{background:var(--ac-l)}
 .mc-sec-hd .ct{font-size:11px;font-weight:400;color:var(--sub)}
 .mc-sec-hd.hid{color:var(--sub)}
 .mc-sec-empty{font-size:11px;color:var(--sub);margin:0 0 6px}
@@ -4016,7 +4018,7 @@ function restoreOsakaModels(){
 }
 function renderMcGrids(){restoreOsakaModels();renderMcGrid('japan');renderMcGrid('osaka');
   const w=document.getElementById('mc-hid-wrap');if(w)w.style.display=allMod().some(m=>m.hidden)?'':'none';
-  ['jp','os'].forEach(g=>{const hd=document.getElementById('mc-'+g+'-hd');if(hd)hd.style.display=(models[g==='jp'?'japan':'osaka']||[]).some(m=>!m.hidden)?'':'none';});const tt=document.getElementById('mc-total');if(tt){const all=allMod();tt.textContent=`（${all.length}名・うち非表示${all.filter(m=>m.hidden).length}名）`;}}
+const tt=document.getElementById('mc-total');if(tt){const all=allMod();tt.textContent=`（${all.length}名・うち非表示${all.filter(m=>m.hidden).length}名）`;}}
 function renderMcGrid(grp){
   const gid=grp==='japan'?'jp':'os';
   const box=document.getElementById('mc-'+gid);if(!box)return;box.innerHTML='';
@@ -4024,12 +4026,14 @@ function renderMcGrid(grp){
   // JAPAN・OSAKA それぞれをモデルランクごとに分けて表示し、非表示のモデルは一番下の「非表示」欄に JAPAN／OSAKA 別にまとめる（2026-11-22）
   const secs=[...RANKS.map(r=>({key:r,label:r,list:models[grp].filter(m=>!m.hidden&&rankOf(m)===r)})),
     {key:'none',label:'ランク未設定',list:models[grp].filter(m=>!m.hidden&&!rankOf(m))},
-    {key:'hidden',label:grp==='japan'?'iito JAPAN':'iito OSAKA',list:models[grp].filter(m=>m.hidden)}].filter(s=>s.list.length);
+    {key:'hidden',label:grp==='japan'?'iito JAPAN':'iito OSAKA',list:models[grp].filter(m=>m.hidden)}].filter(s=>s.list.length||RANKS.includes(s.key)); // 専属〜3rd は空でも出す（ランクごとの「追加」ボタンのため）
   secs.forEach(sec=>{
   const tgt=(sec.key==='hidden'&&hbox)?hbox:box;
   const hd=document.createElement('div');hd.className='mc-sec-hd'+(sec.key==='hidden'?' hid':'');
-  hd.innerHTML=`<i class="ti ${sec.key==='hidden'?'ti-eye-off':'ti-star'}" style="font-size:13px"></i>${sec.label}<span class="ct">${sec.list.length}名</span>`;
+  hd.innerHTML=`<i class="ti ${sec.key==='hidden'?'ti-eye-off':'ti-star'}" style="font-size:13px"></i>${sec.label}<span class="ct">${sec.list.length}名</span>`
+    +(sec.key==='hidden'?'':`<button type="button" class="mc-sec-add" onclick="openMcForm('add','${grp}',null,'${sec.key==='none'?'':sec.key}')"><i class="ti ti-plus" style="font-size:11px"></i> ${sec.key==='none'?'追加':sec.label+'に追加'}</button>`);
   tgt.appendChild(hd);
+  if(!sec.list.length){const em=document.createElement('div');em.className='mc-sec-empty';em.textContent='このランクのモデルはいません。';tgt.appendChild(em);}
   const grid=document.createElement('div');grid.className='mc-grid';grid.setAttribute('data-sec',sec.key);tgt.appendChild(grid);
   sec.list.forEach(m=>{
     const card=document.createElement('div');card.className='mc-card'+(mcEditId===m.id?' mc-ed':'');
@@ -4085,11 +4089,11 @@ function enableMcDrag(grp,grid,boxes){
     });
   });
 }
-function openMcForm(mode,grp,id){
+function openMcForm(mode,grp,id,rank){
   mcDelId=null;const da=document.getElementById('mc-del-area');if(da)da.innerHTML='';
   // 登録・編集とも、画面の真ん中のポップアップで行う（2026-11-22）
   mcCrop=null;mcOrigSrc='';
-  if(mode==='add'){ mcEditId=null;mcImg=''; renderMcForm('add',grp,null); renderMcGrids(); return; }
+  if(mode==='add'){ mcEditId=null;mcImg=''; renderMcForm('add',grp,rank?{rank}:null); renderMcGrids(); return; } // ランクの欄の「追加」から開くと、グループとランクを選んだ状態で開く
   mcEditId=id;const m=findMod(id);if(!m)return;mcImg=m.img||'';
   renderMcForm('edit',m.grp||grp,m);renderMcGrids();
 }
