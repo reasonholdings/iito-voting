@@ -156,6 +156,11 @@ html,body{min-height:100vh;background:var(--bg2);font-family:"Zen Maru Gothic","
 /* 投票者向けの下のメニュー（インスタグラム風）：左＝投票、右＝マイページ。ブラウザの下のアドレス欄のすぐ上に置く（下の余白2px） */
 .tabbar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(2px + env(safe-area-inset-bottom));width:calc(100% - 32px);max-width:420px;display:none;justify-content:space-around;align-items:center;padding:6px;background:rgba(255,255,255,.94);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border:1px solid var(--bd);border-radius:999px;box-shadow:0 6px 24px rgba(0,0,0,.12);z-index:150}
 .tabbar.show{display:flex}
+/* 下にスクロールするとメニューを隠し、上にスクロールすると出す（2026-11-22） */
+.tabbar{transition:transform .25s ease,opacity .25s ease}
+body.tb-hide .tabbar{transform:translate(-50%,calc(100% + 24px));opacity:0;pointer-events:none}
+.float-submit{transition:bottom .25s ease}
+body.tb-hide .float-submit{bottom:calc(18px + env(safe-area-inset-bottom))}
 .float-submit{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(82px + env(safe-area-inset-bottom));width:auto;max-width:calc(100% - 96px);z-index:140;display:flex;align-items:center;justify-content:center;gap:8px;padding:11px 28px;border:none;border-radius:999px;background:rgba(255,78,139,.78);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);color:#fff;font-family:inherit;font-size:15px;font-weight:700;white-space:nowrap;box-shadow:0 6px 18px rgba(216,27,96,.25);cursor:pointer;animation:fs-in .2s ease} /* 横幅は狭め・半透明（2026-11-22） */
 .float-submit .fs-n{font-size:11.5px;font-weight:700;background:rgba(255,255,255,.25);border-radius:999px;padding:2px 9px}
 .float-submit:disabled{background:rgba(231,169,191,.6);box-shadow:none;cursor:default}
@@ -1205,7 +1210,18 @@ function genId(){return Date.now().toString(36)+Math.random().toString(36).slice
 function SS(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active');document.body.classList.toggle('in-admin',id==='s-admin');window.scrollTo(0,0);updateTabbar(id);}
 // 下のメニューは、投票者がログインしているときの「投票・マイページ」の画面だけに出す
 const TAB_SCREENS={'s-vote':'vote','s-mypage':'mypage'};
+// スクロールの向きでメニューを出し入れする。小さな揺れ（8px未満）は無視。ページの一番上付近では常に出す
+let tbLastY=0;
+function onTbScroll(){
+  const y=Math.max(0,window.scrollY||0),dy=y-tbLastY;
+  if(y<40){document.body.classList.remove('tb-hide');tbLastY=y;return;}
+  if(Math.abs(dy)<8)return;
+  document.body.classList.toggle('tb-hide',dy>0);
+  tbLastY=y;
+}
+window.addEventListener('scroll',onTbScroll,{passive:true});
 function updateTabbar(id){
+  document.body.classList.remove('tb-hide');tbLastY=0; // 画面を切り替えたら、メニューは出した状態から
   const t=TAB_SCREENS[id];const show=!!(t&&curUser);
   const bar=document.getElementById('tabbar');if(!bar)return;
   bar.classList.toggle('show',show);document.body.classList.toggle('has-tabbar',show);
