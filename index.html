@@ -282,7 +282,7 @@ body.has-tabbar .screen{padding-bottom:120px}
 .met .n{font-size:22px;font-weight:300}.met .l{font-size:10px;color:var(--sub);margin-top:3px}
 
 /* 候補者グリッド */
-.cand-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px} /* 列数は colsFor() で行ごとに上書き（そのランクが15名以上なら4列、14名以下なら3列） */
+.cand-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px} /* 列数は colsFor() で行ごとに上書き（3rd・iito OSAKA は常に4列。それ以外はそのランクが15名以上なら4列、14名以下なら3列） */
 /* 投票画面のランク別サブ見出し（専属 / 1st） */
 .rank-hd{font-size:12px;font-weight:700;color:var(--ac-d);background:var(--ac-l);border-radius:8px;padding:5px 12px;margin:6px 0 12px;display:inline-block}
 /* ランク切り替え（専属・1st・2nd・3rd・iito OSAKA）：1列に均等幅で並べる。検索欄と同じ細いピル形で控えめに（人数は出さない） */
@@ -1163,7 +1163,9 @@ function sessionAlive(sess){
 }
 // 投票画面のモデル一覧の列数：「すべて」は4列、ランク（専属・1st・2nd・その他）を選んだときは3列
 // 列数：そのランクの人数が15名以上なら4列、14名以下なら3列（2026-11-21）
-function colsFor(count){return count>=15?4:3;}
+// 列数：3rd と iito OSAKA は人数に関係なく4列（2026-11-22）。それ以外は15名以上なら4列、14名以下なら3列
+const COLS4_RANKS=['3rd','osaka'];
+function colsFor(count,rank){return (COLS4_RANKS.includes(rank)||count>=15)?4:3;}
 
 // localStorage キー（v2 = 固定IDバージョン）
 const LS={
@@ -1969,7 +1971,7 @@ function buildGrid(grp){
   // 列数はランクごとに決める（検索で人数が減っても列数が変わらないよう、そのランクの全人数で決める）
   const rankCount={};groups.forEach(g=>{rankCount[g.rank]=g.list.length;});
   shown.forEach(g=>{
-    const COL=colsFor(rankCount[g.rank]||g.list.length);
+    const COL=colsFor(rankCount[g.rank]||g.list.length,g.rank);
     // ランクごとの箱。票の入力パネルは行の直後＝この箱の中に入るので、箱ごと隠せばパネルも一緒に隠れる
     const box=document.createElement('div');
     box.className='rank-sec';box.dataset.rank=g.rank;
