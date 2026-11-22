@@ -1981,9 +1981,9 @@ function buildGrid(grp){
   applyRankFilter(grp);
 }
 // ランクの切り替え。選択中（未確定）の票は消さずに残す
-// ランクのボタンの文字を、1行に収まるぎりぎりまで大きくする（最大20px・最小12px。2026-11-22）
+// ランクのボタンの文字を、1行に収まるぎりぎりまで大きくする（最大15px・最小12px。2026-11-22）
 //  画面幅とボタンの数に合わせて自動で決める。画面に出たとき・幅が変わったときにも計り直す
-const RANK_FS_MAX=20,RANK_FS_MIN=12;
+const RANK_FS_MAX=15,RANK_FS_MIN=12; // 上限は20pxだと大きすぎたため15pxに（2026-11-22）
 let rankBarRO=null;
 function fitRankBar(bar){
   if(!bar)return;
