@@ -2922,7 +2922,7 @@ function renderSupporterRank(){
   p.innerHTML=`<div class="sr-hd"><span class="sr-ttl"><i class="ti ti-trophy"></i> 応援ランキング</span><button type="button" class="sr-x" aria-label="最小化する" onclick="setSrHidden(true)"><i class="ti ti-minus"></i>最小化</button></div>`
     +tabs+(models.length>1?'':`<div class="sr-model">${nm}</div>`)
     +`<div class="sr-list">${rows}</div>`+meLine
-    +(m.locked?'':`<div class="sr-ft">${m.total}人が投票</div>`);
+    +(m.locked?'':`<div class="sr-ft">${m.total}人が投票${srData.at?`・最終更新 ${pad(new Date(srData.at).getHours())}:${pad(new Date(srData.at).getMinutes())}`:''}</div>`);
   p.style.display='flex';
 }
 
