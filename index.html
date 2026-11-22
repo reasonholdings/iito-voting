@@ -344,6 +344,8 @@ body.ia-open{overflow:hidden}
 .overlay.open{display:flex}
 .mbox{background:var(--bg);border-radius:20px;padding:24px 20px;width:100%;max-width:430px;max-height:85vh;overflow-y:auto}
 .mbox h3{font-size:16px;font-weight:500;margin-bottom:10px}
+.mc-modal-box{max-width:460px;padding:0}
+.mc-modal-box .mc-form{margin:0;border:none;border-radius:20px}
 .clist{border:1px solid var(--bd);border-radius:12px;overflow:hidden;margin:12px 0}
 .crow{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:.5px solid var(--bd);font-size:13px}
 .crow:last-child{border-bottom:none}
@@ -820,6 +822,11 @@ body.ia-open{overflow:hidden}
     <div id="gh-full"></div>
     <div class="mp-update-note"><i class="ti ti-refresh" style="vertical-align:-2px"></i> 会員情報は、投票イベントの期間外は<b>毎週月曜日</b>、期間中は<b>毎日12:00</b>に更新します。付与の履歴は、更新のあとに反映されます。</div>
   </div>
+</div>
+
+<!-- モデル管理：登録・編集のポップアップ（画面の真ん中に表示。2026-11-22） -->
+<div class="overlay" id="mc-modal" onclick="if(event.target===this)closeMcForm()">
+  <div class="mbox mc-modal-box" id="mc-modal-body"></div>
 </div>
 
 <div class="overlay" id="logout-modal">
@@ -3998,14 +4005,6 @@ function renderMcGrid(grp){
     const rankBadge=RANKS.includes(m.rank)?`<div style="font-size:9px;color:var(--ac-d);background:var(--ac-l);border:.5px solid var(--ac-m);border-radius:999px;padding:1px 7px;display:inline-block;margin-top:2px;margin-left:3px">${m.rank}</div>`:'';
     card.innerHTML=`<div class="mc-drag" title="ドラッグで並べ替え"><i class="ti ti-grip-vertical" style="font-size:13px"></i></div><div class="mav-w"><div class="mav" onclick="openMcForm('edit','${grp}','${m.id}')"${m.hidden?' style="opacity:.45"':''}>${avC}</div><div class="mav-cam" onclick="openMcForm('edit','${grp}','${m.id}')"><i class="ti ti-camera" style="font-size:10px;color:#fff"></i></div></div><div class="mc-nm">${m.name}</div>${hiddenBadge}${rankBadge}<div class="mc-acts"><button class="mc-edit" onclick="openMcForm('edit','${grp}','${m.id}')"><i class="ti ti-edit" style="font-size:11px"></i> 編集</button><button class="mc-del" onclick="confirmMcDel('${m.id}')"><i class="ti ti-trash" style="font-size:11px"></i></button></div>`;
     grid.appendChild(card);
-    // このカードが編集中なら、直下にインライン編集フォームを差し込む
-    if(mcEditId===m.id){
-      const holder=document.createElement('div');
-      holder.className='mc-inline-form';
-      holder.id='mc-inline-'+m.id;
-      holder.innerHTML=buildMcFormHTML('edit',grp,m);
-      grid.appendChild(holder);
-    }
     // このカードが削除確認中なら、直下に確認バーを差し込む
     if(mcDelId===m.id){
       const del=document.createElement('div');
@@ -4062,21 +4061,10 @@ function enableMcDrag(grp,grid,box){
 }
 function openMcForm(mode,grp,id){
   mcDelId=null;const da=document.getElementById('mc-del-area');if(da)da.innerHTML='';
-  if(mode==='add'){
-    // 新規登録は上部エリアに表示（従来通り）
-    mcEditId=null;mcImg='';
-    renderMcForm('add',grp,null);renderMcGrids();
-    const fa=document.getElementById('mc-form-area');if(fa)fa.scrollIntoView({behavior:'smooth',block:'nearest'});
-    return;
-  }
-  // 編集は、同じカードをもう一度押したら閉じる（トグル）
-  if(mcEditId===id){ mcEditId=null;mcImg=''; renderMcGrids(); return; }
-  mcEditId=id;const m=findMod(id);mcImg=m?.img||'';
-  // 上部フォームエリアは空にして、カード直下に表示
-  const fa=document.getElementById('mc-form-area');if(fa)fa.innerHTML='';
-  renderMcGrids();
-  // 差し込まれたフォームまでスクロール
-  setTimeout(()=>{const el=document.getElementById('mc-inline-'+id);if(el)el.scrollIntoView({behavior:'smooth',block:'center'});},60);
+  // 登録・編集とも、画面の真ん中のポップアップで行う（2026-11-22）
+  if(mode==='add'){ mcEditId=null;mcImg=''; renderMcForm('add',grp,null); renderMcGrids(); return; }
+  mcEditId=id;const m=findMod(id);if(!m)return;mcImg=m.img||'';
+  renderMcForm('edit',m.grp||grp,m);renderMcGrids();
 }
 // フォームのHTMLを生成（上部エリアとインライン、両方で使う共通関数）
 function buildMcFormHTML(mode,grp,m){
@@ -4115,7 +4103,8 @@ function buildMcFormHTML(mode,grp,m){
 </div></div>`;
 }
 function renderMcForm(mode,grp,m){
-  document.getElementById('mc-form-area').innerHTML=buildMcFormHTML(mode,grp,m);}
+  document.getElementById('mc-modal-body').innerHTML=buildMcFormHTML(mode,grp,m);
+  const ov=document.getElementById('mc-modal');ov.classList.add('open');ov.querySelector('.mbox').scrollTop=0;}
 function handleMcImg(input){
   const file=input.files[0];if(!file)return;
   const p=document.getElementById('mc-img-prev');
@@ -4152,11 +4141,11 @@ function saveMcForm(mode){
   else{const m=findMod(mcEditId);if(!m)return;const og=m.grp;m.name=name;m.img=mcImg;m.hidden=hidden;m.rank=rank;if(og!==grp){models[og]=models[og].filter(x=>x.id!==m.id);m.grp=grp;models[grp].push(m);}}
   saveMod();closeMcForm();renderMcGrids();renderMember();buildGrids();
 }
-function closeMcForm(){mcEditId=null;mcImg='';document.getElementById('mc-form-area').innerHTML='';renderMcGrids();}
+function closeMcForm(){mcEditId=null;mcImg='';document.getElementById('mc-modal').classList.remove('open');document.getElementById('mc-modal-body').innerHTML='';renderMcGrids();}
 function confirmMcDel(id){
   const m=findMod(id);if(!m)return;
   mcDelId=id;mcEditId=null;
-  const fa=document.getElementById('mc-form-area');if(fa)fa.innerHTML='';
+  document.getElementById('mc-modal').classList.remove('open');
   const da=document.getElementById('mc-del-area');if(da)da.innerHTML='';
   renderMcGrids();
   // 差し込まれた確認バーまでスクロール
