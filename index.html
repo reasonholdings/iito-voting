@@ -1371,6 +1371,7 @@ async function pullMe(nick){
   const r = await gasPost('me', {nick, ...va});
   if(!r) return {error:'network'};
   if(!r.ok||!r.member) return {error:r.error||'error'};
+  if(r.token && ls(LS.pinTok)) ls(LS.pinTok, r.token); // ログイン証明の期限が近いとGASが新しい証明を返す（使っている間はログアウトされない）
   const n = r.member.nick;
   // 自分の票をサーバーの記録で置き換える（他人の票は持たない）
   Object.keys(allVotes).forEach(evId=>{ if(allVotes[evId]) delete allVotes[evId][n]; });
@@ -1381,12 +1382,15 @@ async function pullMe(nick){
   return {member:r.member};
 }
 // ログインできなかったときの案内
+// ログインをやり直してもらう必要があるエラーか（これ以外のエラーではログイン状態を消さない）
+//  サーバーの混雑・一時的なエラー・会員情報の更新中などでログアウトされないようにする（2026-11-22）
+function isAuthHardError(err){ return err==='auth_required'||err==='email_mismatch'; }
 function loginErrorMessage(err){
   if(err==='not_member') return '会員情報が確認できませんでした。お手数ですが、運営にお問い合わせください。';
   if(err==='email_mismatch') return 'ログインしたメールアドレスが、会員登録のメールアドレスと一致しません。登録しているメールアドレスでログインしてください。';
   if(err==='auth_required') return 'ログインの有効期限が切れました。メールアドレスとパスコードで、もう一度ログインしてください。';
   if(err==='network') return '通信に失敗しました。通信環境を確認して、もう一度お試しください。';
-  return 'セキュリティ強化のため、お手数ですがもう一度ログインしてください。';
+  return 'サーバーが混み合っているか、一時的なエラーが発生しました。少し時間をおいて、もう一度お試しください。（ログインの状態は保持されています）';
 }
 // 【個人情報保護】管理者でない端末から、他の会員のデータ（旧バージョンで保存されたもの）を消す
 function purgeOthersData(){
@@ -2617,7 +2621,7 @@ async function completeLoginAfterLink(nick){
     curEvId=getActEv()?.id||curEvId;
     if(me.error){
       hideLoading();
-      if(me.error!=='network'){lsDel(LS.sess);lsDel(LS.pinTok);}
+      if(isAuthHardError(me.error)){lsDel(LS.sess);lsDel(LS.pinTok);}
       alert('ログインできませんでした。\n'+loginErrorMessage(me.error));
       refreshResumeCard();
       return;
@@ -2693,13 +2697,14 @@ async function resumeSession(){
     if(me.error){
       hideLoading();
       if(me.error==='network'){ alert('ログインできませんでした。\n'+loginErrorMessage(me.error)); refreshResumeCard(); return; }
-      // 本人確認ができない（Firebaseのログインが切れた等）→ ログインし直してもらう
+      if(!isAuthHardError(me.error)){ alert('ログインできませんでした。\n'+loginErrorMessage(me.error)); refreshResumeCard(); return; }
+      // 本人確認ができない（ログイン証明の期限切れ・パスコードの再設定等）→ ログインし直してもらう
       lsDel(LS.sess); lsDel(LS.pinTok); refreshResumeCard();
       showLoginErr(loginErrorMessage(me.error));
       return;
     }
     const m=me.member;
-    ls(LS.sess,{...sess,me:{nick:m.nick,plan:m.plan,mid:m.mid}});
+    ls(LS.sess,{...sess,ts:Date.now(),me:{nick:m.nick,plan:m.plan,mid:m.mid}}); // 使うたびに有効期間を延長
     const evV=(allVotes[curEvId]||{})[m.nick]||{};
     curUser={...m,locked:{...evV}};pending={};
     // 送信済み（完全確定）票を復元（サーバー記録を正）
