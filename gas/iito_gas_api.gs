@@ -10,6 +10,9 @@ const SHEET_GRANTS  = 'プラン付与履歴'; // その月に付与済みのプ
 const SHEET_PAYMENTS = '決済履歴';      // 読み込んだ決済CSVの行をすべてためる（会員リストはここから計算する）
 const SHEET_ADJUST  = '票の調整';      // 運営が個別に足す票（差し戻し等）：ニックネーム／期／票数／理由／記録日時。その期の付与として扱う（2026-11-22）
 const SHEET_OSHI    = '推し設定';      // 会員が選んだ推しモデル（端末をまたいで同じ推しを出すため。2026-11-22）
+const SHEET_CONSENT = '同意記録';      // 利用規約・プライバシーポリシーへの同意：ニックネーム／版／同意した画面／日時（2026-11-23）
+// 利用規約・プライバシーポリシーの版。規約を改定して全員にもう一度同意してもらうときは、この日付を新しくする
+const TERMS_VERSION = '2026-11-23';
 const SHEET_PAID    = '有料投票';      // 投票券（有料）の票：イベントID／ニックネーム／モデルID／モデル名／票数／記録日時。管理画面で商品購入CSVを読み込んで保存（2026-11-22）
 const SECRET_KEY    = 'iito2026secret'; // HTMLと合わせること
 
@@ -100,6 +103,7 @@ function handleAction(action, data) {
   if (action === 'supporterRank') return supporterRank(data);
   if (action === 'saveVote')    return saveVote(data);
   if (action === 'saveOshi')    return saveMyOshi(data);
+  if (action === 'agreeTerms')  return agreeTerms(data);
   // 管理者
   const ADMIN_ACTIONS = {
     getResults: getResults, getTermPlans: getTermPlans, saveMembers: saveMembers, getMembers: getMembers,
@@ -222,6 +226,8 @@ function getMe(data) {
   res.adjusts = adjustsForNick_(nick); // 運営が個別に足した票（差し戻し等）
   const os = readOshiRow_(nick);
   if (os) res.oshi = os.ids; // 推しを保存していれば返す（保存していない会員には返さない＝端末の推しを使う）
+  res.termsVer = TERMS_VERSION;
+  res.consent = hasConsent_(nick); // false のとき、アプリは同意画面を出す
   const nt = renewVoterToken_(data.sessionToken);
   if (nt) res.token = nt;
   return res;
@@ -1471,6 +1477,7 @@ function setPin(data) {
     if (pr) sh.getRange(pr.row, 1, 1, 5).setValues([row]); else sh.appendRow(row);
     cache.remove('pc_' + key);
     cache.remove('pf_' + key);
+    if (data.agree === true) recordConsent_(m.nick, 'ログイン画面');
     return { ok: true, token: issueVoterToken_(email, ver), nick: m.nick };
   } finally {
     lock.releaseLock();
@@ -1493,5 +1500,38 @@ function pinLogin(data) {
     return { ok: false, error: 'wrong_pin' };
   }
   cache.remove('pf_' + key);
+  if (data.agree === true) recordConsent_(m.nick, 'ログイン画面');
   return { ok: true, token: issueVoterToken_(email, pr.ver), nick: m.nick };
+}
+
+// ════════════════════════════════════════
+// 利用規約・プライバシーポリシーへの同意（2026-11-23 追加）
+//  ・ログイン画面でチェックを入れてログインしたとき、または同意画面で「同意して続ける」を押したときに記録する
+//  ・いまの版（TERMS_VERSION）に同意した記録が無い会員には、アプリが同意画面を出す（端末をまたいでも記録はサーバーにあるので、一度だけ）
+// ════════════════════════════════════════
+function consentSheet_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sh = ss.getSheetByName(SHEET_CONSENT);
+  if (!sh) { sh = ss.insertSheet(SHEET_CONSENT); sh.appendRow(['ニックネーム', '版', '同意した画面', '日時']); sh.setFrozenRows(1); }
+  return sh;
+}
+function hasConsent_(nick) {
+  const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_CONSENT);
+  if (!sh || sh.getLastRow() <= 1) return false;
+  const rows = sh.getRange(2, 1, sh.getLastRow() - 1, 2).getValues();
+  for (var i = rows.length - 1; i >= 0; i--) {
+    if (String(rows[i][0]).trim() === String(nick).trim() && String(rows[i][1]).trim() === TERMS_VERSION) return true;
+  }
+  return false;
+}
+function recordConsent_(nick, via) {
+  if (!nick || hasConsent_(nick)) return;
+  consentSheet_().appendRow([nick, TERMS_VERSION, via, new Date()]);
+}
+function agreeTerms(data) {
+  const a = authVoter_(data);
+  if (a.error) return { ok: false, error: a.error };
+  if (data.agree !== true) return { ok: false, error: 'not_agreed' };
+  recordConsent_(a.member.nick, '同意画面');
+  return { ok: true, termsVer: TERMS_VERSION };
 }
