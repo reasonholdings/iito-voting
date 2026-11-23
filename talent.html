@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="referrer" content="no-referrer">
+<title>iito 演者ページ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&display=swap" rel="stylesheet">
+<!--
+  演者ページ（2026-11-23）
+  ・演者（モデル本人）が、専用リンク（talent.html?k=鍵）から、自分の順位・全体のランキング・投票者一覧を見るページ。
+  ・投票者の画面（index.html）とも、管理画面とも別のページ。読むだけで、票の記録には書き込まない。
+  ・専用リンクの発行・停止は talent.html?admin=1 から（管理者のパスワードが必要）。
+  ・talent.html?demo=1 で、架空のデータで見た目を確認できる。
+-->
+<style>
+:root{
+  --ac:#9C1A4F;--ac-l:#FCE8F0;--ac-m:#F2B6CB;--tx:#1F1A1C;--sub:#8A7F84;--bd:#ECE7EA;--card:#F8F7F8;--bg:#FFFFFF;
+  --gold-bg:#FFFBEA;--gold-bd:#F2C94C;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--tx);font-family:'Noto Sans JP',-apple-system,BlinkMacSystemFont,'Hiragino Sans',sans-serif;-webkit-text-size-adjust:100%}
+.wrap{max-width:1100px;margin:0 auto;padding:20px 16px 40px}
+.top{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap}
+.ev-pill{display:inline-block;border:1.5px solid var(--ac);color:var(--ac);border-radius:999px;padding:6px 16px;font-size:13px;font-weight:700;line-height:1.5;max-width:100%}
+.ev-sel{margin-top:8px;font-family:inherit;font-size:13px;padding:6px 10px;border:1px solid var(--bd);border-radius:10px;background:#fff;color:var(--tx);max-width:100%}
+.name{font-size:34px;font-weight:900;color:var(--ac);margin:12px 0 0;line-height:1.25;word-break:break-all}
+.sum{text-align:right;margin-left:auto}
+.sum .lbl{font-size:12px;color:var(--sub);font-weight:700}
+.sum .big{display:inline-flex;align-items:baseline;gap:4px;background:var(--ac);color:#fff;border-radius:14px;padding:8px 22px;margin:6px 0 8px;box-shadow:0 4px 12px rgba(156,26,79,.25)}
+.sum .big b{font-size:34px;font-weight:900;letter-spacing:.01em}
+.sum .big span{font-size:13px;font-weight:700}
+.chips{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}
+.chip{border:1.5px solid var(--ac-m);color:var(--ac);border-radius:999px;padding:4px 12px;font-size:12.5px;font-weight:700;background:#fff;white-space:nowrap}
+.myrank{margin-top:6px;font-size:13px;color:var(--sub);font-weight:700}
+.myrank b{color:var(--ac);font-size:18px}
+.tabs{display:flex;gap:8px;margin:20px 0 12px}
+.tabs button{flex:1;max-width:220px;font-family:inherit;font-size:14px;font-weight:700;padding:10px 12px;border-radius:12px;border:1.5px solid var(--bd);background:#fff;color:var(--tx);cursor:pointer}
+.tabs button.on{background:var(--ac-l);border-color:var(--ac-m);color:var(--ac)}
+.legend{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:0 0 12px;padding-bottom:12px;border-bottom:1px solid var(--bd)}
+.legend .note{font-size:11.5px;color:var(--sub);margin-left:4px}
+.tag{display:inline-block;font-size:11px;font-weight:700;border-radius:999px;padding:2px 9px;border:1.5px solid;white-space:nowrap;line-height:1.5}
+.t-supporter{background:#E6F4FF;border-color:#7CC4F5;color:#1673B5}
+.t-partner{background:#E6F9EF;border-color:#6FD3A0;color:#13824F}
+.t-producer{background:#F1EAFF;border-color:#B9A2F5;color:#6A3FD0}
+.t-free{background:#E8F6FF;border-color:#8ACFF2;color:#0E6E9E}
+.t-paid{background:#FFF2E5;border-color:#F5B985;color:#C25A00}
+.t-guest{background:#F2F2F2;border-color:#CFCFCF;color:#777}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 18px}
+@media (max-width:760px){.grid{grid-template-columns:1fr}.top{flex-direction:column;gap:8px}.top>div{width:100%}.ev-pill{border-radius:14px;font-size:12px}.name{font-size:28px}.sum{text-align:left;margin-left:0}.chips{justify-content:flex-start}}
+.row{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:10px 12px;min-height:52px}
+.row.top1{background:var(--gold-bg);border-color:var(--gold-bd)}
+.row.me{background:var(--ac-l);border-color:var(--ac-m)}
+.rk{flex:0 0 30px;text-align:center;font-style:italic;font-weight:900;color:var(--ac);font-size:16px}
+.who{flex:1;min-width:0;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.who .nm{font-weight:700;font-size:15px;word-break:break-all}
+.who .nm.guest{color:var(--sub);font-style:italic;font-weight:500}
+.ct{flex:0 0 auto;background:var(--ac);color:#fff;border-radius:999px;padding:5px 14px;font-weight:900;font-size:14px;white-space:nowrap}
+.ct small{font-size:11px;font-weight:700;margin-left:1px}
+.br{font-size:11px;color:var(--sub);width:100%;margin-top:1px}
+.empty{text-align:center;color:var(--sub);padding:40px 0;font-size:14px}
+.foot{text-align:center;color:#D9A7BC;letter-spacing:.2em;font-weight:700;font-size:13px;margin-top:28px}
+.upd{display:flex;justify-content:flex-end;align-items:center;gap:8px;font-size:11.5px;color:var(--sub);margin-top:6px}
+.upd button{font-family:inherit;font-size:11.5px;border:1px solid var(--bd);background:#fff;border-radius:999px;padding:3px 10px;cursor:pointer;color:var(--tx)}
+.err{max-width:460px;margin:80px auto;text-align:center;line-height:1.8;font-size:14px}
+.err h2{color:var(--ac);font-size:18px}
+.demo{background:#FFF4E5;border-bottom:1px solid #F0A020;color:#7A4A00;font-size:12px;text-align:center;padding:8px 14px}
+/* 管理（リンク発行） */
+.adm{max-width:720px;margin:0 auto;padding:24px 16px 48px}
+.adm h1{font-size:20px;color:var(--ac);margin:0 0 6px}
+.adm p.lead{font-size:12.5px;color:var(--sub);line-height:1.7;margin:0 0 16px}
+.adm input[type=password]{width:100%;font-family:inherit;font-size:15px;padding:12px 14px;border:1.5px solid var(--bd);border-radius:12px}
+.btn{font-family:inherit;font-size:13px;font-weight:700;border-radius:10px;padding:8px 14px;cursor:pointer;border:1.5px solid var(--ac);background:var(--ac);color:#fff;white-space:nowrap}
+.btn.out{background:#fff;color:var(--ac)}
+.btn.gray{background:#fff;color:var(--sub);border-color:var(--bd)}
+.btn:disabled{opacity:.4;cursor:default}
+.mrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 0;border-bottom:1px solid var(--bd)}
+.mrow .mn{flex:1;min-width:120px;font-weight:700}
+.mrow .st{font-size:11.5px;color:var(--sub)}
+.mrow .st.on{color:#13824F;font-weight:700}
+.msg{font-size:12.5px;margin-top:10px;min-height:18px}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+const GAS_URL='https://script.google.com/macros/s/AKfycbw5EGadYPogNQ5_8KMtedFfz3QLoPBYZj7sa-tCpvgIXh2ZaaYXkHZs755VFS0FcbR1Gw/exec';
+const GAS_KEY='iito2026secret';
+const Q=new URLSearchParams(location.search);
+const DEMO=Q.get('demo')==='1';
+const PLAN_LABEL={supporter:'サポーター',partner:'パートナー',producer:'プロデューサー'};
+const PLAN_ORDER=['supporter','partner','producer'];
+const app=document.getElementById('app');
+const esc=t=>String(t??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const num=n=>Number(n||0).toLocaleString();
+const pad=n=>String(n).padStart(2,'0');
+
+async function gas(action,payload={}){
+  if(DEMO)return demo(action,payload);
+  try{
+    const body=JSON.stringify({key:GAS_KEY,action,...payload});
+    const res=await fetch(GAS_URL+'?d='+encodeURIComponent(body),{method:'GET'});
+    return await res.json();
+  }catch(e){return null;}
+}
+
+// ════════ 演者の画面 ════════
+let view={tab:'voters',evId:'',data:null,timer:null};
+try{view.tab=sessionStorage.getItem('talent_tab')||'voters';}catch(e){}
+async function loadTalent(){
+  const k=Q.get('k')||'';
+  if(!k&&!DEMO){showErr('リンクが正しくありません','運営から届いた専用リンクを、もう一度開いてください。');return;}
+  const r=await gas('talentView',{k,evId:view.evId});
+  if(!r){if(!view.data)showErr('読み込めませんでした','通信環境を確認して、ページを開き直してください。');return;}
+  if(!r.ok){showErr('このリンクは使えません','リンクの有効期限が切れたか、停止されています。運営にお問い合わせください。');stopTimer();return;}
+  view.data=r;if(r.event)view.evId=r.event.id;
+  renderTalent();
+}
+function showErr(t,m){app.innerHTML=`<div class="err"><h2>${esc(t)}</h2><p>${esc(m)}</p></div>`;}
+function stopTimer(){if(view.timer)clearInterval(view.timer);view.timer=null;}
+function tagsFor(v){
+  const t=[];
+  if(v.guest)t.push('<span class="tag t-guest">会員以外</span>');
+  PLAN_ORDER.forEach(p=>{if((v.plans||[]).includes(p))t.push(`<span class="tag t-${p}">${PLAN_LABEL[p]}</span>`);});
+  if(v.free>0)t.push('<span class="tag t-free">無料</span>');
+  if(v.paid>0)t.push('<span class="tag t-paid">有料</span>');
+  return t.join('');
+}
+function renderTalent(){
+  const d=view.data;if(!d)return;
+  const at=new Date(d.at);
+  const stamp=`${at.getMonth()+1}/${at.getDate()} ${pad(at.getHours())}:${pad(at.getMinutes())}時点`;
+  if(!d.event){app.innerHTML=(DEMO?demoBar():'')+`<div class="wrap"><div class="name">${esc(d.model.name)}</div><div class="empty">まだ始まった投票イベントがありません。</div><div class="foot">iito JAPAN</div></div>`;return;}
+  const me=(d.ranking||[]).find(x=>x.me);
+  const evSel=d.events.length>1?`<div><select class="ev-sel" onchange="view.evId=this.value;loadTalent()">${d.events.map(e=>`<option value="${esc(e.id)}"${e.id===d.event.id?' selected':''}>${esc(e.name)}</option>`).join('')}</select></div>`:'';
+  const T=d.totals||{plan:0,free:0,paid:0,total:0};
+  const head=`<div class="top"><div style="min-width:0;flex:1">
+      <span class="ev-pill">${esc(d.event.name)}　${view.tab==='voters'?'投票者リスト':'ランキング'}（${stamp}）</span>${evSel}
+      <div class="name">${esc(d.model.name)}</div>
+      ${me?`<div class="myrank">いまの順位 <b>${me.rank}位</b> ／ ${d.ranking.length}人中</div>`:''}
+    </div>
+    <div class="sum"><div class="lbl">合計票数</div><div class="big"><b>${num(T.total)}</b><span>票</span></div>
+      <div class="chips"><span class="chip">有料・無料 ${num(T.free+T.paid)}票</span><span class="chip">プラン ${num(T.plan)}票</span></div></div>
+  </div>
+  <div class="tabs"><button class="${view.tab==='voters'?'on':''}" onclick="setTab('voters')">投票者一覧</button><button class="${view.tab==='ranking'?'on':''}" onclick="setTab('ranking')">ランキング</button></div>`;
+  let body='';
+  if(view.tab==='voters'){
+    const vs=d.voters||[];
+    body=`<div class="legend">${PLAN_ORDER.map(p=>`<span class="tag t-${p}">${PLAN_LABEL[p]}</span>`).join('')}<span class="tag t-free">無料</span><span class="tag t-paid">有料</span><span class="note">※複数＝両方で投票　／　「ゲスト」は会員以外の方（お名前は表示しません）</span></div>`
+      +(vs.length?`<div class="grid">${vs.map(v=>`<div class="row${v.rank===1?' top1':''}"><span class="rk">${v.rank}</span><span class="who"><span class="nm${v.guest?' guest':''}">${esc(v.nick)}</span>${tagsFor(v)}</span><span class="ct">${num(v.total)}<small>票</small></span></div>`).join('')}</div>`
+        :'<div class="empty">まだ投票がありません。</div>');
+  }else{
+    const rs=d.ranking||[];
+    body=`<div class="legend"><span class="note" style="margin-left:0">全モデルの合計票数（プラン票＋有料・無料の投票券）の順位です。あなたの行に色がついています。</span></div>`
+      +`<div class="grid">${rs.map(x=>`<div class="row${x.me?' me':x.rank===1?' top1':''}"><span class="rk">${x.rank}</span><span class="who"><span class="nm">${esc(x.name)}</span>${x.me?'<span class="tag t-paid" style="background:#fff;border-color:var(--ac-m);color:var(--ac)">あなた</span>':''}</span><span class="ct">${num(x.total)}<small>票</small></span></div>`).join('')}</div>`;
+  }
+  app.innerHTML=(DEMO?demoBar():'')+`<div class="wrap">${head}${body}
+    <div class="upd">1分ごとに自動で更新します <button onclick="loadTalent()">いま更新</button></div>
+    <div class="foot">iito JAPAN</div></div>`;
+}
+function setTab(t){view.tab=t;try{sessionStorage.setItem('talent_tab',t);}catch(e){}renderTalent();}
+
+// ════════ 管理者：専用リンクの発行・停止 ════════
+let admTok='';try{admTok=sessionStorage.getItem('talent_adm')||'';}catch(e){}
+function renderAdminLogin(msg){
+  app.innerHTML=`<div class="adm"><h1>演者ページ：専用リンクの発行</h1>
+    <p class="lead">管理画面と同じパスワードでログインしてください。</p>
+    <input type="password" id="pw" placeholder="管理者パスワード" onkeydown="if(event.key==='Enter')admLogin()"/>
+    <div style="margin-top:10px"><button class="btn" onclick="admLogin()">ログイン</button></div>
+    <div class="msg" id="msg" style="color:#C0392B">${esc(msg||'')}</div></div>`;
+}
+async function admLogin(){
+  const pw=document.getElementById('pw').value;if(!pw)return;
+  const r=await gas('adminLogin',{pw});
+  if(!r||!r.ok){renderAdminLogin(r&&r.error==='locked'?'しばらくログインできません。時間をおいてお試しください。':'パスワードが違います。');return;}
+  admTok=r.token;try{sessionStorage.setItem('talent_adm',admTok);}catch(e){}
+  loadAdmin();
+}
+async function loadAdmin(note){
+  if(!admTok&&!DEMO){renderAdminLogin();return;}
+  const r=await gas('listTalentKeys',{adminToken:admTok});
+  if(!r||!r.ok){admTok='';try{sessionStorage.removeItem('talent_adm');}catch(e){}renderAdminLogin(r&&r.error==='admin_required'?'もう一度ログインしてください。':'読み込めませんでした。');return;}
+  const base=location.origin+location.pathname;
+  const ms=(r.models||[]).slice().sort((a,b)=>(a.hidden-b.hidden));admModels=ms;admBase=base;
+  app.innerHTML=(DEMO?demoBar():'')+`<div class="adm"><h1>演者ページ：専用リンクの発行</h1>
+    <p class="lead">モデルごとに専用リンクを発行し、本人にだけ送ってください。リンクを知っている人は誰でもそのページを見られます。<br>
+    「作り直す」を押すと古いリンクは使えなくなります。「停止」でそのモデルのページを見られなくします。</p>
+    <div class="msg" id="msg">${esc(note||'')}</div>
+    ${ms.map((m,i)=>`<div class="mrow"><span class="mn">${esc(m.name)}${m.hidden?' <span class="st">（非表示）</span>':''}</span>
+      <span class="st${m.active?' on':''}">${m.active?'発行済み':'未発行'}</span>
+      ${m.active?`<button class="btn out" onclick="copyLink(${i})">リンクをコピー</button>
+        <button class="btn gray" onclick="issue(${i},true)">作り直す</button>
+        <button class="btn gray" onclick="revoke(${i})">停止</button>`
+       :`<button class="btn" onclick="issue(${i},false)">発行する</button>`}
+    </div>`).join('')}</div>`;
+}
+let admModels=[],admBase='';
+async function issue(i,re){
+  const m=admModels[i];if(!m)return;const id=m.id,name=m.name;
+  if(re&&!confirm(`${name} のリンクを作り直しますか？\n今のリンクは使えなくなります。`))return;
+  const r=await gas('issueTalentKey',{adminToken:admTok,modelId:id});
+  loadAdmin(r&&r.ok?`${name} のリンクを発行しました。「リンクをコピー」で本人に送ってください。`:'発行できませんでした。');
+}
+async function revoke(i){
+  const m=admModels[i];if(!m)return;const id=m.id,name=m.name;
+  if(!confirm(`${name} のリンクを停止しますか？`))return;
+  const r=await gas('revokeTalentKey',{adminToken:admTok,modelId:id});
+  loadAdmin(r&&r.ok?`${name} のリンクを停止しました。`:'停止できませんでした。');
+}
+async function copyLink(i){
+  const m=admModels[i];if(!m)return;const url=admBase+'?k='+m.key,name=m.name;
+  try{await navigator.clipboard.writeText(url);document.getElementById('msg').textContent=`${name} のリンクをコピーしました。`;}
+  catch(e){prompt('このリンクをコピーしてください',url);}
+}
+
+// ════════ テストモード（架空のデータ） ════════
+function demoBar(){return '<div class="demo"><b>テストモード</b>：架空のデータです（本番のデータではありません）</div>';}
+function demo(action){
+  if(action==='talentView'){
+    const names=['浅浜サク','もも','けいか','ななみ','Mare','七瀬莉海','ひかる','ゆか','acho','まゆ'];
+    const tot=[610,842,512,433,388,301,250,198,120,64];
+    const ranking=names.map((n,i)=>({modelId:'m'+i,name:n,total:tot[i],me:i===0})).sort((a,b)=>b.total-a.total);
+    ranking.forEach((x,i)=>x.rank=i+1);
+    const v=[['のぶしゃ',['producer'],300,1,0],['machu',['producer'],180,1,20],['ゲスト',[],0,1,50,1],['アルちー',['supporter'],24,0,0],['ひろYUKIにゃ〜',['supporter'],12,1,0],['norimaru.27',['supporter'],3,1,1],['hiro',[],0,1,0],['macha',[],0,1,0],['あきひこ',[],0,1,0],['こよみん',[],0,1,0],['なおの隣りのヤギ',[],0,1,0]];
+    const voters=v.map(([nick,plans,plan,free,paid,g])=>({nick,plans,plan,free,paid,guest:!!g,total:plan+free+paid})).sort((a,b)=>b.total-a.total);
+    let rk=0,prev=null;voters.forEach((x,i)=>{if(x.total!==prev){rk=i+1;prev=x.total;}x.rank=rk;});
+    const now=Date.now();
+    return {ok:true,model:{id:'m0',name:'浅浜サク'},events:[{id:'e1',name:'セルフプロモーション動画制作権獲得イベント',start:now-86400000,end:now+86400000*6}],event:{id:'e1',name:'セルフプロモーション動画制作権獲得イベント'},
+      ranking,voters,totals:{plan:529,free:10,paid:71,total:610},at:now};
+  }
+  if(action==='listTalentKeys')return {ok:true,models:[{id:'jp-03',name:'浅浜サク',active:true,key:'0'.repeat(64)},{id:'jp-01',name:'もも',active:false,key:''},{id:'x',name:'（非表示のモデル）',hidden:true,active:false}]};
+  return {ok:true};
+}
+
+// ════════ はじめに ════════
+if(Q.get('admin')==='1'){DEMO?loadAdmin():(admTok?loadAdmin():renderAdminLogin());}
+else{loadTalent();view.timer=setInterval(()=>{if(!document.hidden)loadTalent();},60000);}
+</script>
+</body>
+</html>

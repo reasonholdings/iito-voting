@@ -13,6 +13,7 @@ const SHEET_OSHI    = '推し設定';      // 会員が選んだ推しモデル�
 const SHEET_CONSENT = '同意記録';      // 利用規約・プライバシーポリシーへの同意：ニックネーム／版／同意した画面／日時（2026-11-23）
 // 利用規約・プライバシーポリシーの版。規約を改定して全員にもう一度同意してもらうときは、この日付を新しくする
 const TERMS_VERSION = '2026-11-23';
+const SHEET_TALENT  = '演者リンク';    // 演者ページの専用リンク：モデルID／モデル名／鍵／有効／発行日時（2026-11-23）
 const SHEET_PAID    = '有料投票';      // 投票券（有料）の票：イベントID／ニックネーム／モデルID／モデル名／票数／記録日時。管理画面で商品購入CSVを読み込んで保存（2026-11-22）
 const SECRET_KEY    = 'iito2026secret'; // HTMLと合わせること
 
@@ -98,6 +99,7 @@ function handleAction(action, data) {
   if (action === 'setPin')      return setPin(data);
   if (action === 'pinLogin')    return pinLogin(data);
   if (action === 'adminLogin')  return adminLogin(data);
+  if (action === 'talentView')  return talentView(data); // 演者ページ（専用リンクの鍵が必要）
   // 投票者本人
   if (action === 'me')          return getMe(data);
   if (action === 'supporterRank') return supporterRank(data);
@@ -111,7 +113,8 @@ function handleAction(action, data) {
     getOshi: getOshi, changeAdminPw: changeAdminPw, adminLogout: adminLogout,
     appendPayments: appendPayments, getPayments: getPayments,
     getFanOverrides: getFanOverrides, saveFanOverride: saveFanOverride,
-    savePaidVotes: savePaidVotes, getPaidVotes: getPaidVotes
+    savePaidVotes: savePaidVotes, getPaidVotes: getPaidVotes,
+    listTalentKeys: listTalentKeys, issueTalentKey: issueTalentKey, revokeTalentKey: revokeTalentKey
   };
   if (ADMIN_ACTIONS[action]) {
     if (!isLegacy_() && !isAdmin_(data)) return { ok: false, error: 'admin_required' };
@@ -637,7 +640,7 @@ function paidSheet_() {
   let sh = ss.getSheetByName(SHEET_PAID);
   if (!sh) {
     sh = ss.insertSheet(SHEET_PAID);
-    sh.getRange(1, 1, 1, 6).setValues([['イベントID', 'ニックネーム', 'モデルID', 'モデル名', '票数', '記録日時']]);
+    sh.getRange(1, 1, 1, 7).setValues([['イベントID', 'ニックネーム', 'モデルID', 'モデル名', '票数', '記録日時', '種別']]);
     sh.setFrozenRows(1);
   }
   return sh;
@@ -646,11 +649,12 @@ function paidRows_(evId) {
   const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_PAID);
   if (!sh || sh.getLastRow() <= 1) return [];
   const out = [];
-  sh.getRange(2, 1, sh.getLastRow() - 1, 5).getValues().forEach(function(r){
+  sh.getRange(2, 1, sh.getLastRow() - 1, 7).getValues().forEach(function(r){
     const ev = String(r[0]).trim(), nick = String(r[1]).trim(), modelId = String(r[2]).trim(), v = Number(r[4]) || 0;
     if (!ev || !nick || !modelId || v <= 0) return;
     if (evId && ev !== String(evId)) return;
-    out.push({ evId: ev, nick: nick, modelId: modelId, name: String(r[3] || ''), votes: v });
+    // 種別（G列）：free＝無料の投票券（0円）、それ以外＝有料。古い行（空欄）は有料として扱う（2026-11-23）
+    out.push({ evId: ev, nick: nick, modelId: modelId, name: String(r[3] || ''), votes: v, kind: String(r[6] || '').trim() === 'free' ? 'free' : 'paid' });
   });
   return out;
 }
@@ -659,7 +663,8 @@ function savePaidVotes(data) {
   if (!evId) return { ok: false, error: 'no_event' };
   const rows = (data.rows || []).map(function(x){
     return [evId, String(x.nick || '').trim().slice(0, 100), String(x.modelId || '').trim().slice(0, 100),
-            String(x.name || '').trim().slice(0, 100), Math.max(0, Math.floor(Number(x.votes) || 0)), new Date()];
+            String(x.name || '').trim().slice(0, 100), Math.max(0, Math.floor(Number(x.votes) || 0)), new Date(),
+            x.kind === 'free' ? 'free' : 'paid'];
   }).filter(function(r){ return r[1] && r[2] && r[4] > 0; });
   const lock = LockService.getScriptLock();
   lock.waitLock(20000);
@@ -667,12 +672,14 @@ function savePaidVotes(data) {
     const sh = paidSheet_();
     let keep = [];
     if (sh.getLastRow() > 1) {
-      keep = sh.getRange(2, 1, sh.getLastRow() - 1, 6).getValues().filter(function(r){ return String(r[0]).trim() !== evId; });
-      sh.getRange(2, 1, sh.getLastRow() - 1, 6).clearContent();
+      keep = sh.getRange(2, 1, sh.getLastRow() - 1, 7).getValues().filter(function(r){ return String(r[0]).trim() !== evId; });
+      sh.getRange(2, 1, sh.getLastRow() - 1, 7).clearContent();
     }
+    if (!String(sh.getRange(1, 7).getValue())) sh.getRange(1, 7).setValue('種別');
     const all = keep.concat(rows);
-    if (all.length) sh.getRange(2, 1, all.length, 6).setValues(all);
+    if (all.length) sh.getRange(2, 1, all.length, 7).setValues(all);
   } finally { lock.releaseLock(); }
+  try { CacheService.getScriptCache().remove('tlv_' + Utilities.base64EncodeWebSafe(evId).slice(0, 200)); } catch (e) {}
   // 応援ランキングのキャッシュを消して、すぐ反映させる
   const safeId = evId.replace(/[\\\/\?\*\[\]:]/g, '_').slice(0, 80);
   try { CacheService.getScriptCache().remove('srk_' + Utilities.base64EncodeWebSafe(safeId).slice(0, 200)); } catch (e) {}
@@ -1576,4 +1583,137 @@ function agreeTerms(data) {
   if (data.agree !== true) return { ok: false, error: 'not_agreed' };
   recordConsent_(a.member, '同意画面', data.ua);
   return { ok: true, termsVer: TERMS_VERSION };
+}
+
+
+// ════════════════════════════════════════
+// 演者ページ（2026-11-23 追加）
+//  演者（モデル本人）が、専用リンクから自分の順位・全体のランキング・投票者一覧を見るためのページ（talent.html）。
+//  ・専用リンクの鍵は、管理者が talent.html?admin=1 から発行・停止する（シート「演者リンク」）
+//  ・読むだけで、票の記録には一切書き込まない
+//  ・会員でない人（投票券だけを買った人など）は、応援ランキングと同じく「ゲスト」と表示する
+// ════════════════════════════════════════
+function talentSheet_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sh = ss.getSheetByName(SHEET_TALENT);
+  if (!sh) {
+    sh = ss.insertSheet(SHEET_TALENT);
+    sh.getRange(1, 1, 1, 5).setValues([['モデルID', 'モデル名', '鍵', '有効', '発行日時']]);
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+// モデルの一覧（画像は除く）
+function talentModels_() {
+  const m = readBigJson(SHEET_MODELS) || {};
+  return [].concat(m.japan || [], m.osaka || []).map(function(x){
+    return { id: String(x.id || ''), name: String(x.name || ''), hidden: !!x.hidden };
+  }).filter(function(x){ return x.id; });
+}
+function talentRows_() {
+  const sh = talentSheet_();
+  if (sh.getLastRow() <= 1) return [];
+  return sh.getRange(2, 1, sh.getLastRow() - 1, 5).getValues().map(function(r, i){
+    return { row: i + 2, modelId: String(r[0]).trim(), name: String(r[1]), key: String(r[2]).trim(), active: r[3] === true || String(r[3]).toUpperCase() === 'TRUE', at: r[4] };
+  });
+}
+// 管理者：モデルごとのリンクの状態
+function listTalentKeys() {
+  const rows = talentRows_();
+  return { ok: true, models: talentModels_().map(function(m){
+    const r = rows.filter(function(x){ return x.modelId === m.id; })[0];
+    return { id: m.id, name: m.name, hidden: m.hidden, key: r && r.active ? r.key : '', active: !!(r && r.active) };
+  }) };
+}
+// 管理者：リンクを発行（すでにあれば作り直す＝古いリンクは使えなくなる）
+function issueTalentKey(data) {
+  const id = String(data.modelId || '').trim();
+  const m = talentModels_().filter(function(x){ return x.id === id; })[0];
+  if (!m) return { ok: false, error: 'no_model' };
+  const key = (Utilities.getUuid() + Utilities.getUuid()).replace(/-/g, '');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const sh = talentSheet_();
+    const r = talentRows_().filter(function(x){ return x.modelId === id; })[0];
+    const row = [id, m.name, key, true, new Date()];
+    if (r) sh.getRange(r.row, 1, 1, 5).setValues([row]); else sh.appendRow(row);
+  } finally { lock.releaseLock(); }
+  try { CacheService.getScriptCache().remove('tlk_' + id); } catch (e) {}
+  return { ok: true, modelId: id, key: key };
+}
+// 管理者：リンクを止める
+function revokeTalentKey(data) {
+  const id = String(data.modelId || '').trim();
+  const r = talentRows_().filter(function(x){ return x.modelId === id; })[0];
+  if (r) talentSheet_().getRange(r.row, 4).setValue(false);
+  return { ok: true };
+}
+function talentByKey_(key) {
+  key = String(key || '').trim();
+  if (!/^[0-9a-f]{64}$/.test(key)) return null;
+  const r = talentRows_().filter(function(x){ return x.active && x.key === key; })[0];
+  return r || null;
+}
+function evTime_(d, t) { return d && t ? new Date(d + 'T' + t + ':00+09:00').getTime() : 0; }
+// イベントごとの集計（プラン票・無料・有料、投票者ごとの内訳）。30秒キャッシュ
+function talentAgg_(evId) {
+  const cache = CacheService.getScriptCache();
+  const ck = 'tlv_' + Utilities.base64EncodeWebSafe(evId).slice(0, 200);
+  const hit = cache.get(ck);
+  if (hit) { try { return JSON.parse(hit); } catch (e) {} }
+  const agg = {}; // modelId -> { name, plan, free, paid, by: { nick: { plan, free, paid, plans: {} } } }
+  const get = function(mid, name){ if (!agg[mid]) agg[mid] = { name: name || mid, plan: 0, free: 0, paid: 0, by: {} }; return agg[mid]; };
+  const who = function(m, nick){ if (!m.by[nick]) m.by[nick] = { plan: 0, free: 0, paid: 0, plans: {} }; return m.by[nick]; };
+  const safeId = String(evId).replace(/[\\\/\?\*\[\]:]/g, '_').slice(0, 80);
+  const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('投票_' + safeId);
+  if (sh && sh.getLastRow() > 2) {
+    sh.getRange(3, 1, sh.getLastRow() - 2, 12).getValues().forEach(function(r){
+      const nick = String(r[4] || '').trim(), mid = String(r[8] || '').trim(), c = Number(r[10]) || 0, plan = String(r[5] || '').trim();
+      if (!nick || !mid || !c) return;
+      const m = get(mid, String(r[9] || '')), w = who(m, nick);
+      m.plan += c; w.plan += c; if (plan) w.plans[plan] = 1;
+    });
+  }
+  paidRows_(evId).forEach(function(p){
+    const m = get(p.modelId, p.name), w = who(m, p.nick);
+    m[p.kind] += p.votes; w[p.kind] += p.votes;
+  });
+  try { cache.put(ck, JSON.stringify(agg), 30); } catch (e) {}
+  return agg;
+}
+function talentView(data) {
+  const t = talentByKey_(data.k);
+  if (!t) return { ok: false, error: 'bad_link' };
+  const now = Date.now();
+  const evs = (getEvents().events || []).map(function(e){
+    return { id: String(e.id), name: String(e.name || ''), start: evTime_(e.startDate, e.startTime), end: evTime_(e.endDate, e.endTime) };
+  }).filter(function(e){ return e.id && e.start && e.start <= now; }).sort(function(a, b){ return b.start - a.start; });
+  if (!evs.length) return { ok: true, model: { id: t.modelId, name: t.name }, events: [], event: null, at: now };
+  let ev = evs.filter(function(e){ return e.id === String(data.evId || ''); })[0];
+  if (!ev) ev = evs.filter(function(e){ return now <= e.end; })[0] || evs[0]; // 指定が無ければ開催中、無ければいちばん新しいイベント
+  const agg = talentAgg_(ev.id);
+  const models = talentModels_();
+  const names = {}; models.forEach(function(m){ names[m.id] = m.name; });
+  // 全体のランキング（表示中のモデル全員＋票のあるモデル）
+  const ids = {}; models.forEach(function(m){ if (!m.hidden) ids[m.id] = 1; }); Object.keys(agg).forEach(function(id){ ids[id] = 1; }); ids[t.modelId] = 1;
+  const ranking = Object.keys(ids).map(function(id){
+    const a = agg[id] || { plan: 0, free: 0, paid: 0 };
+    return { modelId: id, name: names[id] || (agg[id] && agg[id].name) || id, total: a.plan + a.free + a.paid, me: id === t.modelId };
+  }).sort(function(a, b){ return b.total - a.total || (a.name < b.name ? -1 : 1); });
+  var rk = 0, prev = null;
+  ranking.forEach(function(x, i){ if (x.total !== prev) { rk = i + 1; prev = x.total; } x.rank = rk; });
+  // 自分の投票者一覧
+  const mine = agg[t.modelId] || { plan: 0, free: 0, paid: 0, by: {} };
+  const memSet = memberNickSet_();
+  const voters = Object.keys(mine.by).map(function(n){
+    const w = mine.by[n];
+    return { nick: memSet[n] ? n : 'ゲスト', guest: !memSet[n], plans: Object.keys(w.plans), plan: w.plan, free: w.free, paid: w.paid, total: w.plan + w.free + w.paid };
+  }).filter(function(x){ return x.total > 0; }).sort(function(a, b){ return b.total - a.total; });
+  rk = 0; prev = null;
+  voters.forEach(function(x, i){ if (x.total !== prev) { rk = i + 1; prev = x.total; } x.rank = rk; });
+  return { ok: true, model: { id: t.modelId, name: names[t.modelId] || t.name },
+           events: evs.map(function(e){ return { id: e.id, name: e.name, start: e.start, end: e.end }; }),
+           event: ev, ranking: ranking, voters: voters,
+           totals: { plan: mine.plan, free: mine.free, paid: mine.paid, total: mine.plan + mine.free + mine.paid }, at: now };
 }

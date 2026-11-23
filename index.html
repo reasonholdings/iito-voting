@@ -1111,7 +1111,7 @@ body.ia-open{overflow:hidden}
     </div>
     <div style="overflow-x:auto">
       <table class="tbl">
-        <thead><tr><th>順位</th><th>候補者名</th><th>プラン票</th><th>有料票</th><th>合計</th></tr></thead>
+        <thead><tr><th>順位</th><th>候補者名</th><th>プラン票</th><th>有料・無料票</th><th>合計</th></tr></thead>
         <tbody id="rank-body"></tbody>
       </table>
     </div>
@@ -4651,6 +4651,7 @@ async function loadPaidCSV(input){
   const files=[...(input.files||[])];input.value='';if(!files.length)return;
   const st=document.getElementById('paid-status');
   const per={}; // {evId:{nick:{modelId:票数}}}
+  const perK={}; // {evId:{'ニックネーム|モデルID|free/paid':票数}}（演者ページで「無料」「有料」を分けて出すため。2026-11-23）
   const marks={},unknownModel={},noEvent={n:0,v:0};
   let rowsOk=0,dup=0,bad=0,noDate=0;
   for(const f of files){
@@ -4675,6 +4676,9 @@ async function loadPaidCSV(input){
       const mem=email&&members.find(x=>String(x.email||'').toLowerCase()===email);
       const who=mem?mem.nick:((c[ix.nick]||'').trim());if(!who)return;
       const p=(per[ev.id]=per[ev.id]||{});(p[who]=p[who]||{})[mod.id]=(p[who][mod.id]||0)+votes;
+      const amt=ix.amount>=0?Number(String(c[ix.amount]||'').replace(/[^0-9.-]/g,'')):NaN;
+      const kind=(ix.amount>=0&&amt===0)?'free':'paid'; // 0円の投票券＝無料
+      const pk=(perK[ev.id]=perK[ev.id]||{}),kk=who+'|'+mod.id+'|'+kind;pk[kk]=(pk[kk]||0)+votes;
       rowsOk++;
     });
   }
@@ -4692,7 +4696,7 @@ async function loadPaidCSV(input){
   if(st)st.textContent='保存中...';
   let ok=0,ng=0;
   for(const id of evIds){
-    const rows=[];Object.entries(per[id]).forEach(([nick,o])=>Object.entries(o).forEach(([mid,v])=>rows.push({nick,modelId:mid,name:findMod(mid)?.name||'',votes:v})));
+    const rows=[];Object.entries(perK[id]||{}).forEach(([k,v])=>{const ps=k.split('|'),kind=ps.pop(),mid=ps.pop(),nick=ps.join('|');rows.push({nick,modelId:mid,name:findMod(mid)?.name||'',votes:v,kind});});
     paidVotes[id]=per[id];
     if(GAS_URL){const r=await gasPost('savePaidVotes',{evId:id,rows}).catch(()=>null);if(r&&r.ok)ok++;else ng++;}else ok++;
   }
@@ -4769,7 +4773,7 @@ function exportRankCSV(){
   const ev=_resultVotes();
   const evName=resultEvId?(events.find(e=>e.id===resultEvId)?.name||'event'):'全イベント合算';
   // 候補者別に得票を合算（プラン票・有料票・合計）
-  const rows=[['順位','候補者名','プラン票','有料票','合計']];
+  const rows=[['順位','候補者名','プラン票','有料・無料票','合計']];
   Object.entries(_resultScores()).sort((a,b)=>(b[1].plan+b[1].paid)-(a[1].plan+a[1].paid)).forEach(([mid,x],idx)=>{
     const m=findMod(mid);
     rows.push([idx+1,m?.name||x.name||mid,x.plan,x.paid,x.plan+x.paid]);
