@@ -332,6 +332,19 @@ function getVoteSheet(evId, evName) {
 }
 
 // 会員が存在するか確認（ニックネーム一致）
+// 会員データにいるニックネームの一覧（応援ランキングで「ゲスト」表示を決めるため。60秒キャッシュ）
+function memberNickSet_() {
+  const cache = CacheService.getScriptCache();
+  const hit = cache.get('memnicks');
+  if (hit) { try { return JSON.parse(hit); } catch (e) {} }
+  const set = {};
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_MEMBERS);
+  if (sheet && sheet.getLastRow() > 1) {
+    sheet.getRange(2, 2, sheet.getLastRow() - 1, 1).getValues().forEach(function(r){ const n = String(r[0]).trim(); if (n) set[n] = 1; });
+  }
+  try { cache.put('memnicks', JSON.stringify(set), 60); } catch (e) {}
+  return set;
+}
 function isMemberValid(nick) {
   if (!nick) return false;
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -556,6 +569,7 @@ function supporterRank(data) {
   const evId = String(data.evId || '');
   if (!evId) return { ok: false, error: 'no_event' };
   const agg = supporterAgg_(evId); // { modelId: { name, by: { ニックネーム: 票数 } } }
+  const memSet = memberNickSet_();
   const out = [];
   Object.keys(agg).forEach(function(modelId){
     const m = agg[modelId];
@@ -577,7 +591,11 @@ function supporterRank(data) {
     list.forEach(function(x, i){ if (x.count !== prev) { rank = i + 1; prev = x.count; } x.rank = rank; });
     const meRow = list.filter(function(x){ return x.nick === me; })[0];
     out.push({ modelId: modelId, name: m.name, votes: votes, total: list.length,
-               top: list.slice(0, SUPPORTER_TOP_N).map(function(x){ return { nick: x.nick, count: x.count, rank: x.rank, me: x.nick === me }; }),
+               // 会員でない人（投票券だけを買った人など）は、規約に同意していないので名前を出さず「ゲスト」と表示する（2026-11-23）
+               top: list.slice(0, SUPPORTER_TOP_N).map(function(x){
+                 const isMem = !!memSet[x.nick];
+                 return { nick: isMem ? x.nick : 'ゲスト', guest: !isMem, count: x.count, rank: x.rank, me: x.nick === me };
+               }),
                me: meRow ? { rank: meRow.rank, count: meRow.count } : null });
   });
   out.sort(function(x, y){ return (y.me ? y.me.count : 0) - (x.me ? x.me.count : 0); }); // 自分が多く入れたモデルを先に

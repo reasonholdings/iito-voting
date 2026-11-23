@@ -103,6 +103,7 @@ html,body{min-height:100vh;background:var(--bg2);font-family:"Zen Maru Gothic","
 .sr-body{flex:1;min-width:0;display:flex;align-items:baseline;gap:8px}
 .sr-nm{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#9EE6C4}
 .sr-ct{flex:0 0 auto;font-weight:700;font-size:13px;white-space:nowrap}
+.sr-nm.guest{color:rgba(255,255,255,.7);font-style:italic}
 .sr-row.me .sr-nm,.sr-row.me .sr-ct{color:#FFD86B}
 .sr-me{font-size:11.5px;margin-top:4px;padding-top:4px;border-top:1px dashed rgba(255,255,255,.35);color:#FFD86B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sr-lock{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:6px;font-size:12.5px;line-height:1.5}
@@ -1418,7 +1419,7 @@ function demoGas(action,payload){
         const list=fake.map(([n,v])=>({nick:n,count:v})).concat([{nick:DEMO_NICK,count:c,me:true}]).sort((a,b)=>b.count-a.count);
         list.forEach((x,i)=>x.rank=i+1);
         const me=list.find(x=>x.me);
-        return {modelId:mid,name:mid,votes:votesAll,total:list.length,top:list.slice(0,5).map(x=>({nick:x.nick,count:x.count,rank:x.rank,me:!!x.me})),me:{rank:me.rank,count:me.count}};
+        return {modelId:mid,name:mid,votes:votesAll,total:list.length,top:list.slice(0,5).map(x=>({nick:x.nick==='ららパパ'?'ゲスト':x.nick,guest:x.nick==='ららパパ',count:x.count,rank:x.rank,me:!!x.me})),me:{rank:me.rank,count:me.count}};
       });
       return ok({models,min:10,at:Date.now()});
     }
@@ -3205,7 +3206,7 @@ function renderSupporterRank(){
   const e=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const nm=e((findMod(m.modelId)||{}).name||m.name||'');
   const tabs=models.length>1?`<div class="sr-tabs">${models.map(x=>`<button type="button" class="sr-tab${x.modelId===srSel?' on':''}" onclick="srSel='${e(x.modelId)}';renderSupporterRank()">${x.locked?'<i class="ti ti-lock"></i> ':''}${e((findMod(x.modelId)||{}).name||x.name||'')}</button>`).join('')}</div>`:'';
-  const rows=m.locked?`<div class="sr-lock"><i class="ti ti-lock"></i><div>このモデルに<br><b>${minV}票以上</b>入れると<br>見られます</div><div class="sr-need">あと ${m.need}票</div></div>`:m.top.map(r=>`<div class="sr-row${r.me?' me':''}"><span class="sr-rk">${r.rank}</span><span class="sr-body"><span class="sr-nm">${e(r.nick)}</span><span class="sr-ct">${Number(r.count).toLocaleString()}票</span></span></div>`).join('');
+  const rows=m.locked?`<div class="sr-lock"><i class="ti ti-lock"></i><div>このモデルに<br><b>${minV}票以上</b>入れると<br>見られます</div><div class="sr-need">あと ${m.need}票</div></div>`:m.top.map(r=>`<div class="sr-row${r.me?' me':''}"><span class="sr-rk">${r.rank}</span><span class="sr-body"><span class="sr-nm${r.guest?' guest':''}">${e(r.nick)}</span><span class="sr-ct">${Number(r.count).toLocaleString()}票</span></span></div>`).join('');
   const meLine=(!m.locked&&m.me&&!m.top.some(r=>r.me))?`<div class="sr-me">あなた：${m.me.rank}位　${Number(m.me.count).toLocaleString()}票</div>`:'';
   p.innerHTML=`<div class="sr-hd"><span class="sr-ttl"><i class="ti ti-trophy"></i> 応援ランキング</span><button type="button" class="sr-x" aria-label="最小化する" onclick="setSrHidden(true)"><i class="ti ti-minus"></i>最小化</button></div>`
     +tabs+(models.length>1?'':`<div class="sr-model">${nm}</div>`)
