@@ -160,6 +160,14 @@ html,body{min-height:100vh;background:var(--bg2);font-family:"Zen Maru Gothic","
 .agree a{color:var(--ac-d);text-decoration:underline}
 .agree.on{border-color:#F4A6C0;background:#FFF5F8}
 .agree.need{border-color:#E24B4A}
+.consent-box{max-width:400px;text-align:center}
+.consent-box h3{font-size:17px;font-weight:700;line-height:1.6;margin:0 0 8px;text-align:center}
+.consent-lead{font-size:13.5px;line-height:1.7;margin:0 0 14px}
+.consent-lk{display:flex;gap:8px}
+.consent-lk a{flex:1;display:flex;align-items:center;justify-content:center;text-align:center;border:1.5px solid #F4A6C0;color:#C2185B;border-radius:10px;padding:8px 4px;text-decoration:none;font-size:12.5px;font-weight:700;line-height:1.5}
+.consent-box .agree{text-align:left}
+.consent-out{margin-top:14px;font-size:12px}
+.consent-out a{color:var(--sub);text-decoration:underline}
 .legal-lnk{text-align:center;font-size:11px;color:var(--sub);line-height:1.7;margin-top:18px}
 .legal-lnk a{color:var(--sub);text-decoration:underline;margin:0 4px}
 .forgot-lnk{text-align:center;font-size:12px;color:var(--ac-d);text-decoration:underline;margin-top:12px;cursor:pointer}
@@ -870,6 +878,19 @@ body.ia-open{overflow:hidden}
   <div class="mbox mc-modal-box" id="mc-modal-body"></div>
 </div>
 
+<!-- 利用規約・プライバシーポリシーへの同意（2026-11-23）：いまの版に同意した記録が無い会員に、ログイン後1回だけ出す -->
+<div class="overlay" id="consent-modal" style="z-index:400">
+  <div class="mbox consent-box">
+    <h3>利用規約・プライバシーポリシー<br>への同意</h3>
+    <p class="consent-lead">引き続きご利用いただくには、<br>同意が必要です。</p>
+    <div class="consent-lk"><a href="terms.html" target="_blank" rel="noopener">利用規約<br>を読む</a><a href="privacy.html" target="_blank" rel="noopener">プライバシー<br>ポリシーを読む</a></div>
+    <label class="agree" id="consent-agree-box"><input type="checkbox" id="consent-chk" onchange="onConsentChk()"/><span>利用規約とプライバシーポリシーを読み、同意します</span></label>
+    <button class="btn-gold" id="consent-btn" style="margin-top:0" onclick="submitConsent()" disabled>同意して続ける</button>
+    <div class="email-fb" id="consent-err"><i class="ti ti-alert-circle" style="font-size:14px"></i><span id="consent-err-txt"></span></div>
+    <div class="consent-out"><a href="#" onclick="event.preventDefault();closeConsent();logout()">ログアウトする</a></div>
+  </div>
+</div>
+
 <div class="overlay" id="logout-modal">
     <div class="mbox" style="max-width:340px;text-align:center">
       <h3 style="text-align:center"><i class="ti ti-logout" style="font-size:15px;vertical-align:-2px;margin-right:6px;color:var(--ac)"></i>ログアウトしますか？</h3>
@@ -1371,13 +1392,14 @@ function demoGas(action,payload){
   const ok=o=>Promise.resolve(Object.assign({ok:true},o||{}));
   switch(action){
     case 'getEvents': return ok({events:[demoEvent()]});
-    case 'pinLogin': case 'setPin': return ok({token:'demo-token',nick:DEMO_NICK});
+    case 'pinLogin': case 'setPin': if(payload.agree===true)ls('demo_consent',1); return ok({token:'demo-token',nick:DEMO_NICK});
+    case 'agreeTerms': ls('demo_consent',1); return ok({termsVer:'demo'});
     case 'requestPinCode': return ok();
     case 'me': {
       const g={};g[demoTerm(0)]=['producer'];g[demoTerm(-1)]=['producer'];g[demoTerm(-2)]=['producer'];
       const pd=new Date();pd.setDate(pd.getDate()-10);
       const dso=ls('demo_oshi');
-      return ok({member:{nick:DEMO_NICK,mid:'0',plan:'producer',email:'test@example.com',paidAt:ymdOf(pd.getTime())},votes:votes,grants:g,termPlans:{},...(Array.isArray(dso)?{oshi:dso}:{})});
+      return ok({member:{nick:DEMO_NICK,mid:'0',plan:'producer',email:'test@example.com',paidAt:ymdOf(pd.getTime())},votes:votes,grants:g,termPlans:{},consent:!!ls('demo_consent'),...(Array.isArray(dso)?{oshi:dso}:{})});
     }
     case 'saveVote': {
       const ev=payload.evId||'demo-event';const mine=votes[ev]||(votes[ev]={});
@@ -1507,6 +1529,7 @@ async function pullMe(nick){
   grants[n] = r.grants||{}; ls('iito_grants', grants);
   termPlans[n] = r.termPlans||{}; ls('iito_termplans', termPlans);
   adjusts = {[n]: r.adjusts||{}}; ls('iito_adjusts', adjusts); // 本人の分だけ持つ
+  if(r.consent===false) openConsent(); else if(r.consent===true) closeConsent(); // いまの版の規約に同意していなければ、同意画面を出す
   // 推し：サーバーに保存してあれば、それを使う（端末をまたいで同じ推しを出す。2026-11-22）
   if(Array.isArray(r.oshi)){ oshiMap[n]=r.oshi.map(String); ls(LS.oshi,oshiMap); return {member:r.member}; }
   return {member:r.member,noServerOshi:true};
@@ -2538,7 +2561,7 @@ async function doPinLogin(){
   if(needAgree())return;
   const btn=document.getElementById('reg-btn');
   btn.disabled=true;btn.textContent='確認中...';hideLoginErr();
-  const r=await gasPost('pinLogin',{email,pin});
+  const r=await gasPost('pinLogin',{email,pin,agree:agreed()});
   btn.textContent='ログイン';checkRegBtn();
   if(!r||!r.ok){
     if(r&&r.error==='wrong_pin'){document.getElementById('pin-inp').className='inp er';document.getElementById('pin-inp').value='';checkRegBtn();}
@@ -2573,7 +2596,7 @@ async function submitPinSetup(){
   if(needAgree())return;
   const btn=document.getElementById('ps-set-btn');
   btn.disabled=true;btn.textContent='作成中...';hideLoginErr();
-  const r=await gasPost('setPin',{email,code,pin});
+  const r=await gasPost('setPin',{email,code,pin,agree:agreed()});
   btn.textContent='パスコードを作ってログイン';checkRegBtn();
   if(!r||!r.ok){showLoginErr(pinErrorMessage(r));return;}
   ['ps-code','ps-pin','ps-pin2'].forEach(id=>document.getElementById(id).value='');
@@ -3067,6 +3090,29 @@ function clearResume(){
 }
 function openLogoutConfirm(){document.getElementById('logout-modal').classList.add('open');}
 function closeLogoutConfirm(){document.getElementById('logout-modal').classList.remove('open');}
+// ── 利用規約・プライバシーポリシーへの同意画面（2026-11-23）──
+function openConsent(){
+  const c=document.getElementById('consent-chk');if(c)c.checked=false;
+  onConsentChk();document.getElementById('consent-err').className='email-fb';
+  document.getElementById('consent-modal').classList.add('open');
+}
+function closeConsent(){document.getElementById('consent-modal')?.classList.remove('open');}
+function onConsentChk(){
+  const on=!!document.getElementById('consent-chk')?.checked;
+  document.getElementById('consent-agree-box').classList.toggle('on',on);
+  const b=document.getElementById('consent-btn');if(b.textContent!=='送信中...')b.disabled=!on;
+}
+async function submitConsent(){
+  if(!document.getElementById('consent-chk').checked)return;
+  const b=document.getElementById('consent-btn');b.disabled=true;b.textContent='送信中...';
+  document.getElementById('consent-err').className='email-fb';
+  const va=DEMO?{}:await getVoterAuth();
+  const r=va?await gasPost('agreeTerms',{nick:curUser?.nick,agree:true,...va}).catch(()=>null):null;
+  b.textContent='同意して続ける';onConsentChk();
+  if(r&&r.ok){closeConsent();return;}
+  document.getElementById('consent-err-txt').textContent=r&&isAuthHardError(r.error)?loginErrorMessage(r.error):'送信できませんでした。通信環境を確認して、もう一度お試しください。';
+  document.getElementById('consent-err').className='email-fb er';
+}
 function logout(){
   document.getElementById('logout-modal').classList.remove('open');
   submitted=false;sentLocked={};
