@@ -637,7 +637,7 @@ body.ia-open{overflow:hidden}
     <!-- ログイン方法の案内（2026-10 から全員パスコード） -->
     <div class="new-login-note"><i class="ti ti-info-circle" style="font-size:15px;vertical-align:-2px"></i> ログイン方法が新しくなりました。<br>はじめての方は「はじめて」から、パスコードを作ってください（最初の1回だけ）。</div>
     <!-- プランに加入してからログインできるまでの目安（2026-11-23） -->
-    <div class="join-note"><div class="jn-ttl"><i class="ti ti-clock"></i> プランに加入したばかりの方へ</div><div class="jn-main">加入した日の<b>翌日 12:00</b>から<br>ログインできるようになります</div><div class="jn-ex">例）11月23日に加入 → 11月24日 12:00 からログインOK</div></div>
+    <div class="join-note"><div class="jn-ttl"><i class="ti ti-clock"></i> プランに加入したばかりの方へ</div><div class="jn-main" id="jn-main">加入した日の<b>翌日 12:00</b>から<br>ログインできるようになります</div><div class="jn-ex" id="jn-ex"></div></div>
 
     <!-- はじめて／2回目から の切り替え -->
     <div class="login-tabs" role="tablist">
@@ -1972,7 +1972,22 @@ function tickCd(){
 }
 
 // バナー描画
+// ログイン画面の「加入したばかりの方へ」：投票期間中は毎日12:00（初日を除く）、期間外は毎週月曜日に会員情報を反映する（2026-11-23）
+function updateJoinNote(){
+  const m=document.getElementById('jn-main'),x=document.getElementById('jn-ex');if(!m||!x)return;
+  const now=new Date();
+  const live=events.some(e=>{const a=getEvStart(e),b=getEvEnd(e);return e.active&&a&&b&&now>=a&&now<=b;});
+  if(live){
+    const t=new Date(now.getTime()+86400000);
+    m.innerHTML='加入した日の<b>翌日 12:00</b>から<br>ログインできるようになります';
+    x.textContent=`例）今日 ${now.getMonth()+1}月${now.getDate()}日に加入 → ${t.getMonth()+1}月${t.getDate()}日 12:00 からログインOK`;
+  }else{
+    m.innerHTML='加入後、<b>次の月曜日</b>から<br>ログインできるようになります';
+    x.textContent='投票期間中は、加入した日の翌日 12:00 からログインできます';
+  }
+}
 function applyEvUI(){
+  try{updateJoinNote();}catch(e){}
   const pub=getPublicEvents();
   const lb=document.getElementById('login-banner');
   // 公開中のイベントが1つも無い場合：ログイン画面バナーに案内を出す
