@@ -1972,19 +1972,30 @@ function tickCd(){
 }
 
 // バナー描画
-// ログイン画面の「加入したばかりの方へ」：投票期間中は毎日12:00（初日を除く）、期間外は毎週月曜日に会員情報を反映する（2026-11-23）
+// ログイン画面の「加入したばかりの方へ」（2026-11-23 運営ルール）
+//  ・投票期間中に加入、または投票の開始日に加入 → 翌日 12:00 からログインできる
+//  ・投票期間外に加入 → 次の月曜日。ただし、次の月曜日より前に投票が始まるなら、その開始日時から
+function joinLoginAt(now){
+  now=now||new Date();
+  const day=d=>new Date(d.getFullYear(),d.getMonth(),d.getDate());
+  const today=day(now);
+  const evs=events.map(e=>({a:getEvStart(e),b:getEvEnd(e)})).filter(x=>x.a&&x.b);
+  const tomorrowNoon=new Date(today.getFullYear(),today.getMonth(),today.getDate()+1,12,0,0);
+  if(evs.some(x=>(now>=x.a&&now<=x.b)||day(x.a).getTime()===today.getTime()))return{at:tomorrowNoon,kind:'live'};
+  const mon=new Date(today);mon.setDate(today.getDate()+(((8-today.getDay())%7)||7)); // 次の月曜日（今日が月曜なら来週）
+  const next=evs.filter(x=>x.a>now).sort((p,q)=>p.a-q.a)[0];
+  if(next&&next.a<mon)return{at:next.a,kind:'start'};
+  return{at:mon,kind:'monday'};
+}
 function updateJoinNote(){
   const m=document.getElementById('jn-main'),x=document.getElementById('jn-ex');if(!m||!x)return;
-  const now=new Date();
-  const live=events.some(e=>{const a=getEvStart(e),b=getEvEnd(e);return e.active&&a&&b&&now>=a&&now<=b;});
-  if(live){
-    const t=new Date(now.getTime()+86400000);
-    m.innerHTML='加入した日の<b>翌日 12:00</b>から<br>ログインできるようになります';
-    x.textContent=`例）今日 ${now.getMonth()+1}月${now.getDate()}日に加入 → ${t.getMonth()+1}月${t.getDate()}日 12:00 からログインOK`;
-  }else{
-    m.innerHTML='加入後、<b>次の月曜日</b>から<br>ログインできるようになります';
-    x.textContent='投票期間中は、加入した日の翌日 12:00 からログインできます';
-  }
+  const now=new Date(),r=joinLoginAt(now);
+  const W='日月火水木金土',d=r.at;
+  const dt=`${d.getMonth()+1}月${d.getDate()}日（${W[d.getDay()]}）`+(r.kind==='monday'?'':` ${pad(d.getHours())}:${pad(d.getMinutes())}`);
+  m.innerHTML=`今日（${now.getMonth()+1}月${now.getDate()}日）加入した方は<br><b>${dt}</b>から<br>ログインできます`;
+  x.innerHTML=r.kind==='live'?'投票期間中は、加入した日の翌日 12:00 からログインできます'
+    :r.kind==='start'?'投票の開始日から、ログインできるようになります'
+    :'投票期間外は、毎週月曜日にまとめて反映します';
 }
 function applyEvUI(){
   try{updateJoinNote();}catch(e){}
