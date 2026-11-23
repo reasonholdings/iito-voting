@@ -2561,7 +2561,7 @@ async function doPinLogin(){
   if(needAgree())return;
   const btn=document.getElementById('reg-btn');
   btn.disabled=true;btn.textContent='確認中...';hideLoginErr();
-  const r=await gasPost('pinLogin',{email,pin,agree:agreed()});
+  const r=await gasPost('pinLogin',{email,pin,agree:agreed(),ua:navigator.userAgent});
   btn.textContent='ログイン';checkRegBtn();
   if(!r||!r.ok){
     if(r&&r.error==='wrong_pin'){document.getElementById('pin-inp').className='inp er';document.getElementById('pin-inp').value='';checkRegBtn();}
@@ -2596,7 +2596,7 @@ async function submitPinSetup(){
   if(needAgree())return;
   const btn=document.getElementById('ps-set-btn');
   btn.disabled=true;btn.textContent='作成中...';hideLoginErr();
-  const r=await gasPost('setPin',{email,code,pin,agree:agreed()});
+  const r=await gasPost('setPin',{email,code,pin,agree:agreed(),ua:navigator.userAgent});
   btn.textContent='パスコードを作ってログイン';checkRegBtn();
   if(!r||!r.ok){showLoginErr(pinErrorMessage(r));return;}
   ['ps-code','ps-pin','ps-pin2'].forEach(id=>document.getElementById(id).value='');
@@ -3107,7 +3107,7 @@ async function submitConsent(){
   const b=document.getElementById('consent-btn');b.disabled=true;b.textContent='送信中...';
   document.getElementById('consent-err').className='email-fb';
   const va=DEMO?{}:await getVoterAuth();
-  const r=va?await gasPost('agreeTerms',{nick:curUser?.nick,agree:true,...va}).catch(()=>null):null;
+  const r=va?await gasPost('agreeTerms',{nick:curUser?.nick,agree:true,ua:navigator.userAgent,...va}).catch(()=>null):null;
   b.textContent='同意して続ける';onConsentChk();
   if(r&&r.ok){closeConsent();return;}
   document.getElementById('consent-err-txt').textContent=r&&isAuthHardError(r.error)?loginErrorMessage(r.error):'送信できませんでした。通信環境を確認して、もう一度お試しください。';
