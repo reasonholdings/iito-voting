@@ -1477,11 +1477,13 @@ function setPin(data) {
     if (pr) sh.getRange(pr.row, 1, 1, 5).setValues([row]); else sh.appendRow(row);
     cache.remove('pc_' + key);
     cache.remove('pf_' + key);
-    if (data.agree === true) recordConsent_(m.nick, 'ログイン画面');
-    return { ok: true, token: issueVoterToken_(email, ver), nick: m.nick };
+    var res = { ok: true, token: issueVoterToken_(email, ver), nick: m.nick };
   } finally {
     lock.releaseLock();
   }
+  // 同意の記録は、パスコードの保存が終わってから（同じロックを二重に取らないため）
+  if (data.agree === true) recordConsent_(m, 'ログイン画面（はじめて・パスコード作成）', data.ua);
+  return res;
 }
 
 // ③ メールアドレス＋暗証番号でログイン
@@ -1500,7 +1502,7 @@ function pinLogin(data) {
     return { ok: false, error: 'wrong_pin' };
   }
   cache.remove('pf_' + key);
-  if (data.agree === true) recordConsent_(m.nick, 'ログイン画面');
+  if (data.agree === true) recordConsent_(m, 'ログイン画面（パスコードでログイン）', data.ua);
   return { ok: true, token: issueVoterToken_(email, pr.ver), nick: m.nick };
 }
 
@@ -1509,29 +1511,51 @@ function pinLogin(data) {
 //  ・ログイン画面でチェックを入れてログインしたとき、または同意画面で「同意して続ける」を押したときに記録する
 //  ・いまの版（TERMS_VERSION）に同意した記録が無い会員には、アプリが同意画面を出す（端末をまたいでも記録はサーバーにあるので、一度だけ）
 // ════════════════════════════════════════
+// 同意の記録（証拠として残す。同意のたびに1行ずつ追加し、消したり書き換えたりしない）
+//  列：日時／会員番号／ニックネーム／メールアドレス／規約の版／同意した画面／端末（ブラウザの情報）
+const CONSENT_HEAD = ['日時', '会員番号', 'ニックネーム', 'メールアドレス', '規約の版', '同意した画面', '端末'];
 function consentSheet_() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sh = ss.getSheetByName(SHEET_CONSENT);
-  if (!sh) { sh = ss.insertSheet(SHEET_CONSENT); sh.appendRow(['ニックネーム', '版', '同意した画面', '日時']); sh.setFrozenRows(1); }
+  if (sh && String(sh.getRange(1, 1).getValue()) === 'ニックネーム') {
+    // 旧い形（ニックネーム／版／同意した画面／日時）のシートがあれば、新しい形に移し替える（記録は消さない）
+    const old = sh.getLastRow() > 1 ? sh.getRange(2, 1, sh.getLastRow() - 1, 4).getValues() : [];
+    sh.setName(SHEET_CONSENT + '（旧）');
+    sh = null;
+    const ns = ss.insertSheet(SHEET_CONSENT);
+    ns.getRange(1, 1, 1, CONSENT_HEAD.length).setValues([CONSENT_HEAD]); ns.setFrozenRows(1);
+    if (old.length) ns.getRange(2, 1, old.length, CONSENT_HEAD.length).setValues(old.map(function(r){ return [r[3], '', r[0], '', r[1], r[2], '']; }));
+    return ns;
+  }
+  if (!sh) {
+    sh = ss.insertSheet(SHEET_CONSENT);
+    sh.getRange(1, 1, 1, CONSENT_HEAD.length).setValues([CONSENT_HEAD]); sh.setFrozenRows(1);
+  }
   return sh;
 }
 function hasConsent_(nick) {
-  const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_CONSENT);
-  if (!sh || sh.getLastRow() <= 1) return false;
-  const rows = sh.getRange(2, 1, sh.getLastRow() - 1, 2).getValues();
+  const sh = consentSheet_();
+  if (sh.getLastRow() <= 1) return false;
+  const rows = sh.getRange(2, 3, sh.getLastRow() - 1, 3).getValues(); // ニックネーム／メールアドレス／規約の版
   for (var i = rows.length - 1; i >= 0; i--) {
-    if (String(rows[i][0]).trim() === String(nick).trim() && String(rows[i][1]).trim() === TERMS_VERSION) return true;
+    if (String(rows[i][0]).trim() === String(nick).trim() && String(rows[i][2]).trim() === TERMS_VERSION) return true;
   }
   return false;
 }
-function recordConsent_(nick, via) {
-  if (!nick || hasConsent_(nick)) return;
-  consentSheet_().appendRow([nick, TERMS_VERSION, via, new Date()]);
+// 同意したら必ず1行残す（ログインのたびの同意も、それぞれ記録する）
+function recordConsent_(member, via, ua) {
+  if (!member || !member.nick) return;
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    consentSheet_().appendRow([new Date(), String(member.mid || ''), member.nick, String(member.email || ''),
+                               TERMS_VERSION, via, String(ua || '').slice(0, 300)]);
+  } finally { lock.releaseLock(); }
 }
 function agreeTerms(data) {
   const a = authVoter_(data);
   if (a.error) return { ok: false, error: a.error };
   if (data.agree !== true) return { ok: false, error: 'not_agreed' };
-  recordConsent_(a.member.nick, '同意画面');
+  recordConsent_(a.member, '同意画面', data.ua);
   return { ok: true, termsVer: TERMS_VERSION };
 }
