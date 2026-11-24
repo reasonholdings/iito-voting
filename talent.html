@@ -126,6 +126,7 @@ body.tv .tabs button.on{background:#2C2C34;color:var(--tx2)}
 .vr .n{font-size:16px;font-weight:900;color:var(--sub2);text-align:center;font-variant-numeric:tabular-nums}
 .vr .nm{font-size:15px;font-weight:700;color:var(--tx2);word-break:break-all;line-height:1.35;padding:8px 0}
 .vr .q{text-align:right;font-size:14px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--tx2)}
+.vr .q.p{color:#C9B8FB}.vr .q.y{color:#FFCD94}.vr .q.f{color:#A8E0F7}
 .vr .q.z{color:#4A4A52}
 .vr .tv2{text-align:right;font-size:17px;font-weight:900;color:var(--tx2);font-variant-numeric:tabular-nums}
 .vr.k1 .n{color:var(--gd);font-size:20px}.vr.k2 .n{color:var(--sv);font-size:19px}.vr.k3 .n{color:var(--bz);font-size:19px}
@@ -204,8 +205,8 @@ async function gas(action,payload={}){
 }
 
 // ════════ 演者の画面 ════════
-let view={tab:'voters',evId:'',data:null,timer:null};
-try{view.tab=sessionStorage.getItem('talent_tab')||'voters';}catch(e){}
+let view={tab:'ranking',evId:'',data:null,timer:null};
+try{view.tab=sessionStorage.getItem('talent_tab')||'ranking';}catch(e){}
 async function loadTalent(){
   const k=Q.get('k')||'';
   if(!k&&!DEMO){showErr('リンクが正しくありません','運営から届いた専用リンクを、もう一度開いてください。');return;}
@@ -253,21 +254,25 @@ function renderTalent(){
   }
   // 見せるのは「いまの順位」と「ランキング」「誰が自分に投票したか（プラン・有料・無料の内訳）」（2026-11-24）。見られるのは開催中のイベントだけ
   const head=`<div class="hd"><div class="evn">${esc(d.event.name)}</div></div>
-  <div class="hero2">
+  ${view.tab==='ranking'?`<div class="hero">
+    <div class="nm">${esc(d.model.name)}</div>
+    ${me?`<div class="rk-lbl">いまの順位（${rs.length}人中）</div><div class="rk-big">${me.rank}<small>位</small></div>${gap?`<div class="gap">${gap}</div>`:''}`:''}
+    <div class="tot">合計 <b>${num(T.total)}</b>票</div>
+  </div>`:`<div class="hero2">
     ${me?`<div class="h2r"><div class="h2l">いまの順位<span>（${rs.length}人中）</span></div><div class="h2v">${me.rank}<small>位</small></div></div>`:''}
     <div class="h2m">
       <div class="h2nm">${esc(d.model.name)}</div>
       ${gap?`<div class="h2gap">${gap}</div>`:''}
       <div class="h2tot">合計 <b>${num(T.total)}</b>票</div>
     </div>
-  </div>
-  <div class="tabs"><button class="${view.tab==='voters'?'on':''}" onclick="setTab('voters')">投票してくれた人</button><button class="${view.tab==='ranking'?'on':''}" onclick="setTab('ranking')">ランキング</button></div>`;
+  </div>`}
+  <div class="tabs"><button class="${view.tab==='ranking'?'on':''}" onclick="setTab('ranking')">ランキング</button><button class="${view.tab==='voters'?'on':''}" onclick="setTab('voters')">投票してくれた人</button></div>`;
   const k=r=>r<=3?' k'+r:'';
   let body='';
   if(view.tab==='voters'){
     // 1人1行：順位・名前・プラン・有料・無料・合計を横に並べる（見出しは上に1回だけ）
-    const z=v=>`<span class="q${v?'':' z'}">${num(v)}</span>`;
-    body=vs.length?`<div class="vt"><div class="vh"><span>順位</span><span>名前</span><span class="qh p">プラン</span><span class="qh y">有料</span><span class="qh f">無料</span><span class="qh">合計</span></div>${vs.map(v=>`<div class="vr${k(v.rank)}"><span class="n">${v.rank}</span><span class="nm">${esc(v.nick)}</span>${z(v.plan)}${z(v.paid)}${z(v.free)}<span class="tv2">${num(v.total)}</span></div>`).join('')}</div>`
+    const z=(v,c)=>`<span class="q ${c}${v?'':' z'}">${num(v)}</span>`;
+    body=vs.length?`<div class="vt"><div class="vh"><span>順位</span><span>名前</span><span class="qh p">プラン</span><span class="qh y">有料</span><span class="qh f">無料</span><span class="qh">合計</span></div>${vs.map(v=>`<div class="vr${k(v.rank)}"><span class="n">${v.rank}</span><span class="nm">${esc(v.nick)}</span>${z(v.plan,'p')}${z(v.paid,'y')}${z(v.free,'f')}<span class="tv2">${num(v.total)}</span></div>`).join('')}</div>`
       :'<div class="empty">まだ投票がありません。</div>';
   }else{
     body=`<div class="list">${rs.map(x=>`<div class="r${k(x.rank)}${x.me?' me':''}"><span class="n">${x.rank}</span><span class="b"><span class="nm">${esc(x.name)}</span>${x.me?'<span class="pt you">あなた</span>':''}</span><span class="v">${num(x.total)}<small>票</small></span></div>`).join('')}</div>`;
