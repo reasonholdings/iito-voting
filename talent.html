@@ -69,7 +69,8 @@ html,body{margin:0;background:var(--bg);color:var(--tx);font-family:'Noto Sans J
 .err h2{color:var(--ac);font-size:18px}
 .demo{background:#FFF4E5;border-bottom:1px solid #F0A020;color:#7A4A00;font-size:12px;text-align:center;padding:8px 14px}
 /* ════ 演者の画面：黒地＋ゴールド。見やすさ・わかりやすさを最優先にした、シンプルな形（2026-11-24） ════ */
-body.tv{--gd:#E8C766;--sv:#D6DCE4;--bz:#E0A97E;--bk:#0E0E11;--bk2:#18181D;--ln:#2A2A31;--tx2:#FFFFFF;--sub2:#A6A6B0;background:var(--bk);color:var(--tx2)}
+html:has(body.tv){background:#0E0E11}
+body.tv{min-height:100vh;--gd:#E8C766;--sv:#D6DCE4;--bz:#E0A97E;--bk:#0E0E11;--bk2:#18181D;--ln:#2A2A31;--tx2:#FFFFFF;--sub2:#A6A6B0;background:var(--bk);color:var(--tx2)}
 body.tv .wrap{max-width:720px;padding-top:16px}
 .tv-ev{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap;font-size:13px;color:var(--sub2)}
 .tv-ev .evn{font-weight:700;color:var(--sub2)}
@@ -129,6 +130,31 @@ body.tv .tabs button.on{background:#2C2C34;color:var(--tx2)}
 .vr .tv2{text-align:right;font-size:17px;font-weight:900;color:var(--tx2);font-variant-numeric:tabular-nums}
 .vr.k1 .n{color:var(--gd);font-size:20px}.vr.k2 .n{color:var(--sv);font-size:19px}.vr.k3 .n{color:var(--bz);font-size:19px}
 @media (max-width:400px){.vh,.vr{grid-template-columns:24px minmax(0,1fr) 40px 34px 34px 50px;gap:4px;padding:0 8px}.vr .nm{font-size:14px}.vr .q{font-size:13px}.vr .tv2{font-size:15px}}
+/* 上部をコンパクトに：投票してくれた人の一覧が、開いてすぐ目に入るように（2026-11-24） */
+.hero2{display:flex;align-items:center;gap:16px;padding:12px 4px 14px;border-bottom:1px solid var(--ln)}
+.h2r{flex:0 0 auto;text-align:center;min-width:92px}
+.h2l{font-size:11px;color:var(--sub2);white-space:nowrap}
+.h2l span{font-size:10px}
+.h2v{font-size:54px;font-weight:900;line-height:1;color:var(--gd);font-variant-numeric:tabular-nums}
+.h2v small{font-size:20px;margin-left:1px}
+.h2m{flex:1;min-width:0}
+.h2nm{font-size:20px;font-weight:900;color:var(--tx2);word-break:break-all;line-height:1.3}
+.h2gap{font-size:14px;font-weight:700;color:var(--tx2);margin-top:4px}
+.h2gap b{color:var(--gd);font-size:18px;margin:0 2px}
+.h2tot{font-size:13px;color:var(--sub2);margin-top:2px}
+.h2tot b{font-size:17px;color:var(--tx2);font-variant-numeric:tabular-nums}
+.hd .evn{font-size:12px}
+body.tv .tabs{margin:10px 0 8px}
+body.tv .tabs button{padding:8px;font-size:14px}
+.vt{gap:3px!important}
+.vr{min-height:36px!important;border-radius:8px!important}
+.vr .nm{font-size:14px!important;padding:5px 0!important}
+.vr .n{font-size:14px!important}.vr.k1 .n{font-size:17px!important}.vr.k2 .n,.vr.k3 .n{font-size:16px!important}
+.vr .q{font-size:13px!important}.vr .tv2{font-size:15px!important}
+.r{padding:8px 12px!important;border-radius:8px!important}
+.list{gap:3px!important}
+.r .v{font-size:16px!important}.r .nm{font-size:14px!important}
+.r.k1,.r.k2,.r.k3{padding:10px 12px!important}
 .pt{font-size:11px;font-weight:700;border-radius:6px;padding:1px 7px;white-space:nowrap;line-height:1.6}
 .pt.supporter{background:#1E3446;color:#9FD2F7}.pt.partner{background:#1B3A2C;color:#8FE0B8}.pt.producer{background:#2E2548;color:#C9B8FB}
 .pt.guest{background:#2A2A31;color:#B5B5BE}.pt.you{background:var(--gd);color:#1A1500}
@@ -178,8 +204,8 @@ async function gas(action,payload={}){
 }
 
 // ════════ 演者の画面 ════════
-let view={tab:'ranking',evId:'',data:null,timer:null};
-try{view.tab=sessionStorage.getItem('talent_tab')||'ranking';}catch(e){}
+let view={tab:'voters',evId:'',data:null,timer:null};
+try{view.tab=sessionStorage.getItem('talent_tab')||'voters';}catch(e){}
 async function loadTalent(){
   const k=Q.get('k')||'';
   if(!k&&!DEMO){showErr('リンクが正しくありません','運営から届いた専用リンクを、もう一度開いてください。');return;}
@@ -227,12 +253,15 @@ function renderTalent(){
   }
   // 見せるのは「いまの順位」と「ランキング」「誰が自分に投票したか（プラン・有料・無料の内訳）」（2026-11-24）。見られるのは開催中のイベントだけ
   const head=`<div class="hd"><div class="evn">${esc(d.event.name)}</div></div>
-  <div class="hero">
-    <div class="nm">${esc(d.model.name)}</div>
-    ${me?`<div class="rk-lbl">いまの順位（${rs.length}人中）</div><div class="rk-big">${me.rank}<small>位</small></div>${gap?`<div class="gap">${gap}</div>`:''}`:''}
-    <div class="tot">合計 <b>${num(T.total)}</b>票</div>
+  <div class="hero2">
+    ${me?`<div class="h2r"><div class="h2l">いまの順位<span>（${rs.length}人中）</span></div><div class="h2v">${me.rank}<small>位</small></div></div>`:''}
+    <div class="h2m">
+      <div class="h2nm">${esc(d.model.name)}</div>
+      ${gap?`<div class="h2gap">${gap}</div>`:''}
+      <div class="h2tot">合計 <b>${num(T.total)}</b>票</div>
+    </div>
   </div>
-  <div class="tabs"><button class="${view.tab==='ranking'?'on':''}" onclick="setTab('ranking')">ランキング</button><button class="${view.tab==='voters'?'on':''}" onclick="setTab('voters')">投票してくれた人</button></div>`;
+  <div class="tabs"><button class="${view.tab==='voters'?'on':''}" onclick="setTab('voters')">投票してくれた人</button><button class="${view.tab==='ranking'?'on':''}" onclick="setTab('ranking')">ランキング</button></div>`;
   const k=r=>r<=3?' k'+r:'';
   let body='';
   if(view.tab==='voters'){
