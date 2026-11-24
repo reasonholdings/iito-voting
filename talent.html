@@ -165,6 +165,16 @@ body.tv .upd button{background:var(--bk2);border-color:var(--ln);color:var(--tx2
 body.tv .foot{color:#5C5C66}
 body.tv .err h2{color:var(--gd)}
 body.tv .demo{background:#2A2210;border-color:#6B5520;color:#F1D58A}
+/* 更新中の表示 */
+.boot{min-height:70vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;color:#A6A6B0;font-size:14px;font-weight:700}
+.spin{display:inline-block;width:14px;height:14px;border:2px solid rgba(232,199,102,.25);border-top-color:#E8C766;border-radius:50%;animation:spin .8s linear infinite;vertical-align:-2px;margin-right:6px}
+.spin.lg{width:36px;height:36px;border-width:3px;margin:0}
+.spin.sm{width:11px;height:11px;margin-right:4px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.busy{position:fixed;top:10px;left:50%;transform:translate(-50%,-80px);z-index:50;background:#2C2C34;color:#FFF;border:1px solid #E8C766;border-radius:999px;padding:8px 18px;font-size:13px;font-weight:700;box-shadow:0 6px 20px rgba(0,0,0,.4);transition:transform .25s ease;white-space:nowrap}
+.busy.on{transform:translate(-50%,0)}
+.busy.ok{border-color:#4CC98C;color:#9FE8C3}
+body.tv .upd button:disabled{opacity:.7;cursor:default}
 /* 管理（リンク発行） */
 .adm{max-width:720px;margin:0 auto;padding:24px 16px 48px}
 .adm h1{font-size:20px;color:var(--ac);margin:0 0 6px}
@@ -207,14 +217,31 @@ async function gas(action,payload={}){
 // ════════ 演者の画面 ════════
 let view={tab:'ranking',evId:'',data:null,timer:null};
 try{view.tab=sessionStorage.getItem('talent_tab')||'ranking';}catch(e){}
+// 更新中の表示（2026-11-24）：はじめは画面の真ん中に「読み込み中」、表示した後の更新は上に「更新中」の帯を出す
+let loadingNow=false;
+function setBusy(on,done){
+  let el=document.getElementById('busy');
+  if(!el){el=document.createElement('div');el.id='busy';document.body.appendChild(el);}
+  if(on){el.className='busy on';el.innerHTML='<span class="spin"></span>更新中...';}
+  else if(done){el.className='busy on ok';el.innerHTML='✓ 最新になりました';clearTimeout(el._t);el._t=setTimeout(()=>{el.className='busy';},1500);}
+  else el.className='busy';
+  const b=document.getElementById('upd-btn');if(b){b.disabled=!!on;b.innerHTML=on?'<span class="spin sm"></span>更新中':'いま更新';}
+}
 async function loadTalent(){
   const k=Q.get('k')||'';
   if(!k&&!DEMO){showErr('リンクが正しくありません','運営から届いた専用リンクを、もう一度開いてください。');return;}
-  const r=await gas('talentView',{k,evId:view.evId});
-  if(!r){if(!view.data)showErr('読み込めませんでした','通信環境を確認して、ページを開き直してください。');return;}
+  if(loadingNow)return;loadingNow=true;
+  if(!view.data){document.body.classList.add('tv');app.innerHTML='<div class="boot"><span class="spin lg"></span><div>読み込み中...</div></div>';}
+  else setBusy(true);
+  let r=null;
+  try{r=await gas('talentView',{k,evId:view.evId});}finally{loadingNow=false;}
+  if(DEMO)await new Promise(x=>setTimeout(x,400));
+  if(!r){setBusy(false);if(!view.data)showErr('読み込めませんでした','通信環境を確認して、ページを開き直してください。');return;}
+  const had=!!view.data;
   if(!r.ok){showErr('このリンクは使えません','リンクの有効期限が切れたか、停止されています。運営にお問い合わせください。');stopTimer();return;}
   view.data=r;if(r.event)view.evId=r.event.id;
   renderTalent();
+  if(had)setBusy(false,true);
 }
 function showErr(t,m){document.body.classList.add('tv');app.innerHTML=`<div class="err"><h2>${esc(t)}</h2><p>${esc(m)}</p></div>`;}
 function stopTimer(){if(view.timer)clearInterval(view.timer);view.timer=null;}
@@ -278,7 +305,7 @@ function renderTalent(){
     body=`<div class="list">${rs.map(x=>`<div class="r${k(x.rank)}${x.me?' me':''}"><span class="n">${x.rank}</span><span class="b"><span class="nm">${esc(x.name)}</span>${x.me?'<span class="pt you">あなた</span>':''}</span><span class="v">${num(x.total)}<small>票</small></span></div>`).join('')}</div>`;
   }
   app.innerHTML=(DEMO?demoBar():'')+`<div class="wrap">${head}${body}
-    <div class="upd">${stamp}・1分ごとに自動更新 <button onclick="loadTalent()">いま更新</button></div>
+    <div class="upd">${stamp}・1分ごとに自動更新 <button id="upd-btn" onclick="loadTalent()">いま更新</button></div>
     <div class="foot">iito JAPAN</div></div>`;
 }
 function setTab(t){view.tab=t;try{sessionStorage.setItem('talent_tab',t);}catch(e){}renderTalent();}
