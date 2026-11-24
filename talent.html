@@ -109,13 +109,26 @@ body.tv .tabs button.on{background:#2C2C34;color:var(--tx2)}
 .hd{padding:6px 0 4px}
 .hd .evn{font-size:13px;color:var(--sub2)}
 .hd .nm{font-size:26px;font-weight:900;color:var(--tx2);margin-top:4px;word-break:break-all}
-.r .b{display:flex;flex-direction:column;align-items:flex-start;gap:5px}
+.r .b{display:flex;flex-direction:row;align-items:center;flex-wrap:wrap;gap:6px 10px}
 .r .b>.nm{display:flex;align-items:center;gap:6px}
 .cs{display:flex;gap:6px;flex-wrap:wrap}
 .c{display:inline-flex;align-items:baseline;gap:4px;font-size:14px;font-weight:700;border-radius:8px;padding:2px 9px;font-variant-numeric:tabular-nums}
 .c i{font-style:normal;font-size:11px;font-weight:700;opacity:.85}
 .c.p{background:#2E2548;color:#D5C8FF}.c.y{background:#3B2A15;color:#FFCD94}.c.f{background:#17323F;color:#A8E0F7}
 .c.z{opacity:.35}
+.vt{display:flex;flex-direction:column;gap:4px}
+.vh,.vr{display:grid;grid-template-columns:30px minmax(0,1fr) 46px 40px 40px 58px;align-items:center;gap:6px;padding:0 12px}
+.vh{font-size:11px;color:var(--sub2);padding-bottom:2px}
+.vh .qh{text-align:right}
+.vh .qh.p{color:#C9B8FB}.vh .qh.y{color:#FFCD94}.vh .qh.f{color:#A8E0F7}
+.vr{background:var(--bk2);border-radius:10px;min-height:48px}
+.vr .n{font-size:16px;font-weight:900;color:var(--sub2);text-align:center;font-variant-numeric:tabular-nums}
+.vr .nm{font-size:15px;font-weight:700;color:var(--tx2);word-break:break-all;line-height:1.35;padding:8px 0}
+.vr .q{text-align:right;font-size:14px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--tx2)}
+.vr .q.z{color:#4A4A52}
+.vr .tv2{text-align:right;font-size:17px;font-weight:900;color:var(--tx2);font-variant-numeric:tabular-nums}
+.vr.k1 .n{color:var(--gd);font-size:20px}.vr.k2 .n{color:var(--sv);font-size:19px}.vr.k3 .n{color:var(--bz);font-size:19px}
+@media (max-width:400px){.vh,.vr{grid-template-columns:24px minmax(0,1fr) 40px 34px 34px 50px;gap:4px;padding:0 8px}.vr .nm{font-size:14px}.vr .q{font-size:13px}.vr .tv2{font-size:15px}}
 .pt{font-size:11px;font-weight:700;border-radius:6px;padding:1px 7px;white-space:nowrap;line-height:1.6}
 .pt.supporter{background:#1E3446;color:#9FD2F7}.pt.partner{background:#1B3A2C;color:#8FE0B8}.pt.producer{background:#2E2548;color:#C9B8FB}
 .pt.guest{background:#2A2A31;color:#B5B5BE}.pt.you{background:var(--gd);color:#1A1500}
@@ -200,18 +213,32 @@ function renderTalent(){
   const d=view.data;if(!d)return;
   const at=new Date(d.at);
   const stamp=`${at.getMonth()+1}/${at.getDate()} ${pad(at.getHours())}:${pad(at.getMinutes())}時点`;
-  if(!d.event){app.innerHTML=(DEMO?demoBar():'')+`<div class="wrap"><div class="hd"><div class="nm">${esc(d.model.name)}</div></div><div class="empty">まだ始まった投票イベントがありません。</div><div class="foot">iito JAPAN</div></div>`;return;}
+  if(!d.event){app.innerHTML=(DEMO?demoBar():'')+`<div class="wrap"><div class="hd"><div class="nm">${esc(d.model.name)}</div></div><div class="empty">いま開催中の投票イベントはありません。</div><div class="foot">iito JAPAN</div></div>`;return;}
   const rs=d.ranking||[],vs=d.voters||[];
-  const evSel=d.events.length>1?`<select class="ev-sel" onchange="view.evId=this.value;loadTalent()">${d.events.map(e=>`<option value="${esc(e.id)}"${e.id===d.event.id?' selected':''}>${esc(e.name)}</option>`).join('')}</select>`:'';
-  // 見せるのは「ランキング」と「誰が自分に投票したか（プラン・有料・無料の内訳）」の2つだけ（2026-11-24）
-  const head=`<div class="hd"><div class="evn">${esc(d.event.name)}</div>${evSel}<div class="nm">${esc(d.model.name)}</div></div>
+  const me=rs.find(x=>x.me);
+  const T=d.totals||{plan:0,free:0,paid:0,total:0};
+  // 1つ上の順位を抜くのに必要な票数（1位なら、2位との差）
+  let gap='';
+  if(me){
+    const above=rs.filter(x=>x.total>me.total).sort((a,b)=>a.total-b.total)[0];
+    if(me.total===0)gap='まだ投票がありません';
+    else if(above)gap=`${above.rank}位まで あと<b>${num(above.total-me.total+1)}</b>票`;
+    else{const next=rs.filter(x=>!x.me&&x.total<me.total).sort((a,b)=>b.total-a.total)[0];gap=next?`2位と<b>${num(me.total-next.total)}</b>票差でトップ`:'トップです';}
+  }
+  // 見せるのは「いまの順位」と「ランキング」「誰が自分に投票したか（プラン・有料・無料の内訳）」（2026-11-24）。見られるのは開催中のイベントだけ
+  const head=`<div class="hd"><div class="evn">${esc(d.event.name)}</div></div>
+  <div class="hero">
+    <div class="nm">${esc(d.model.name)}</div>
+    ${me?`<div class="rk-lbl">いまの順位（${rs.length}人中）</div><div class="rk-big">${me.rank}<small>位</small></div>${gap?`<div class="gap">${gap}</div>`:''}`:''}
+    <div class="tot">合計 <b>${num(T.total)}</b>票</div>
+  </div>
   <div class="tabs"><button class="${view.tab==='ranking'?'on':''}" onclick="setTab('ranking')">ランキング</button><button class="${view.tab==='voters'?'on':''}" onclick="setTab('voters')">投票してくれた人</button></div>`;
   const k=r=>r<=3?' k'+r:'';
   let body='';
   if(view.tab==='voters'){
-    const cell=(l,v,c)=>`<span class="c ${c}${v?'':' z'}"><i>${l}</i>${num(v)}</span>`;
-    body=vs.length?`<div class="list">${vs.map(v=>`<div class="r${k(v.rank)}"><span class="n">${v.rank}</span><span class="b"><span class="nm${v.guest?' guest':''}">${esc(v.nick)}</span><span class="cs">${cell('プラン',v.plan,'p')}${cell('有料',v.paid,'y')}${cell('無料',v.free,'f')}</span></span><span class="v">${num(v.total)}<small>票</small></span></div>`).join('')}</div>
-`
+    // 1人1行：順位・名前・プラン・有料・無料・合計を横に並べる（見出しは上に1回だけ）
+    const z=v=>`<span class="q${v?'':' z'}">${num(v)}</span>`;
+    body=vs.length?`<div class="vt"><div class="vh"><span>順位</span><span>名前</span><span class="qh p">プラン</span><span class="qh y">有料</span><span class="qh f">無料</span><span class="qh">合計</span></div>${vs.map(v=>`<div class="vr${k(v.rank)}"><span class="n">${v.rank}</span><span class="nm">${esc(v.nick)}</span>${z(v.plan)}${z(v.paid)}${z(v.free)}<span class="tv2">${num(v.total)}</span></div>`).join('')}</div>`
       :'<div class="empty">まだ投票がありません。</div>';
   }else{
     body=`<div class="list">${rs.map(x=>`<div class="r${k(x.rank)}${x.me?' me':''}"><span class="n">${x.rank}</span><span class="b"><span class="nm">${esc(x.name)}</span>${x.me?'<span class="pt you">あなた</span>':''}</span><span class="v">${num(x.total)}<small>票</small></span></div>`).join('')}</div>`;
