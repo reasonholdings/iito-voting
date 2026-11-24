@@ -4694,14 +4694,15 @@ async function loadPaidCSV(input){
   const summary=evIds.map(id=>{const e=events.find(x=>x.id===id);const v=Object.values(per[id]).reduce((a,o)=>a+Object.values(o).reduce((x,y)=>x+y,0),0);return `・${e?.name||id}：${Object.keys(per[id]).length}人／${v}票`;}).join('\n');
   if(!confirm('次のイベントの有料票を、このCSVの内容で入れ替えます。\n\n'+summary+(unk.length?'\n\n※モデルが見つからない商品は数えていません（モデル名を確認してください）':'')+'\n\nよろしいですか？'))return;
   if(st)st.textContent='保存中...';
-  let ok=0,ng=0;
+  let ok=0,ng=0;const ngWhy=[];
   for(const id of evIds){
     const rows=[];Object.entries(perK[id]||{}).forEach(([k,v])=>{const ps=k.split('|'),kind=ps.pop(),mid=ps.pop(),nick=ps.join('|');rows.push({nick,modelId:mid,name:findMod(mid)?.name||'',votes:v,kind});});
     paidVotes[id]=per[id];
-    if(GAS_URL){const r=await gasPost('savePaidVotes',{evId:id,rows}).catch(()=>null);if(r&&r.ok)ok++;else ng++;}else ok++;
+    // 行が多いとURLの長さの上限を超えて送れないため、POSTで送る（2026-11-24）
+    if(GAS_URL){const r=await gasPostBig('savePaidVotes',{evId:id,rows}).catch(()=>null);if(r&&r.ok)ok++;else{ng++;ngWhy.push(!r?'通信エラー':r.error==='unknown action'?'GASが古い（最新のGASをデプロイしてください）':r.error==='admin_required'?'管理者ログインの期限切れ（ログインし直してください）':String(r.error||'エラー'));}}else ok++;
   }
   ls(LS.paid,paidVotes);
-  if(st)st.textContent=`${rowsOk}件の購入を数えました（${evIds.length}イベント）`+(ng?`／サーバーへの保存に失敗 ${ng}件（もう一度読み込んでください）`:'')+(notes.length?'。'+notes.join('／'):'');
+  if(st)st.textContent=`${rowsOk}件の購入を数えました（${evIds.length}イベント）`+(ng?`／サーバーへの保存に失敗 ${ng}件（原因：${[...new Set(ngWhy)].join('、')}）`:'')+(notes.length?'。'+notes.join('／'):'');
   _renderResultLocal();
 }
 
