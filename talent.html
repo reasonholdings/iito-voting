@@ -346,13 +346,13 @@ function renderTalent(){
   if(view.tab==='voters'){
     // 1人1行：順位・名前・プラン・有料・無料・合計を横に並べる（見出しは上に1回だけ）
     const z=(v,c)=>`<span class="q ${c}${v?'':' z'}">${num(v)}</span>`;
-    body=vs.length?`<div class="ban-top">⚠️ この画面のスクリーンショットを載せる・送ることは禁止です。見つけ次第、失格とします。</div><div class="vt"><div class="vh"><span>順位</span><span>名前</span><span class="qh p">プラン</span><span class="qh y">有料</span><span class="qh f">無料</span><span class="qh">合計</span></div>${vs.map(v=>`<div class="vr${k(v.rank)}"><span class="n">${v.rank}</span><span class="nm">${esc(v.nick)}</span>${z(v.plan,'p')}${z(v.paid,'y')}${z(v.free,'f')}<span class="tv2">${num(v.total)}</span></div>`).join('')}</div>`
+    body=vs.length?`<div class="ban-top">⚠️ 本画面のスクリーンショットを第三者へ送信し、又はSNS等へ掲載することを禁止します。違反が確認された場合は、失格といたします。</div><div class="vt"><div class="vh"><span>順位</span><span>名前</span><span class="qh p">プラン</span><span class="qh y">有料</span><span class="qh f">無料</span><span class="qh">合計</span></div>${vs.map(v=>`<div class="vr${k(v.rank)}"><span class="n">${v.rank}</span><span class="nm">${esc(v.nick)}</span>${z(v.plan,'p')}${z(v.paid,'y')}${z(v.free,'f')}<span class="tv2">${num(v.total)}</span></div>`).join('')}</div>`
       :'<div class="empty">まだ投票がありません。</div>';
   }else{
     body=`<div class="list">${rs.map(x=>`<div class="r${k(x.rank)}${x.me?' me':''}"><span class="n">${x.rank}</span><span class="b"><span class="nm">${esc(x.name)}</span>${x.me?'<span class="pt you">あなた</span>':''}</span><span class="v">${num(x.total)}<small>票</small></span></div>`).join('')}</div>`;
   }
   app.innerHTML=(DEMO?demoBar():'')+`<div class="wrap">${head}${body}
-    <div class="secret">🔒 このページは<b>あなた専用</b>です。ファンの方のお名前や票数が載っているため、<b>スクリーンショットやこのページのURLを、他の人に送ったりSNSに載せたりしないでください。</b><br><span class="ban">⚠️「投票者一覧」のスクリーンショットを載せる・送ることは禁止です。見つけ次第、失格とします。</span></div>
+    <div class="secret">🔒 本ページは、<b>ご本人様専用</b>のページです。ファンの皆様のニックネーム及び票数等を掲載しているため、<b>本ページのスクリーンショット及びURLを第三者へ共有すること、並びにSNS等へ掲載することを固く禁じます。</b><br><span class="ban">⚠️「投票者一覧」のスクリーンショットを第三者へ送信し、又はSNS等へ掲載する行為が確認された場合は、失格といたします。</span></div>
     <div class="upd">${stamp}・1分ごとに自動更新 <button id="upd-btn" onclick="loadTalent()">いま更新</button></div>
     <div class="foot">iito JAPAN</div></div>${tabbar}`;
 }
