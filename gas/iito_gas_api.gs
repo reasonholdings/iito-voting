@@ -1714,7 +1714,8 @@ function talentView(data) {
   const memSet = memberNickSet_();
   const voters = Object.keys(mine.by).map(function(n){
     const w = mine.by[n];
-    return { nick: memSet[n] ? n : 'ゲスト', guest: !memSet[n], plans: Object.keys(w.plans), plan: w.plan, free: w.free, paid: w.paid, total: w.plan + w.free + w.paid };
+    // 演者ページでは、会員以外（投票券だけを買った人）もニックネームを表示する（応援ランキングは「ゲスト」のまま。2026-11-24）
+    return { nick: n, guest: false, nonMember: !memSet[n], plans: Object.keys(w.plans), plan: w.plan, free: w.free, paid: w.paid, total: w.plan + w.free + w.paid };
   }).filter(function(x){ return x.total > 0; }).sort(function(a, b){ return b.total - a.total; });
   rk = 0; prev = null;
   voters.forEach(function(x, i){ if (x.total !== prev) { rk = i + 1; prev = x.total; } x.rank = rk; });
