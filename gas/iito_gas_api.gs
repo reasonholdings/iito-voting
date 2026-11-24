@@ -1695,9 +1695,9 @@ function talentView(data) {
   const evs = (getEvents().events || []).map(function(e){
     return { id: String(e.id), name: String(e.name || ''), start: evTime_(e.startDate, e.startTime), end: evTime_(e.endDate, e.endTime) };
   }).filter(function(e){ return e.id && e.start && e.start <= now; }).sort(function(a, b){ return b.start - a.start; });
-  if (!evs.length) return { ok: true, model: { id: t.modelId, name: t.name }, events: [], event: null, at: now };
-  let ev = evs.filter(function(e){ return e.id === String(data.evId || ''); })[0];
-  if (!ev) ev = evs.filter(function(e){ return now <= e.end; })[0] || evs[0]; // 指定が無ければ開催中、無ければいちばん新しいイベント
+  // 見られるのは、いま開催中のイベントだけ（2026-11-24）
+  const ev = evs.filter(function(e){ return now >= e.start && now <= e.end; })[0];
+  if (!ev) return { ok: true, model: { id: t.modelId, name: t.name }, events: [], event: null, at: now };
   const agg = talentAgg_(ev.id);
   const models = talentModels_();
   const names = {}; models.forEach(function(m){ names[m.id] = m.name; });
