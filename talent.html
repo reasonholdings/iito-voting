@@ -106,6 +106,16 @@ body.tv .tabs button.on{background:#2C2C34;color:var(--tx2)}
 .r.k1,.r.k2,.r.k3{padding:15px 14px}
 .r.k1 .nm,.r.k2 .nm,.r.k3 .nm{font-size:17px}
 .r.me{border-color:var(--gd)}
+.hd{padding:6px 0 4px}
+.hd .evn{font-size:13px;color:var(--sub2)}
+.hd .nm{font-size:26px;font-weight:900;color:var(--tx2);margin-top:4px;word-break:break-all}
+.r .b{display:flex;flex-direction:column;align-items:flex-start;gap:5px}
+.r .b>.nm{display:flex;align-items:center;gap:6px}
+.cs{display:flex;gap:6px;flex-wrap:wrap}
+.c{display:inline-flex;align-items:baseline;gap:4px;font-size:14px;font-weight:700;border-radius:8px;padding:2px 9px;font-variant-numeric:tabular-nums}
+.c i{font-style:normal;font-size:11px;font-weight:700;opacity:.85}
+.c.p{background:#2E2548;color:#D5C8FF}.c.y{background:#3B2A15;color:#FFCD94}.c.f{background:#17323F;color:#A8E0F7}
+.c.z{opacity:.35}
 .pt{font-size:11px;font-weight:700;border-radius:6px;padding:1px 7px;white-space:nowrap;line-height:1.6}
 .pt.supporter{background:#1E3446;color:#9FD2F7}.pt.partner{background:#1B3A2C;color:#8FE0B8}.pt.producer{background:#2E2548;color:#C9B8FB}
 .pt.guest{background:#2A2A31;color:#B5B5BE}.pt.you{background:var(--gd);color:#1A1500}
@@ -155,8 +165,8 @@ async function gas(action,payload={}){
 }
 
 // ════════ 演者の画面 ════════
-let view={tab:'voters',evId:'',data:null,timer:null};
-try{view.tab=sessionStorage.getItem('talent_tab')||'voters';}catch(e){}
+let view={tab:'ranking',evId:'',data:null,timer:null};
+try{view.tab=sessionStorage.getItem('talent_tab')||'ranking';}catch(e){}
 async function loadTalent(){
   const k=Q.get('k')||'';
   if(!k&&!DEMO){showErr('リンクが正しくありません','運営から届いた専用リンクを、もう一度開いてください。');return;}
@@ -190,42 +200,25 @@ function renderTalent(){
   const d=view.data;if(!d)return;
   const at=new Date(d.at);
   const stamp=`${at.getMonth()+1}/${at.getDate()} ${pad(at.getHours())}:${pad(at.getMinutes())}時点`;
-  if(!d.event){app.innerHTML=(DEMO?demoBar():'')+`<div class="wrap"><div class="hero"><div class="nm">${esc(d.model.name)}</div><div class="empty">まだ始まった投票イベントがありません。</div></div><div class="foot">iito JAPAN</div></div>`;return;}
+  if(!d.event){app.innerHTML=(DEMO?demoBar():'')+`<div class="wrap"><div class="hd"><div class="nm">${esc(d.model.name)}</div></div><div class="empty">まだ始まった投票イベントがありません。</div><div class="foot">iito JAPAN</div></div>`;return;}
   const rs=d.ranking||[],vs=d.voters||[];
-  const me=rs.find(x=>x.me);
-  const T=d.totals||{plan:0,free:0,paid:0,total:0};
-  // 1つ上の順位を抜くのに必要な票数（1位なら、2位との差）
-  let gap='';
-  if(me){
-    const above=rs.filter(x=>x.total>me.total).sort((a,b)=>a.total-b.total)[0];
-    if(me.total===0)gap='まだ投票がありません';
-    else if(above)gap=`${above.rank}位まで あと<b>${num(above.total-me.total+1)}</b>票`;
-    else{const next=rs.filter(x=>!x.me&&x.total<me.total).sort((a,b)=>b.total-a.total)[0];gap=next?`2位と<b>${num(me.total-next.total)}</b>票差でトップ`:'トップです';}
-  }
   const evSel=d.events.length>1?`<select class="ev-sel" onchange="view.evId=this.value;loadTalent()">${d.events.map(e=>`<option value="${esc(e.id)}"${e.id===d.event.id?' selected':''}>${esc(e.name)}</option>`).join('')}</select>`:'';
-  const head=`<div class="tv-ev"><span class="evn">${esc(d.event.name)}</span><span class="cd" id="cd">${cdText(d.event.end)}</span></div>${evSel}
-  <div class="hero">
-    <div class="nm">${esc(d.model.name)}</div>
-    ${me?`<div class="rk-lbl">いまの順位（${rs.length}人中）</div><div class="rk-big">${me.rank}<small>位</small></div>${gap?`<div class="gap">${gap}</div>`:''}`:''}
-    <div class="tot">合計 <b>${num(T.total)}</b>票<span class="sep">|</span><b>${num(vs.length)}</b>人が投票</div>
-    <div class="sub">プラン ${num(T.plan)}票 ／ 有料・無料 ${num(T.free+T.paid)}票</div>
-  </div>
-  <div class="tabs"><button class="${view.tab==='voters'?'on':''}" onclick="setTab('voters')">投票者一覧</button><button class="${view.tab==='ranking'?'on':''}" onclick="setTab('ranking')">ランキング</button></div>`;
+  // 見せるのは「ランキング」と「誰が自分に投票したか（プラン・有料・無料の内訳）」の2つだけ（2026-11-24）
+  const head=`<div class="hd"><div class="evn">${esc(d.event.name)}</div>${evSel}<div class="nm">${esc(d.model.name)}</div></div>
+  <div class="tabs"><button class="${view.tab==='ranking'?'on':''}" onclick="setTab('ranking')">ランキング</button><button class="${view.tab==='voters'?'on':''}" onclick="setTab('voters')">投票してくれた人</button></div>`;
   const k=r=>r<=3?' k'+r:'';
   let body='';
   if(view.tab==='voters'){
-    body=vs.length?`<div class="note2">票の内訳（プラン・無料・有料）つき。「ゲスト」は会員以外の方です。</div><div class="list">${vs.map(v=>{
-      const tags=(v.guest?'<span class="pt guest">会員以外</span>':'')+PLAN_ORDER.filter(p=>(v.plans||[]).includes(p)).map(p=>`<span class="pt ${p}">${PLAN_LABEL[p]}</span>`).join('');
-      return `<div class="r${k(v.rank)}"><span class="n">${v.rank}</span><span class="b"><span class="t"><span class="nm${v.guest?' guest':''}">${esc(v.nick)}</span>${tags}</span><span class="s">${brText(v)}</span></span><span class="v">${num(v.total)}<small>票</small></span></div>`;}).join('')}</div>`
+    const cell=(l,v,c)=>`<span class="c ${c}${v?'':' z'}"><i>${l}</i>${num(v)}</span>`;
+    body=vs.length?`<div class="list">${vs.map(v=>`<div class="r${k(v.rank)}"><span class="n">${v.rank}</span><span class="b"><span class="nm${v.guest?' guest':''}">${esc(v.nick)}</span><span class="cs">${cell('プラン',v.plan,'p')}${cell('有料',v.paid,'y')}${cell('無料',v.free,'f')}</span></span><span class="v">${num(v.total)}<small>票</small></span></div>`).join('')}</div>
+      <div class="note2">「ゲスト」は会員以外の方です（お名前は表示しません）。</div>`
       :'<div class="empty">まだ投票がありません。</div>';
   }else{
-    body=`<div class="note2">全モデルの合計票数の順位です。</div><div class="list">${rs.map(x=>`<div class="r${k(x.rank)}${x.me?' me':''}"><span class="n">${x.rank}</span><span class="b"><span class="t"><span class="nm">${esc(x.name)}</span>${x.me?'<span class="pt you">あなた</span>':''}</span></span><span class="v">${num(x.total)}<small>票</small></span></div>`).join('')}</div>`;
+    body=`<div class="list">${rs.map(x=>`<div class="r${k(x.rank)}${x.me?' me':''}"><span class="n">${x.rank}</span><span class="b"><span class="nm">${esc(x.name)}</span>${x.me?'<span class="pt you">あなた</span>':''}</span><span class="v">${num(x.total)}<small>票</small></span></div>`).join('')}</div>`;
   }
   app.innerHTML=(DEMO?demoBar():'')+`<div class="wrap">${head}${body}
     <div class="upd">${stamp}・1分ごとに自動更新 <button onclick="loadTalent()">いま更新</button></div>
     <div class="foot">iito JAPAN</div></div>`;
-  if(cdTimer)clearInterval(cdTimer);
-  cdTimer=setInterval(()=>{const el=document.getElementById('cd');if(el)el.innerHTML=cdText(d.event.end);},1000);
 }
 function setTab(t){view.tab=t;try{sessionStorage.setItem('talent_tab',t);}catch(e){}renderTalent();}
 
