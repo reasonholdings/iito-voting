@@ -972,6 +972,7 @@ body.ia-open{overflow:hidden}
     <button class="atab" onclick="switchATab('model')"><i class="ti ti-user-star atab-ic"></i><span>モデル管理</span></button>
     <button class="atab" onclick="switchATab('result')"><i class="ti ti-chart-bar atab-ic"></i><span>集計</span></button>
     <button class="atab" onclick="switchATab('fan')"><i class="ti ti-heart atab-ic"></i><span>ファン分析</span></button>
+    <button class="atab" onclick="switchATab('talent')"><i class="ti ti-link atab-ic"></i><span>演者ページ</span></button>
     <button class="atab" onclick="switchATab('setting')"><i class="ti ti-settings atab-ic"></i><span>設定</span></button>
   </div>
 
@@ -1157,6 +1158,14 @@ body.ia-open{overflow:hidden}
   </div>
 
   <!-- 設定 -->
+  <!-- 演者ページ（talent.html）の専用リンクの発行・停止（2026-11-24） -->
+  <div class="apanel" id="ap-talent">
+    <p style="font-size:14px;font-weight:600;margin:0">演者ページ：専用リンク</p>
+    <p style="font-size:11px;color:var(--sub);margin:6px 0 12px;line-height:1.7">演者（モデル本人）が「ランキング」と「投票してくれた人（プラン・有料・無料の内訳）」を見られるページの専用リンクです。モデルごとに発行して、<b>本人にだけ</b>送ってください。リンクを知っている人は誰でも見られます。<br>「作り直す」を押すと古いリンクは使えなくなります。「停止」でそのモデルのページを見られなくします。</p>
+    <div style="font-size:12px;min-height:18px;margin-bottom:6px" id="tl-msg"></div>
+    <div id="tl-list"><p style="font-size:13px;color:var(--sub)">読み込み中...</p></div>
+  </div>
+
   <div class="apanel" id="ap-setting">
     <div class="sc">
       <div class="sc-title">管理者ログイン</div>
@@ -1391,6 +1400,9 @@ function demoGas(action,payload){
     case 'getEvents': return ok({events:[demoEvent()]});
     case 'pinLogin': case 'setPin': if(payload.agree===true)ls('demo_consent',1); return ok({token:'demo-token',nick:DEMO_NICK});
     case 'agreeTerms': ls('demo_consent',1); return ok({termsVer:'demo'});
+    case 'listTalentKeys': { const k=ls('demo_tkeys')||{}; return ok({models:allMod().map(m=>({id:m.id,name:m.name,hidden:!!m.hidden,active:!!k[m.id],key:k[m.id]||''}))}); }
+    case 'issueTalentKey': { const k=ls('demo_tkeys')||{}; k[payload.modelId]=Array.from({length:64},()=>'0123456789abcdef'[Math.random()*16|0]).join(''); ls('demo_tkeys',k); return ok({key:k[payload.modelId]}); }
+    case 'revokeTalentKey': { const k=ls('demo_tkeys')||{}; delete k[payload.modelId]; ls('demo_tkeys',k); return ok(); }
     case 'requestPinCode': return ok();
     case 'me': {
       const g={};g[demoTerm(0)]=['producer'];g[demoTerm(-1)]=['producer'];g[demoTerm(-2)]=['producer'];
@@ -3492,8 +3504,42 @@ function exitAdmin(){
   // 投票者としてログイン中なら投票画面、そうでなければログイン画面へ
   if(curUser){SS('s-vote');}else{SS('s-login');refreshResumeCard();}
 }
+// ── 演者ページの専用リンク（2026-11-24）──
+let tlModels=[];
+function talentUrl(key){return new URL('talent.html?k='+key,location.href.split('?')[0]).href;}
+async function renderTalentLinks(msg){
+  const box=document.getElementById('tl-list'),m=document.getElementById('tl-msg');if(!box)return;
+  if(msg!==undefined&&m)m.textContent=msg;
+  const r=await gasPost('listTalentKeys',{});
+  if(!r||!r.ok){box.innerHTML=`<p style="font-size:13px;color:var(--rd)">${r&&r.error==='unknown action'?'GASが古いため使えません。最新のGASをデプロイしてください。':'読み込めませんでした。もう一度開いてください。'}</p>`;return;}
+  tlModels=(r.models||[]).slice().sort((a,b)=>(a.hidden-b.hidden));
+  const esc=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  box.innerHTML=`<div style="overflow-x:auto"><table class="tbl"><thead><tr><th>モデル</th><th>状態</th><th>操作</th></tr></thead><tbody>${tlModels.map((x,i)=>`<tr>
+    <td style="font-weight:600">${esc(x.name)}${x.hidden?' <span style="font-size:10px;color:var(--sub)">（非表示）</span>':''}</td>
+    <td style="font-size:12px;${x.active?'color:var(--gr);font-weight:600':'color:var(--sub)'}">${x.active?'発行済み':'未発行'}</td>
+    <td><div style="display:flex;gap:6px;flex-wrap:wrap">${x.active
+      ?`<button class="btn-sm-out" onclick="copyTalentLink(${i})"><i class="ti ti-copy" style="font-size:12px;vertical-align:-1px"></i> リンクをコピー</button><button class="btn-sm-out" onclick="window.open(talentUrl(tlModels[${i}].key),'_blank')">開く</button><button class="btn-sm-out" onclick="issueTalentLink(${i},true)">作り直す</button><button class="btn-sm-rd-out" onclick="revokeTalentLink(${i})">停止</button>`
+      :`<button class="btn-sm-out" onclick="issueTalentLink(${i},false)">発行する</button>`}</div></td></tr>`).join('')}</tbody></table></div>`;
+}
+async function issueTalentLink(i,re){
+  const x=tlModels[i];if(!x)return;
+  if(re&&!confirm(`${x.name} のリンクを作り直しますか？\n今のリンクは使えなくなります。`))return;
+  const r=await gasPost('issueTalentKey',{modelId:x.id});
+  await renderTalentLinks(r&&r.ok?`${x.name} のリンクを発行しました。「リンクをコピー」で本人に送ってください。`:'発行できませんでした。');
+}
+async function revokeTalentLink(i){
+  const x=tlModels[i];if(!x)return;
+  if(!confirm(`${x.name} のリンクを停止しますか？\n本人はページを見られなくなります。`))return;
+  const r=await gasPost('revokeTalentKey',{modelId:x.id});
+  await renderTalentLinks(r&&r.ok?`${x.name} のリンクを停止しました。`:'停止できませんでした。');
+}
+async function copyTalentLink(i){
+  const x=tlModels[i];if(!x)return;const url=talentUrl(x.key),m=document.getElementById('tl-msg');
+  try{await navigator.clipboard.writeText(url);if(m)m.textContent=`${x.name} のリンクをコピーしました。`;}
+  catch(e){prompt('このリンクをコピーしてください',url);}
+}
 function switchATab(tab){
-  document.querySelectorAll('.atab').forEach((b,i)=>{const ts=['event','member','history','carry','model','result','fan','setting'];b.classList.toggle('on',ts[i]===tab);});
+  document.querySelectorAll('.atab').forEach((b,i)=>{const ts=['event','member','history','carry','model','result','fan','talent','setting'];b.classList.toggle('on',ts[i]===tab);});
   document.querySelectorAll('.apanel').forEach(p=>p.classList.remove('active'));
   document.getElementById('ap-'+tab).classList.add('active');
   if(tab==='result')renderResult();
@@ -3501,6 +3547,7 @@ function switchATab(tab){
   if(tab==='carry')renderCarry();
   if(tab==='model')renderMcGrids();
   if(tab==='fan')renderFanTab(true);
+  if(tab==='talent')renderTalentLinks();
 }
 
 // ════════════════════════════════════════
