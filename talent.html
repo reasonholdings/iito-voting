@@ -132,7 +132,7 @@ body.tv .tabs button.on{background:#2C2C34;color:var(--tx2)}
 .vr .tv2{text-align:right;font-size:17px;font-weight:900;color:var(--tx2);font-variant-numeric:tabular-nums}
 .vr.k1 .n{color:var(--gd);font-size:20px}.vr.k2 .n{color:var(--sv);font-size:19px}.vr.k3 .n{color:var(--bz);font-size:19px}
 @media (max-width:400px){.vh,.vr{grid-template-columns:24px minmax(0,1fr) 40px 34px 34px 50px;gap:4px;padding:0 8px}.vr .nm{font-size:14px}.vr .q{font-size:13px}.vr .tv2{font-size:15px}}
-/* 上部をコンパクトに：投票してくれた人の一覧が、開いてすぐ目に入るように（2026-11-24） */
+/* 上部をコンパクトに：投票者一覧の一覧が、開いてすぐ目に入るように（2026-11-24） */
 .hero2{display:flex;align-items:center;gap:16px;padding:12px 4px 14px;border-bottom:1px solid var(--ln)}
 .h2r{flex:0 0 auto;text-align:center;min-width:92px}
 .h2l{font-size:11px;color:var(--sub2);white-space:nowrap}
@@ -336,7 +336,7 @@ function renderTalent(){
   </div>`}
 `;
   // 下に浮かぶメニュー（投票ページの下のメニューと同じ形。スクロールしても常に表示）
-  const tabbar=`<nav class="ttb" aria-label="メニュー"><button type="button" class="ttb-btn${view.tab==='ranking'?' on':''}" onclick="setTab('ranking')"><span class="ttb-ic">🏆</span><span class="ttb-lb">ランキング</span></button><button type="button" class="ttb-btn${view.tab==='voters'?' on':''}" onclick="setTab('voters')"><span class="ttb-ic">🙌</span><span class="ttb-lb">投票してくれた人</span></button></nav>`;
+  const tabbar=`<nav class="ttb" aria-label="メニュー"><button type="button" class="ttb-btn${view.tab==='ranking'?' on':''}" onclick="setTab('ranking')"><span class="ttb-ic">🏆</span><span class="ttb-lb">ランキング</span></button><button type="button" class="ttb-btn${view.tab==='voters'?' on':''}" onclick="setTab('voters')"><span class="ttb-ic">🙌</span><span class="ttb-lb">投票者一覧</span></button></nav>`;
   const k=r=>r<=3?' k'+r:'';
   let body='';
   if(view.tab==='voters'){
@@ -348,7 +348,7 @@ function renderTalent(){
     body=`<div class="list">${rs.map(x=>`<div class="r${k(x.rank)}${x.me?' me':''}"><span class="n">${x.rank}</span><span class="b"><span class="nm">${esc(x.name)}</span>${x.me?'<span class="pt you">あなた</span>':''}</span><span class="v">${num(x.total)}<small>票</small></span></div>`).join('')}</div>`;
   }
   app.innerHTML=(DEMO?demoBar():'')+`<div class="wrap">${head}${body}
-    <div class="secret">🔒 このページは<b>あなた専用</b>です。ファンの方のお名前や票数が載っているため、<b>スクリーンショットやこのページのURLを、他の人に送ったりSNSに載せたりしないでください。</b><br><span class="ban">⚠️「投票してくれた人」のスクリーンショットを載せる・送ることは禁止です。見つけ次第、失格とします。</span></div>
+    <div class="secret">🔒 このページは<b>あなた専用</b>です。ファンの方のお名前や票数が載っているため、<b>スクリーンショットやこのページのURLを、他の人に送ったりSNSに載せたりしないでください。</b><br><span class="ban">⚠️「投票者一覧」のスクリーンショットを載せる・送ることは禁止です。見つけ次第、失格とします。</span></div>
     <div class="upd">${stamp}・1分ごとに自動更新 <button id="upd-btn" onclick="loadTalent()">いま更新</button></div>
     <div class="foot">iito JAPAN</div></div>${tabbar}`;
 }
