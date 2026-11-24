@@ -1129,19 +1129,7 @@ body.ia-open{overflow:hidden}
         <button class="btn-sm-out" onclick="exportFanCSV()"><i class="ti ti-download" style="font-size:12px;vertical-align:-1px"></i> 会員別CSV</button>
       </div>
     </div>
-    <p style="font-size:11px;color:var(--sub);margin:8px 0 12px;line-height:1.6">これまでの全イベントで一番多く票を入れたモデルを「推し（ファン）」とします（アプリでの投票と、読み込んだ投票券の購入を合わせて数えます。同じ票数なら、登録している推しを優先）。「繰越票」は前月・前々月から持ち越している票、「今使える票」は今月の持ち票から今月使った分を引いた残りです。会員リストに載っている人だけを数えます。投票も投票券の購入も無くて推しが「わからない」人は、会員別の表で推しを手入力できます（入力した内容はサーバーに保存され、どの端末からも同じに見えます）。</p>
-    <div class="sc" style="margin-bottom:14px">
-      <div class="sc-title" style="margin-bottom:6px">投票券の購入履歴CSV（FaveConnect）</div>
-      <p style="font-size:11px;color:var(--sub);margin:0 0 10px;line-height:1.6">FaveConnect の商品購入履歴CSV（「商品名」が【…】モデル名 の投票券）を読み込むと、誰がどのモデルの投票券を買ったかも合わせて推しを判定します。複数のファイルをまとめて選べます。同じ行を2回読み込んでも二重には数えません。<b>読み込んだ内容はこの端末の中だけで集計し、サーバーには送りません。</b>名前・住所・電話番号・生年月日は読み込みません。</p>
-      <div class="upload-area" onclick="document.getElementById('ticket-inp').click()" style="padding:12px">
-        <p style="font-size:13px;color:var(--sub)"><i class="ti ti-file-text" style="font-size:16px;vertical-align:-3px"></i> クリックして購入履歴CSVを選択</p>
-      </div>
-      <input type="file" id="ticket-inp" accept=".csv" multiple style="display:none" onchange="loadTicketCSV(this)"/>
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px">
-        <span id="ticket-status" style="font-size:12px;color:var(--sub)"></span>
-        <button class="btn-sm-out" id="ticket-clear" style="display:none" onclick="clearTicketData()">読み込んだ購入履歴を消す</button>
-      </div>
-    </div>
+    <p style="font-size:11px;color:var(--sub);margin:8px 0 12px;line-height:1.6">これまでの全イベントで、アプリで一番多く票を入れたモデルを「推し（ファン）」とします（同じ票数なら、登録している推しを優先）。「繰越票」は前月・前々月から持ち越している票、「今使える票」は今月の持ち票から今月使った分を引いた残りです。会員リストに載っている人だけを数えます。まだ投票が無くて推しが「わからない」人は、会員別の表で推しを手入力できます（入力した内容はサーバーに保存され、どの端末からも同じに見えます）。</p>
     <div class="met3">
       <div class="met3c"><div class="n" id="fan-m-carry">0</div><div class="l">繰越票の合計</div></div>
       <div class="met3c"><div class="n" id="fan-m-rem">0</div><div class="l">今使える票の合計</div></div>
@@ -1162,7 +1150,7 @@ body.ia-open{overflow:hidden}
     <input class="inp tbl-filter" id="fan-filter" type="search" placeholder="ニックネーム・モデル名で絞り込み" style="font-size:13px;margin-bottom:10px" oninput="applyRowFilter('fan-member-body','fan-filter');document.getElementById('fan-clear').style.display=this.value?'':'none'"/>
     <div style="overflow-x:auto">
       <table class="tbl">
-        <thead><tr><th>ニックネーム</th><th>推し（ファン）</th><th>プラン</th><th>繰越票</th><th>今使える票</th><th>アプリでの投票</th><th>投票券</th></tr></thead>
+        <thead><tr><th>ニックネーム</th><th>推し（ファン）</th><th>プラン</th><th>繰越票</th><th>今使える票</th><th>アプリでの投票</th></tr></thead>
         <tbody id="fan-member-body"></tbody>
       </table>
     </div>
@@ -3523,11 +3511,9 @@ const LS_FAN_OVR='iito_fan_ovr';
 let fanOverrides=(()=>{try{return JSON.parse(localStorage.getItem(LS_FAN_OVR)||'null')||{}}catch(e){return {}}})();
 // これまでの全イベントで一番多く票を入れたモデル名（同票なら登録している推しを優先、それも無ければ名前順）
 function fanOf(nick){
-  // モデル名ごとに合計（アプリでの投票＋投票券の購入）
-  const sum={};let app=0,ticket=0;
+  // モデル名ごとに合計（アプリでの投票だけ）
+  const sum={};let app=0,ticket=0; // ticket は使わない（常に0）
   Object.values(allVotes||{}).forEach(ev=>{const v=(ev||{})[nick];if(!v)return;Object.entries(v).forEach(([mid,c])=>{const n=findMod(mid)?.name||mid,x=Number(c)||0;sum[n]=(sum[n]||0)+x;app+=x;});});
-  const t=(ticketData.people||{})[nick];
-  if(t)Object.entries(t).forEach(([n,x])=>{sum[n]=(sum[n]||0)+x;ticket+=x;});
   const names=Object.keys(sum).filter(n=>sum[n]>0);
   if(!names.length){const o=fanOverrides[nick];return o?{fan:o,total:0,app:0,ticket:0,manual:true}:{fan:FAN_NONE,total:0,app:0,ticket:0};}
   const max=Math.max(...names.map(n=>sum[n]));
@@ -3545,7 +3531,7 @@ async function renderFanTab(sync){
   const draw=()=>{
     const rows=buildFanRows();fanRowsCache=rows;
     const term=(rows[0]&&rows[0].curTerm)||todayTermId();
-    const note=document.getElementById('fan-note');if(note)note.textContent=term+' 時点・会員 '+rows.length+'名';
+    const note=document.getElementById('fan-note');if(note){const t=fanSyncedAt?new Date(fanSyncedAt):null;note.textContent=term+'・会員 '+rows.length+'名'+(t?`・最終更新 ${pad(t.getHours())}:${pad(t.getMinutes())}`:'');}
     const byModel={};
     rows.forEach(r=>{const g=byModel[r.fan]||(byModel[r.fan]={fan:r.fan,people:[],carry:0,remaining:0});g.people.push(r);g.carry+=r.carry;g.remaining+=r.remaining;});
     const groups=Object.values(byModel).sort((a,b)=>(a.fan===FAN_NONE)-(b.fan===FAN_NONE)||b.carry-a.carry||b.remaining-a.remaining);
@@ -3570,21 +3556,30 @@ async function renderFanTab(sync){
       const fanCell=(r.fan===FAN_NONE||r.manual)
         ?`<span style="display:none">${esc(r.manual?r.fan:FAN_NONE)}</span><input class="inp fan-input" list="fan-model-list" data-nick="${esc(r.nick)}" value="${r.manual?esc(r.fan):''}" placeholder="推しを入力" onchange="setFanOverride(this.dataset.nick,this.value)"/>${r.manual?'<span class="fan-tag">手入力</span>':''}`
         :esc(r.fan);
-      tr.innerHTML=`<td>${esc(r.nick)}</td><td>${fanCell}</td><td style="font-size:11px">${PLAN_LBL[r.plan]||r.plan}</td><td><b>${r.carry}</b></td><td>${r.remaining}</td><td>${r.app}</td><td>${r.ticket}</td>`;
+      tr.innerHTML=`<td>${esc(r.nick)}</td><td>${fanCell}</td><td style="font-size:11px">${PLAN_LBL[r.plan]||r.plan}</td><td><b>${r.carry}</b></td><td>${r.remaining}</td><td>${r.app}</td>`;
       ub.appendChild(tr);
     });
     applyRowFilter('fan-member-body','fan-filter');
     const dl=document.getElementById('fan-model-list');
     if(dl)dl.innerHTML=[...new Set(allMod().filter(m=>!m.hidden).map(m=>m.name))].map(n=>`<option value="${esc(n)}"></option>`).join('');
-    const clr=document.getElementById('ticket-clear');if(clr)clr.style.display=Object.keys((ticketData&&ticketData.people)||{}).length?'':'none';
   };
   draw();
   if(sync&&GAS_URL){
+    // 会員リスト・票の付与（運営の調整を含む）・期ごとのプラン・推しも取り直して、繰越票・今使える票を最新にする（2026-11-24）
+    const note=document.getElementById('fan-note');if(note)note.textContent='最新のデータを取得中...';
+    try{await pullMembers();}catch(e){}
+    try{await pullGrants();}catch(e){}
+    try{await pullTermPlans();}catch(e){}
+    try{await pullOshi();}catch(e){}
     try{const r=await gasPost('getFanOverrides');if(r&&r.ok&&r.overrides){fanOverrides=r.overrides;try{localStorage.setItem(LS_FAN_OVR,JSON.stringify(fanOverrides));}catch(e){}}}catch(e){}
     try{await syncAllEventVotes();}catch(e){console.warn('ファン分析の更新に失敗',e);}
+    fanSyncedAt=Date.now();
     draw();
   }
 }
+// ファン分析を開いている間は、2分ごとに自動で最新にする
+let fanSyncedAt=0;
+setInterval(()=>{const p=document.getElementById('ap-fan');if(p&&p.classList.contains('active')&&!document.hidden&&Date.now()-fanSyncedAt>110000)renderFanTab(true);},30000);
 // 推しの手入力を保存（サーバーの「推し手入力」シートに保存して、どの端末からも同じに見えるようにする）
 async function setFanOverride(nick,fan){
   fan=String(fan||'').trim();
@@ -3602,54 +3597,17 @@ function setFanFilter(v){const i=document.getElementById('fan-filter');if(!i)ret
 function exportFanCSV(){
   const rows=(fanRowsCache.length?fanRowsCache:buildFanRows()).slice().sort((a,b)=>b.carry-a.carry);
   if(!rows.length){alert('会員データがありません。');return;}
-  const out=[['会員番号','ニックネーム','推し（ファン）','推しの決め方','プラン','繰越票','今使える票','アプリでの投票','投票券','期']].concat(rows.map(r=>[r.mid,r.nick,r.fan,r.manual?'手入力':(r.fan===FAN_NONE?'わからない':'投票・投票券'),PLAN_LBL[r.plan]||r.plan,r.carry,r.remaining,r.app,r.ticket,r.curTerm]));
+  const out=[['会員番号','ニックネーム','推し（ファン）','推しの決め方','プラン','繰越票','今使える票','アプリでの投票','期']].concat(rows.map(r=>[r.mid,r.nick,r.fan,r.manual?'手入力':(r.fan===FAN_NONE?'わからない':'投票'),PLAN_LBL[r.plan]||r.plan,r.carry,r.remaining,r.app,r.curTerm]));
   const csv=out.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(',')).join('\n');
   const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='ファン別の票_'+new Date().toISOString().slice(0,10)+'.csv';a.click();
 }
 
-// ── 投票券の購入履歴CSV（FaveConnect の商品購入履歴） ──
-//  ・「商品名」の【…】のあとをモデル名、票数＝購入数×（「○票分」があればその数、無ければ1）とする
-//  ・人は、メールアドレスが会員リストにあればその会員のニックネーム、無ければCSVのニックネームでまとめる
-//  ・この端末の中だけで集計し、サーバーには送らない。名前・住所・電話番号・生年月日は読まない
-//  ・同じ行（決済日・メール・商品名・購入数・金額）は1回だけ数える（行の目印だけを保存し、メールは保存しない）
-const LS_TICKET='iito_fan_tickets';
-let ticketData=(()=>{try{return JSON.parse(localStorage.getItem(LS_TICKET)||'null')||{}}catch(e){return {}}})();
-function saveTicketData(){try{localStorage.setItem(LS_TICKET,JSON.stringify(ticketData));}catch(e){console.warn('購入履歴の保存に失敗',e);}}
+// 行の目印（同じ購入を2回数えないための短い値。集計タブの有料票CSVの読み込みで使う）
 function rowMark(s){let h=5381;for(let i=0;i<s.length;i++)h=((h<<5)+h+s.charCodeAt(i))|0;return (h>>>0).toString(36)+s.length.toString(36);}
-async function loadTicketCSV(input){
-  const files=[...(input.files||[])];input.value='';if(!files.length)return;
-  const st=document.getElementById('ticket-status');
-  const td=ticketData&&ticketData.people?ticketData:{people:{},plans:{},marks:{},min:'',max:''};
-  let added=0,skipped=0,bad=0;
-  for(const f of files){
-    const text=(await f.text()).replace(/^\uFEFF/,'');
-    const lines=text.split(/\r?\n/).filter(l=>l.trim());if(lines.length<2){bad++;continue;}
-    const h=parseCSVLine(lines[0]);const col=k=>h.findIndex(x=>x.trim()===k);
-    const ix={item:col('商品名'),qty:col('購入数'),amount:col('合計金額'),date:col('決済日'),email:col('メールアドレス'),nick:col('ニックネーム'),status:col('ステータス'),plan:col('加入中のプラン')};
-    if(ix.item<0||ix.qty<0||ix.nick<0){bad++;continue;}
-    lines.slice(1).forEach(line=>{
-      const c=parseCSVLine(line);const item=(c[ix.item]||'').trim();
-      const m=item.match(/】\s*(.+)$/);if(!m)return;            // 投票券以外の商品は数えない
-      const status=ix.status>=0?(c[ix.status]||''):'';if(/キャンセル|返金|取消/.test(status))return;
-      const qty=parseInt(c[ix.qty])||0;const per=parseInt((item.match(/(\d+)票分/)||[])[1])||1;const votes=qty*per;if(votes<=0)return;
-      const email=ix.email>=0?(c[ix.email]||'').trim().toLowerCase():'';const date=ix.date>=0?(c[ix.date]||'').trim():'';
-      const mark=rowMark([date,email,item,qty,ix.amount>=0?c[ix.amount]:''].join('|'));
-      if(td.marks[mark]){skipped++;return;}td.marks[mark]=1;
-      const mem=email&&members.find(x=>String(x.email||'').toLowerCase()===email);
-      const who=mem?mem.nick:((c[ix.nick]||'').trim()||'（ニックネームなし）');
-      const model=m[1].trim();
-      (td.people[who]=td.people[who]||{})[model]=(td.people[who][model]||0)+votes;
-      if(!mem&&ix.plan>=0)td.plans[who]=(c[ix.plan]||'').trim();
-      if(date){if(!td.min||date<td.min)td.min=date;if(!td.max||date>td.max)td.max=date;}
-      added++;
-    });
-  }
-  td.loadedAt=new Date().toISOString();ticketData=td;saveTicketData();
-  if(st)st.textContent=`${added}件を追加しました`+(skipped?`（すでに読み込み済みの ${skipped}件は数えていません）`:'')+(bad?`／読めなかったファイル ${bad}件（「商品名」「購入数」「ニックネーム」の列が必要です）`:'');
-  renderFanTab(false);
-}
-function clearTicketData(){ticketData={};try{localStorage.removeItem(LS_TICKET);}catch(e){}const st=document.getElementById('ticket-status');if(st)st.textContent='購入履歴を消しました';renderFanTab(false);}
+// ファン分析は「誰がプラン票をどれくらい持っているか」を見る画面なので、投票券（有料）の情報は使わない（2026-11-24）。
+// 以前この端末に保存した購入履歴は消しておく
+try{localStorage.removeItem('iito_fan_tickets');}catch(e){}
 
 // 【パソコン版】表の行をキーワードで絞り込む（ニックネーム・会員番号など、行の文字に含まれるかで判定）
 function applyRowFilter(tbodyId,inputId){
