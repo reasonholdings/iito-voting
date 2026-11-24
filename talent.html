@@ -232,6 +232,9 @@ body.tb-hide .ttb{transform:translate(-50%,calc(100% + 24px));opacity:0;pointer-
 @media (prefers-color-scheme: light){.rt-r.ok .ic{color:#1E9E63}.rt-r.ng .ic{color:#D93636}}
 .ttb-ic{font-size:18px;display:flex}
 .busy .i{margin-right:6px}
+.rt-r .tg .act{display:block;font-size:13px;font-weight:900;margin-top:2px}
+.rt-r.ok .tg .act{color:#4CC98C}.rt-r.ng .tg .act{color:#FF7A7A}
+@media (prefers-color-scheme: light){.rt-r.ok .tg .act{color:#1E9E63}.rt-r.ng .tg .act{color:#D93636}}
 /* 更新中の表示 */
 .boot{min-height:70vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;color:#A6A6B0;font-size:14px;font-weight:700}
 .spin{display:inline-block;width:14px;height:14px;border:2px solid rgba(232,199,102,.25);border-top-color:#E8C766;border-radius:50%;animation:spin .8s linear infinite;vertical-align:-2px;margin-right:6px}
@@ -368,10 +371,10 @@ function rulesHtml(big){
   return `<div class="rules${big?' big':''}">
     <div class="rules-hd">${IC.lock}ご本人様専用ページのルール</div>
     <div class="rt">
-      <div class="rt-h"><span></span><span>対象</span><span>送信・SNS掲載</span></div>
-      <div class="rt-r ok"><span class="ic">${IC.trophy}</span><span class="tg">「ランキング」画面の<br>スクリーンショット</span><span class="jd"><b>OK</b></span></div>
-      <div class="rt-r ng"><span class="ic">${IC.users}</span><span class="tg">「投票者一覧」画面の<br>スクリーンショット</span><span class="jd"><b>NG</b><small>違反は失格</small></span></div>
-      <div class="rt-r ng"><span class="ic">${IC.link}</span><span class="tg">本ページのURL</span><span class="jd"><b>NG</b></span></div>
+      <div class="rt-h"><span></span><span>してよいこと・いけないこと</span><span>可否</span></div>
+      <div class="rt-r ok"><span class="ic">${IC.trophy}</span><span class="tg">「ランキング」画面の<br>スクリーンショットを<span class="act">SNS等に掲載</span></span><span class="jd"><b>OK</b></span></div>
+      <div class="rt-r ng"><span class="ic">${IC.users}</span><span class="tg">「投票者一覧」画面の<br>スクリーンショットを<span class="act">送信・掲載</span></span><span class="jd"><b>NG</b><small>違反は失格</small></span></div>
+      <div class="rt-r ng"><span class="ic">${IC.link}</span><span class="tg">本ページのURLを<span class="act">共有・拡散</span></span><span class="jd"><b>NG</b></span></div>
     </div>
   </div>`;
 }
