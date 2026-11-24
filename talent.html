@@ -198,19 +198,25 @@ body.tb-hide .ttb{transform:translate(-50%,calc(100% + 24px));opacity:0;pointer-
 @media (prefers-color-scheme: light){.agree-btn{background:#A87A0C;color:#FFF}}
 .ok-top{margin:0 0 8px;padding:7px 12px;border-radius:8px;background:rgba(76,201,140,.12);border:1px solid rgba(76,201,140,.45);color:#8FE0B8;font-size:12px;font-weight:700;line-height:1.5}
 @media (prefers-color-scheme: light){.ok-top{background:#E6F7EE;border-color:#9ED9BA;color:#137A4A}}
-/* OK・NGの一覧 */
-.rules{margin:16px 0 6px;display:flex;flex-direction:column;gap:6px}
+/* OK・NGの一覧（表の形） */
+.rules{margin:16px 0 6px}
 .rules.big{margin:12px 0 16px}
-.rules-hd{font-size:13px;color:var(--sub2);margin:0 2px 2px}
-.rules-hd b{color:var(--tx2)}
-.rule{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:10px;border:1.5px solid}
-.rule .mk{flex:0 0 auto;min-width:38px;text-align:center;font-size:12px;font-weight:900;border-radius:6px;padding:3px 6px;color:#fff;letter-spacing:.04em}
-.rule .tx{font-size:13.5px;line-height:1.55;color:var(--tx2)}
-.rule .tx em{display:block;font-style:normal;font-size:12px;font-weight:700;margin-top:2px}
-.rule.ok{border-color:rgba(76,201,140,.55);background:rgba(76,201,140,.10)}.rule.ok .mk{background:#1E9E63}
-.rule.ng{border-color:rgba(255,82,82,.55);background:rgba(255,82,82,.10)}.rule.ng .mk{background:#D93636}
-.rule.ng .tx em{color:#FF8A80}
-@media (prefers-color-scheme: light){.rule.ok{background:#E8F8EF;border-color:#9ED9BA}.rule.ng{background:#FFEDED;border-color:#F3A9A9}.rule.ng .tx em{color:#C62828}}
+.rules-hd{font-size:14px;font-weight:900;color:var(--tx2);margin:0 2px 8px}
+.rt{border:1px solid var(--ln);border-radius:12px;overflow:hidden;background:var(--bk2)}
+.rt-h,.rt-r{display:grid;grid-template-columns:40px minmax(0,1fr) 96px;align-items:center;gap:6px;padding:0 12px}
+.rt-h{font-size:11px;color:var(--sub2);padding-top:7px;padding-bottom:7px;border-bottom:1px solid var(--ln)}
+.rt-h span:last-child{text-align:center}
+.rt-r{min-height:58px;border-bottom:1px solid var(--ln)}
+.rt-r:last-child{border-bottom:none}
+.rt-r .ic{font-size:22px;text-align:center}
+.rt-r .tg{font-size:13.5px;font-weight:700;line-height:1.4;color:var(--tx2);padding:8px 0}
+.rt-r .jd{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px}
+.rt-r .jd b{display:inline-block;min-width:56px;text-align:center;font-size:15px;font-weight:900;border-radius:999px;padding:4px 0;color:#fff;letter-spacing:.06em}
+.rt-r .jd small{font-size:10.5px;font-weight:700}
+.rt-r.ok .jd b{background:#1E9E63}.rt-r.ng .jd b{background:#D93636}
+.rt-r.ng .jd small{color:#FF8A80}
+.rt-r.ok{background:rgba(76,201,140,.07)}.rt-r.ng{background:rgba(255,82,82,.06)}
+@media (prefers-color-scheme: light){.rt{background:#FFFFFF}.rt-r.ok{background:#F1FBF5}.rt-r.ng{background:#FFF5F5}.rt-r.ng .jd small{color:#C62828}}
 .ban-top b,.ok-top b{font-weight:900}
 /* 更新中の表示 */
 .boot{min-height:70vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;color:#A6A6B0;font-size:14px;font-weight:700}
@@ -336,11 +342,15 @@ let cdTimer=null;
 //  承認したことはこの端末に覚え、サーバーの「演者承認記録」にも残す。リンクを作り直すと、もう一度出る
 // OK・NGをひと目で分かるように並べる（2026-11-24）
 function rulesHtml(big){
+  // 対象（下のメニューと同じアイコン）と、送信・SNS掲載の可否を表で並べる
   return `<div class="rules${big?' big':''}">
-    <div class="rules-hd">🔒 本ページは<b>ご本人様専用</b>です</div>
-    <div class="rule ok"><span class="mk">OK</span><span class="tx"><b>「ランキング」画面</b>のスクリーンショットをSNS等に掲載すること</span></div>
-    <div class="rule ng"><span class="mk">NG</span><span class="tx"><b>「投票者一覧」画面</b>のスクリーンショットを送信・掲載すること<em>違反が確認された場合は失格</em></span></div>
-    <div class="rule ng"><span class="mk">NG</span><span class="tx">本ページの<b>URL</b>を第三者に共有・公開すること</span></div>
+    <div class="rules-hd">🔒 ご本人様専用ページのルール</div>
+    <div class="rt">
+      <div class="rt-h"><span></span><span>対象</span><span>送信・SNS掲載</span></div>
+      <div class="rt-r ok"><span class="ic">🏆</span><span class="tg">「ランキング」画面の<br>スクリーンショット</span><span class="jd"><b>OK</b></span></div>
+      <div class="rt-r ng"><span class="ic">🙌</span><span class="tg">「投票者一覧」画面の<br>スクリーンショット</span><span class="jd"><b>NG</b><small>違反は失格</small></span></div>
+      <div class="rt-r ng"><span class="ic">🔗</span><span class="tg">本ページのURL</span><span class="jd"><b>NG</b></span></div>
+    </div>
   </div>`;
 }
 function agreedKey(){return 'talent_ok_'+(Q.get('k')||'demo');}
@@ -402,10 +412,10 @@ function renderTalent(){
   if(view.tab==='voters'){
     // 1人1行：順位・名前・プラン・有料・無料・合計を横に並べる（見出しは上に1回だけ）
     const z=(v,c)=>`<span class="q ${c}${v?'':' z'}">${num(v)}</span>`;
-    body=vs.length?`<div class="ban-top">❌ この画面は<b>スクリーンショット禁止</b>（送信・掲載が確認された場合は失格）</div><div class="vt"><div class="vh"><span>順位</span><span>名前</span><span class="qh p">プラン</span><span class="qh y">有料</span><span class="qh f">無料</span><span class="qh">合計</span></div>${vs.map(v=>`<div class="vr${k(v.rank)}"><span class="n">${v.rank}</span><span class="nm">${esc(v.nick)}</span>${z(v.plan,'p')}${z(v.paid,'y')}${z(v.free,'f')}<span class="tv2">${num(v.total)}</span></div>`).join('')}</div>`
+    body=vs.length?`<div class="ban-top">🙌 この画面のスクショ：<b>送信・掲載 NG</b>（違反は失格）</div><div class="vt"><div class="vh"><span>順位</span><span>名前</span><span class="qh p">プラン</span><span class="qh y">有料</span><span class="qh f">無料</span><span class="qh">合計</span></div>${vs.map(v=>`<div class="vr${k(v.rank)}"><span class="n">${v.rank}</span><span class="nm">${esc(v.nick)}</span>${z(v.plan,'p')}${z(v.paid,'y')}${z(v.free,'f')}<span class="tv2">${num(v.total)}</span></div>`).join('')}</div>`
       :'<div class="empty">まだ投票がありません。</div>';
   }else{
-    body=`<div class="ok-top">✅ この画面は<b>スクリーンショットのSNS掲載OK</b></div><div class="list">${rs.map(x=>`<div class="r${k(x.rank)}${x.me?' me':''}"><span class="n">${x.rank}</span><span class="b"><span class="nm">${esc(x.name)}</span>${x.me?'<span class="pt you">あなた</span>':''}</span><span class="v">${num(x.total)}<small>票</small></span></div>`).join('')}</div>`;
+    body=`<div class="ok-top">🏆 この画面のスクショ：<b>SNS掲載 OK</b></div><div class="list">${rs.map(x=>`<div class="r${k(x.rank)}${x.me?' me':''}"><span class="n">${x.rank}</span><span class="b"><span class="nm">${esc(x.name)}</span>${x.me?'<span class="pt you">あなた</span>':''}</span><span class="v">${num(x.total)}<small>票</small></span></div>`).join('')}</div>`;
   }
   app.innerHTML=(DEMO?demoBar():'')+`<div class="wrap">${head}${body}
     ${rulesHtml()}
