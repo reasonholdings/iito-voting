@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
 <meta name="referrer" content="no-referrer">
+<meta name="color-scheme" content="light dark">
 <title>iito 演者ページ</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -177,6 +178,29 @@ body.tv .demo{background:#2A2210;border-color:#6B5520;color:#F1D58A}
 .busy.on{transform:translate(-50%,0)}
 .busy.ok{border-color:#4CC98C;color:#9FE8C3}
 body.tv .upd button:disabled{opacity:.7;cursor:default}
+/* ════ 明るいモード：スマホの設定（ライト／ダーク）に合わせて自動で切り替える（2026-11-24） ════ */
+@media (prefers-color-scheme: light){
+  html:has(body.tv){background:#F6F5F2}
+  body.tv{--gd:#A87A0C;--sv:#6F7B8A;--bz:#A4602F;--bk:#F6F5F2;--bk2:#FFFFFF;--ln:#E4E2DC;--tx2:#1B1B20;--sub2:#6E6E78}
+  body.tv .r,body.tv .vr{box-shadow:0 1px 2px rgba(0,0,0,.06);border:1px solid #ECEAE5}
+  body.tv .r.me{border-color:var(--gd);background:#FFF9E8}
+  body.tv .tabs{background:#EAE8E3}
+  body.tv .tabs button.on{background:#FFFFFF;color:var(--tx2);box-shadow:0 1px 3px rgba(0,0,0,.08)}
+  .c.p{background:#EFE9FF;color:#5B34C4}.c.y{background:#FFF1E2;color:#B25300}.c.f{background:#E6F5FD;color:#0B6E9E}
+  .vh .qh.p,.vr .q.p{color:#5B34C4}.vh .qh.y,.vr .q.y{color:#B25300}.vh .qh.f,.vr .q.f{color:#0B6E9E}
+  .vr .q.z{color:#C9C8CF}
+  .pt.supporter{background:#E4F2FD;color:#1468A8}.pt.partner{background:#E2F6EC;color:#127A49}.pt.producer{background:#EFE9FF;color:#5B34C4}
+  .pt.guest{background:#EEEEF1;color:#6E6E78}.pt.you{background:#E8C766;color:#2B2000}
+  body.tv .foot{color:#B5B3AD}
+  body.tv .demo{background:#FFF4DA;border-color:#E9C877;color:#6B4E00}
+  .secret{border-color:#E7CF8A;background:#FFF8E4;color:#4B4330}
+  .secret b{color:#8A5D00}
+  .boot{color:#6E6E78}
+  .spin{border-color:rgba(168,122,12,.2);border-top-color:#A87A0C}
+  .busy{background:#FFFFFF;color:#1B1B20;border-color:#A87A0C;box-shadow:0 6px 20px rgba(0,0,0,.15)}
+  .busy.ok{border-color:#1E9E63;color:#137A4A}
+  body.tv .upd button{background:#FFFFFF;border-color:#E4E2DC;color:#1B1B20}
+}
 /* 管理（リンク発行） */
 .adm{max-width:720px;margin:0 auto;padding:24px 16px 48px}
 .adm h1{font-size:20px;color:var(--ac);margin:0 0 6px}
