@@ -1563,9 +1563,14 @@ function hasConsent_(nick) {
   if (sh.getLastRow() <= 1) return false;
   const rows = sh.getRange(2, 3, sh.getLastRow() - 1, 3).getValues(); // ニックネーム／メールアドレス／規約の版
   for (var i = rows.length - 1; i >= 0; i--) {
-    if (String(rows[i][0]).trim() === String(nick).trim() && String(rows[i][2]).trim() === TERMS_VERSION) return true;
+    if (String(rows[i][0]).trim() === String(nick).trim() && consentVer_(rows[i][2]) === TERMS_VERSION) return true;
   }
   return false;
+}
+// 版の値をそろえる：「2026-11-23」のような版は、スプレッドシートが日付に変えてしまうため、日付なら元の文字に戻して比べる（2026-11-24 修正）
+function consentVer_(v) {
+  if (v instanceof Date) return Utilities.formatDate(v, 'Asia/Tokyo', 'yyyy-MM-dd');
+  return String(v || '').trim();
 }
 // 同意したら必ず1行残す（ログインのたびの同意も、それぞれ記録する）
 function recordConsent_(member, via, ua) {
@@ -1573,8 +1578,9 @@ function recordConsent_(member, via, ua) {
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
+    // 版は文字として書き込む（先頭の ' で日付への自動変換を防ぐ）
     consentSheet_().appendRow([new Date(), String(member.mid || ''), member.nick, String(member.email || ''),
-                               TERMS_VERSION, via, String(ua || '').slice(0, 300)]);
+                               "'" + TERMS_VERSION, via, String(ua || '').slice(0, 300)]);
   } finally { lock.releaseLock(); }
 }
 function agreeTerms(data) {
