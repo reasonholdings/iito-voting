@@ -211,7 +211,7 @@ function renderTalent(){
   if(view.tab==='voters'){
     const cell=(l,v,c)=>`<span class="c ${c}${v?'':' z'}"><i>${l}</i>${num(v)}</span>`;
     body=vs.length?`<div class="list">${vs.map(v=>`<div class="r${k(v.rank)}"><span class="n">${v.rank}</span><span class="b"><span class="nm${v.guest?' guest':''}">${esc(v.nick)}</span><span class="cs">${cell('プラン',v.plan,'p')}${cell('有料',v.paid,'y')}${cell('無料',v.free,'f')}</span></span><span class="v">${num(v.total)}<small>票</small></span></div>`).join('')}</div>
-      <div class="note2">「ゲスト」は会員以外の方です（お名前は表示しません）。</div>`
+`
       :'<div class="empty">まだ投票がありません。</div>';
   }else{
     body=`<div class="list">${rs.map(x=>`<div class="r${k(x.rank)}${x.me?' me':''}"><span class="n">${x.rank}</span><span class="b"><span class="nm">${esc(x.name)}</span>${x.me?'<span class="pt you">あなた</span>':''}</span><span class="v">${num(x.total)}<small>票</small></span></div>`).join('')}</div>`;
@@ -283,7 +283,7 @@ function demo(action){
     const tot=[610,842,512,433,388,301,250,198,120,64];
     const ranking=names.map((n,i)=>({modelId:'m'+i,name:n,total:tot[i],me:i===0})).sort((a,b)=>b.total-a.total);
     ranking.forEach((x,i)=>x.rank=i+1);
-    const v=[['のぶしゃ',['producer'],300,1,0],['machu',['producer'],180,1,20],['ゲスト',[],0,1,50,1],['アルちー',['supporter'],24,0,0],['ひろYUKIにゃ〜',['supporter'],12,1,0],['norimaru.27',['supporter'],3,1,1],['hiro',[],0,1,0],['macha',[],0,1,0],['あきひこ',[],0,1,0],['こよみん',[],0,1,0],['なおの隣りのヤギ',[],0,1,0]];
+    const v=[['のぶしゃ',['producer'],300,1,0],['machu',['producer'],180,1,20],['いちろう',[],0,1,50],['アルちー',['supporter'],24,0,0],['ひろYUKIにゃ〜',['supporter'],12,1,0],['norimaru.27',['supporter'],3,1,1],['hiro',[],0,1,0],['macha',[],0,1,0],['あきひこ',[],0,1,0],['こよみん',[],0,1,0],['なおの隣りのヤギ',[],0,1,0]];
     const voters=v.map(([nick,plans,plan,free,paid,g])=>({nick,plans,plan,free,paid,guest:!!g,total:plan+free+paid})).sort((a,b)=>b.total-a.total);
     let rk=0,prev=null;voters.forEach((x,i)=>{if(x.total!==prev){rk=i+1;prev=x.total;}x.rank=rk;});
     const now=Date.now();
