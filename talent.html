@@ -358,7 +358,8 @@ function renderTalent(){
 }
 
 // ── 下のメニュー：下にスクロールで隠し、上にスクロールで出す（投票ページ index.html の onTbScroll と同じ動き。2026-11-24）──
-//  ・一度隠したら、利用者が自分で上へスクロールするまでは出さない（iPhoneの端での跳ね返り・自動更新による位置のずれでは出さない）
+//  ・一度隠したら、利用者が自分で上へスクロールして、上の順位の表示が画面に見えるところまで戻るまでは出さない
+//    （iPhoneの端での跳ね返り・自動更新による位置のずれでは出さない）
 let tbLastY=0,tbUpAcc=0,tbDownAcc=0,tbTouching=false,tbInputAt=0;
 function tbMaxY(){return Math.max(0,document.documentElement.scrollHeight-window.innerHeight);}
 function tbUpNeed(){return Math.max(45,Math.min(180,tbMaxY()*0.3));}
@@ -375,11 +376,12 @@ function onTbScroll(){
     tbDownAcc=0;
     if(!hidden)return;
     if(!tbByUser()){tbUpAcc=0;return;}
-    tbUpAcc+=-dy;
-    if(tbUpAcc>=tbUpNeed()||y<40)document.body.classList.remove('tb-hide');
+    // 上の順位の表示（大きな順位／コンパクトな帯）が画面に見えるところまで戻ったら出す（2026-11-24）
+    if(heroInView()||y<40)document.body.classList.remove('tb-hide');
   }
 }
 window.addEventListener('scroll',onTbScroll,{passive:true});
+function heroInView(){const h=document.querySelector('.hero,.hero2');if(!h)return true;const r=h.getBoundingClientRect();return r.bottom>0&&r.top<window.innerHeight;}
 function tbReset(){document.body.classList.remove('tb-hide');tbLastY=window.scrollY||0;tbUpAcc=tbDownAcc=0;}
 function setTab(t){if(view.tab!==t){view.tab=t;try{sessionStorage.setItem('talent_tab',t);}catch(e){}renderTalent();window.scrollTo(0,0);tbReset();}}
 
