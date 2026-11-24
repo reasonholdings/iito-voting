@@ -196,6 +196,8 @@ body.tb-hide .ttb{transform:translate(-50%,calc(100% + 24px));opacity:0;pointer-
 .agree-btn{width:100%;height:50px;border:none;border-radius:999px;background:#E8C766;color:#1A1500;font-family:inherit;font-size:16px;font-weight:900;cursor:pointer}
 .agree-btn:disabled{opacity:.6}
 @media (prefers-color-scheme: light){.agree-btn{background:#A87A0C;color:#FFF}}
+.ok-top{margin:0 0 8px;padding:7px 12px;border-radius:8px;background:rgba(76,201,140,.12);border:1px solid rgba(76,201,140,.45);color:#8FE0B8;font-size:12px;font-weight:700;line-height:1.5}
+@media (prefers-color-scheme: light){.ok-top{background:#E6F7EE;border-color:#9ED9BA;color:#137A4A}}
 /* 更新中の表示 */
 .boot{min-height:70vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;color:#A6A6B0;font-size:14px;font-weight:700}
 .spin{display:inline-block;width:14px;height:14px;border:2px solid rgba(232,199,102,.25);border-top-color:#E8C766;border-radius:50%;animation:spin .8s linear infinite;vertical-align:-2px;margin-right:6px}
@@ -325,7 +327,7 @@ function renderAgree(){
   const name=view.data&&view.data.model?esc(view.data.model.name)+' 様':'';
   app.innerHTML=(DEMO?demoBar():'')+`<div class="agree-wrap"><div class="agree-box">
     <div class="agree-ttl">ご利用の前に</div>${name?`<div class="agree-nm">${name}</div>`:''}
-    <div class="secret" style="margin:12px 0 16px">🔒 本ページは、<b>ご本人様専用</b>のページです。ファンの皆様のニックネーム及び票数等を掲載しているため、<b>本ページのスクリーンショット及びURLを第三者へ共有すること、並びにSNS等へ掲載することを固く禁じます。</b><br><span class="ban">⚠️「投票者一覧」のスクリーンショットを第三者へ送信し、又はSNS等へ掲載する行為が確認された場合は、失格といたします。</span></div>
+    <div class="secret" style="margin:12px 0 16px">🔒 本ページは、<b>ご本人様専用</b>のページです。ファンの皆様のニックネーム及び票数等を掲載しているため、<b>本ページのURLを第三者へ共有すること、並びにSNS等へ掲載することを固く禁じます。</b>なお、「ランキング」画面のスクリーンショットに限り、SNS等への掲載を認めます。<br><span class="ban">⚠️「投票者一覧」のスクリーンショットを第三者へ送信し、又はSNS等へ掲載する行為が確認された場合は、失格といたします。</span></div>
     <p class="agree-note">上記の内容を確認のうえ、「承認する」を押してください。承認いただいた場合に限り、本ページをご覧いただけます。</p>
     <button type="button" class="agree-btn" id="agree-btn" onclick="doAgree()">承認する</button>
   </div></div>`;
@@ -380,10 +382,10 @@ function renderTalent(){
     body=vs.length?`<div class="ban-top">⚠️ 本画面のスクリーンショットを第三者へ送信し、又はSNS等へ掲載することを禁止します。違反が確認された場合は、失格といたします。</div><div class="vt"><div class="vh"><span>順位</span><span>名前</span><span class="qh p">プラン</span><span class="qh y">有料</span><span class="qh f">無料</span><span class="qh">合計</span></div>${vs.map(v=>`<div class="vr${k(v.rank)}"><span class="n">${v.rank}</span><span class="nm">${esc(v.nick)}</span>${z(v.plan,'p')}${z(v.paid,'y')}${z(v.free,'f')}<span class="tv2">${num(v.total)}</span></div>`).join('')}</div>`
       :'<div class="empty">まだ投票がありません。</div>';
   }else{
-    body=`<div class="list">${rs.map(x=>`<div class="r${k(x.rank)}${x.me?' me':''}"><span class="n">${x.rank}</span><span class="b"><span class="nm">${esc(x.name)}</span>${x.me?'<span class="pt you">あなた</span>':''}</span><span class="v">${num(x.total)}<small>票</small></span></div>`).join('')}</div>`;
+    body=`<div class="ok-top">📸 「ランキング」画面に限り、スクリーンショットのSNS等への掲載を認めます。</div><div class="list">${rs.map(x=>`<div class="r${k(x.rank)}${x.me?' me':''}"><span class="n">${x.rank}</span><span class="b"><span class="nm">${esc(x.name)}</span>${x.me?'<span class="pt you">あなた</span>':''}</span><span class="v">${num(x.total)}<small>票</small></span></div>`).join('')}</div>`;
   }
   app.innerHTML=(DEMO?demoBar():'')+`<div class="wrap">${head}${body}
-    <div class="secret">🔒 本ページは、<b>ご本人様専用</b>のページです。ファンの皆様のニックネーム及び票数等を掲載しているため、<b>本ページのスクリーンショット及びURLを第三者へ共有すること、並びにSNS等へ掲載することを固く禁じます。</b><br><span class="ban">⚠️「投票者一覧」のスクリーンショットを第三者へ送信し、又はSNS等へ掲載する行為が確認された場合は、失格といたします。</span></div>
+    <div class="secret">🔒 本ページは、<b>ご本人様専用</b>のページです。ファンの皆様のニックネーム及び票数等を掲載しているため、<b>本ページのURLを第三者へ共有すること、並びにSNS等へ掲載することを固く禁じます。</b>なお、「ランキング」画面のスクリーンショットに限り、SNS等への掲載を認めます。<br><span class="ban">⚠️「投票者一覧」のスクリーンショットを第三者へ送信し、又はSNS等へ掲載する行為が確認された場合は、失格といたします。</span></div>
     <div class="upd">${stamp}・1分ごとに自動更新 <button id="upd-btn" onclick="loadTalent()">いま更新</button></div>
     <div class="foot">iito JAPAN</div></div>${tabbar}`;
 }
