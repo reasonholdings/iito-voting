@@ -168,6 +168,9 @@ body.tv .err h2{color:var(--gd)}
 body.tv .demo{background:#2A2210;border-color:#6B5520;color:#F1D58A}
 .secret{margin:16px 0 6px;padding:10px 14px;border:1px solid rgba(232,199,102,.45);border-radius:10px;background:rgba(232,199,102,.08);color:#E9E2CF;font-size:12.5px;line-height:1.7}
 .secret b{color:#F3D98A}
+.secret .ban{display:block;margin-top:6px;color:#FF8A80;font-weight:700}
+.ban-top{margin:0 0 8px;padding:7px 12px;border-radius:8px;background:rgba(255,82,82,.12);border:1px solid rgba(255,82,82,.45);color:#FF8A80;font-size:12px;font-weight:700;line-height:1.5}
+@media (prefers-color-scheme: light){.secret .ban,.ban-top{color:#C62828}.ban-top{background:#FFECEC;border-color:#F5A3A3}}
 /* 更新中の表示 */
 .boot{min-height:70vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;color:#A6A6B0;font-size:14px;font-weight:700}
 .spin{display:inline-block;width:14px;height:14px;border:2px solid rgba(232,199,102,.25);border-top-color:#E8C766;border-radius:50%;animation:spin .8s linear infinite;vertical-align:-2px;margin-right:6px}
@@ -325,13 +328,13 @@ function renderTalent(){
   if(view.tab==='voters'){
     // 1人1行：順位・名前・プラン・有料・無料・合計を横に並べる（見出しは上に1回だけ）
     const z=(v,c)=>`<span class="q ${c}${v?'':' z'}">${num(v)}</span>`;
-    body=vs.length?`<div class="vt"><div class="vh"><span>順位</span><span>名前</span><span class="qh p">プラン</span><span class="qh y">有料</span><span class="qh f">無料</span><span class="qh">合計</span></div>${vs.map(v=>`<div class="vr${k(v.rank)}"><span class="n">${v.rank}</span><span class="nm">${esc(v.nick)}</span>${z(v.plan,'p')}${z(v.paid,'y')}${z(v.free,'f')}<span class="tv2">${num(v.total)}</span></div>`).join('')}</div>`
+    body=vs.length?`<div class="ban-top">⚠️ この画面のスクリーンショットを載せる・送ることは禁止です。見つけ次第、失格とします。</div><div class="vt"><div class="vh"><span>順位</span><span>名前</span><span class="qh p">プラン</span><span class="qh y">有料</span><span class="qh f">無料</span><span class="qh">合計</span></div>${vs.map(v=>`<div class="vr${k(v.rank)}"><span class="n">${v.rank}</span><span class="nm">${esc(v.nick)}</span>${z(v.plan,'p')}${z(v.paid,'y')}${z(v.free,'f')}<span class="tv2">${num(v.total)}</span></div>`).join('')}</div>`
       :'<div class="empty">まだ投票がありません。</div>';
   }else{
     body=`<div class="list">${rs.map(x=>`<div class="r${k(x.rank)}${x.me?' me':''}"><span class="n">${x.rank}</span><span class="b"><span class="nm">${esc(x.name)}</span>${x.me?'<span class="pt you">あなた</span>':''}</span><span class="v">${num(x.total)}<small>票</small></span></div>`).join('')}</div>`;
   }
   app.innerHTML=(DEMO?demoBar():'')+`<div class="wrap">${head}${body}
-    <div class="secret">🔒 このページは<b>あなた専用</b>です。ファンの方のお名前や票数が載っているため、<b>スクリーンショットやこのページのURLを、他の人に送ったりSNSに載せたりしないでください。</b></div>
+    <div class="secret">🔒 このページは<b>あなた専用</b>です。ファンの方のお名前や票数が載っているため、<b>スクリーンショットやこのページのURLを、他の人に送ったりSNSに載せたりしないでください。</b><br><span class="ban">⚠️「投票してくれた人」のスクリーンショットを載せる・送ることは禁止です。見つけ次第、失格とします。</span></div>
     <div class="upd">${stamp}・1分ごとに自動更新 <button id="upd-btn" onclick="loadTalent()">いま更新</button></div>
     <div class="foot">iito JAPAN</div></div>`;
 }
