@@ -100,6 +100,7 @@ function handleAction(action, data) {
   if (action === 'pinLogin')    return pinLogin(data);
   if (action === 'adminLogin')  return adminLogin(data);
   if (action === 'talentView')  return talentView(data); // 演者ページ（専用リンクの鍵が必要）
+  if (action === 'talentAgree') return talentAgree(data); // 演者ページの注意事項への承認を記録
   // 投票者本人
   if (action === 'me')          return getMe(data);
   if (action === 'supporterRank') return supporterRank(data);
@@ -1687,6 +1688,17 @@ function talentAgg_(evId) {
   });
   try { cache.put(ck, JSON.stringify(agg), 30); } catch (e) {}
   return agg;
+}
+// 演者ページを初めて開いたときの注意事項への「承認」を記録する（シート「演者承認記録」。2026-11-24）
+const SHEET_TALENT_AGREE = '演者承認記録';
+function talentAgree(data) {
+  const t = talentByKey_(data.k);
+  if (!t) return { ok: false, error: 'bad_link' };
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sh = ss.getSheetByName(SHEET_TALENT_AGREE);
+  if (!sh) { sh = ss.insertSheet(SHEET_TALENT_AGREE); sh.appendRow(['日時', 'モデルID', 'モデル名', '鍵の末尾', '端末']); sh.setFrozenRows(1); }
+  sh.appendRow([new Date(), t.modelId, t.name, t.key.slice(-6), String(data.ua || '').slice(0, 300)]);
+  return { ok: true };
 }
 function talentView(data) {
   const t = talentByKey_(data.k);

@@ -187,6 +187,15 @@ body.tv .wrap{padding-bottom:84px}
    出てくるときはゆっくり（0.7秒）、隠れるときは速め（0.25秒） */
 .ttb{transition:transform .7s ease-in-out,opacity .7s ease-in-out}
 body.tb-hide .ttb{transform:translate(-50%,calc(100% + 24px));opacity:0;pointer-events:none;transition:transform .25s ease,opacity .25s ease}
+/* 初めて開いたときの注意事項 */
+.agree-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px 16px}
+.agree-box{max-width:460px;width:100%}
+.agree-ttl{font-size:20px;font-weight:900;text-align:center;color:var(--tx2)}
+.agree-nm{font-size:14px;text-align:center;color:var(--sub2);margin-top:4px}
+.agree-note{font-size:12.5px;line-height:1.7;color:var(--sub2);margin:0 0 14px}
+.agree-btn{width:100%;height:50px;border:none;border-radius:999px;background:#E8C766;color:#1A1500;font-family:inherit;font-size:16px;font-weight:900;cursor:pointer}
+.agree-btn:disabled{opacity:.6}
+@media (prefers-color-scheme: light){.agree-btn{background:#A87A0C;color:#FFF}}
 /* 更新中の表示 */
 .boot{min-height:70vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;color:#A6A6B0;font-size:14px;font-weight:700}
 .spin{display:inline-block;width:14px;height:14px;border:2px solid rgba(232,199,102,.25);border-top-color:#E8C766;border-radius:50%;animation:spin .8s linear infinite;vertical-align:-2px;margin-right:6px}
@@ -307,7 +316,29 @@ function cdText(end){
   return `終了まで <b>${d?d+'日 ':''}${pad(h)}:${pad(m)}:${pad(sec)}</b>`;
 }
 let cdTimer=null;
+// ── 初めて開いたときの注意事項（承認するまで中身を見せない。2026-11-24）──
+//  承認したことはこの端末に覚え、サーバーの「演者承認記録」にも残す。リンクを作り直すと、もう一度出る
+function agreedKey(){return 'talent_ok_'+(Q.get('k')||'demo');}
+function hasAgreed(){try{return localStorage.getItem(agreedKey())==='1';}catch(e){return false;}}
+function renderAgree(){
+  document.body.classList.add('tv');
+  const name=view.data&&view.data.model?esc(view.data.model.name)+' 様':'';
+  app.innerHTML=(DEMO?demoBar():'')+`<div class="agree-wrap"><div class="agree-box">
+    <div class="agree-ttl">ご利用の前に</div>${name?`<div class="agree-nm">${name}</div>`:''}
+    <div class="secret" style="margin:12px 0 16px">🔒 本ページは、<b>ご本人様専用</b>のページです。ファンの皆様のニックネーム及び票数等を掲載しているため、<b>本ページのスクリーンショット及びURLを第三者へ共有すること、並びにSNS等へ掲載することを固く禁じます。</b><br><span class="ban">⚠️「投票者一覧」のスクリーンショットを第三者へ送信し、又はSNS等へ掲載する行為が確認された場合は、失格といたします。</span></div>
+    <p class="agree-note">上記の内容を確認のうえ、「承認する」を押してください。承認いただいた場合に限り、本ページをご覧いただけます。</p>
+    <button type="button" class="agree-btn" id="agree-btn" onclick="doAgree()">承認する</button>
+  </div></div>`;
+}
+async function doAgree(){
+  const b=document.getElementById('agree-btn');if(b){b.disabled=true;b.textContent='送信中...';}
+  try{if(!DEMO)await gas('talentAgree',{k:Q.get('k')||'',ua:navigator.userAgent});}catch(e){}
+  try{localStorage.setItem(agreedKey(),'1');}catch(e){}
+  renderTalent();window.scrollTo(0,0);
+}
 function renderTalent(){
+  if(!hasAgreed()){renderAgree();return;}
+
   document.body.classList.add('tv');
   const d=view.data;if(!d)return;
   const at=new Date(d.at);
