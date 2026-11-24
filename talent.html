@@ -183,6 +183,10 @@ body.tv .wrap{padding-bottom:110px}
   .ttb-btn{color:#6E6E78}
   .ttb-btn.on{background:#FFF3D6;color:#8A5D00}
 }
+/* 下にスクロールするとメニューを隠し、上にスクロールすると出す（投票ページと同じ動き。2026-11-24）
+   出てくるときはゆっくり（0.7秒）、隠れるときは速め（0.25秒） */
+.ttb{transition:transform .7s ease-in-out,opacity .7s ease-in-out}
+body.tb-hide .ttb{transform:translate(-50%,calc(100% + 24px));opacity:0;pointer-events:none;transition:transform .25s ease,opacity .25s ease}
 /* 更新中の表示 */
 .boot{min-height:70vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;color:#A6A6B0;font-size:14px;font-weight:700}
 .spin{display:inline-block;width:14px;height:14px;border:2px solid rgba(232,199,102,.25);border-top-color:#E8C766;border-radius:50%;animation:spin .8s linear infinite;vertical-align:-2px;margin-right:6px}
@@ -352,7 +356,32 @@ function renderTalent(){
     <div class="upd">${stamp}・1分ごとに自動更新 <button id="upd-btn" onclick="loadTalent()">いま更新</button></div>
     <div class="foot">iito JAPAN</div></div>${tabbar}`;
 }
-function setTab(t){if(view.tab!==t){view.tab=t;try{sessionStorage.setItem('talent_tab',t);}catch(e){}renderTalent();window.scrollTo(0,0);}}
+
+// ── 下のメニュー：下にスクロールで隠し、上にスクロールで出す（投票ページ index.html の onTbScroll と同じ動き。2026-11-24）──
+//  ・一度隠したら、利用者が自分で上へスクロールするまでは出さない（iPhoneの端での跳ね返り・自動更新による位置のずれでは出さない）
+let tbLastY=0,tbUpAcc=0,tbDownAcc=0,tbTouching=false,tbInputAt=0;
+function tbMaxY(){return Math.max(0,document.documentElement.scrollHeight-window.innerHeight);}
+function tbUpNeed(){return Math.max(45,Math.min(180,tbMaxY()*0.3));}
+function tbByUser(){return tbTouching||Date.now()-tbInputAt<1500;}
+['touchstart','touchmove'].forEach(ev=>window.addEventListener(ev,()=>{tbTouching=true;tbInputAt=Date.now();},{passive:true}));
+['touchend','touchcancel'].forEach(ev=>window.addEventListener(ev,()=>{tbTouching=false;tbInputAt=Date.now();},{passive:true}));
+window.addEventListener('wheel',()=>{tbInputAt=Date.now();},{passive:true});
+window.addEventListener('keydown',()=>{tbInputAt=Date.now();});
+function onTbScroll(){
+  const y=Math.min(tbMaxY(),Math.max(0,window.scrollY||0)),dy=y-tbLastY;tbLastY=y;
+  const hidden=document.body.classList.contains('tb-hide');
+  if(dy>0){tbUpAcc=0;tbDownAcc+=dy;if(y>=40&&tbDownAcc>=8)document.body.classList.add('tb-hide');return;}
+  if(dy<0){
+    tbDownAcc=0;
+    if(!hidden)return;
+    if(!tbByUser()){tbUpAcc=0;return;}
+    tbUpAcc+=-dy;
+    if(tbUpAcc>=tbUpNeed()||y<40)document.body.classList.remove('tb-hide');
+  }
+}
+window.addEventListener('scroll',onTbScroll,{passive:true});
+function tbReset(){document.body.classList.remove('tb-hide');tbLastY=window.scrollY||0;tbUpAcc=tbDownAcc=0;}
+function setTab(t){if(view.tab!==t){view.tab=t;try{sessionStorage.setItem('talent_tab',t);}catch(e){}renderTalent();window.scrollTo(0,0);tbReset();}}
 
 // ════════ 管理者：専用リンクの発行・停止 ════════
 let admTok='';try{admTok=sessionStorage.getItem('talent_adm')||'';}catch(e){}
