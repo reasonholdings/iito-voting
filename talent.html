@@ -318,6 +318,8 @@ const Q=new URLSearchParams(location.search);
 const DEMO=Q.get('demo')==='1';
 // 管理者ビュー（2026-11-25）：talent.html?admin=1&m=モデルID で、管理者がそのモデルの演者ページをそのまま見る（承認画面は出さず、承認の記録も残さない）
 const ADMV=Q.get('admin')==='1'&&!!Q.get('m');
+const EMBED=Q.get('embed')==='1'; // 管理画面（index.html）の中に埋め込んで表示しているとき
+let admM=Q.get('m')||'',admList=null; // 管理者ビューで表示中のモデルと、選べるモデルの一覧
 const PLAN_LABEL={supporter:'サポーター',partner:'パートナー',producer:'プロデューサー'};
 const PLAN_ORDER=['supporter','partner','producer'];
 const app=document.getElementById('app');
@@ -355,7 +357,7 @@ async function loadTalent(){
   if(!view.data){document.body.classList.add('tv');app.innerHTML='<div class="boot"><span class="spin lg"></span><div>読み込み中...</div></div>';}
   else setBusy(true);
   let r=null;
-  try{r=await gas('talentView',ADMV?{adminToken:admTok,modelId:Q.get('m'),evId:view.evId}:{k,evId:view.evId});}finally{loadingNow=false;}
+  try{r=await gas('talentView',ADMV?{adminToken:admTok,modelId:admM,evId:view.evId}:{k,evId:view.evId});}finally{loadingNow=false;}
   if(DEMO)await new Promise(x=>setTimeout(x,400));
   if(!r){setBusy(false);if(!view.data)showErr('読み込めませんでした','通信環境を確認して、ページを開き直してください。');return;}
   const had=!!view.data;
@@ -597,8 +599,22 @@ async function copyLink(i){
 function topBar(){return (DEMO?demoBar():'')+(ADMV?admBar():'');}
 function admBar(){
   const d=view.data||{},evs=d.events||[];
-  const sel=evs.length>1?`<select class="admv-sel" onchange="view.evId=this.value;loadTalent()">${evs.map(e=>`<option value="${esc(e.id)}"${d.event&&d.event.id===e.id?' selected':''}>${esc(e.name)}</option>`).join('')}</select>`:'';
-  return `<div class="admv"><div><b>管理者ビュー</b>：${esc(d.model?d.model.name:'')} さんのページ（演者本人と同じ表示です）</div><div class="admv-r">${sel}<a href="?admin=1${DEMO?'&demo=1':''}">一覧へ戻る</a></div></div>`;
+  const evSel=evs.length>1?`<select class="admv-sel" onchange="view.evId=this.value;loadTalent()">${evs.map(e=>`<option value="${esc(e.id)}"${d.event&&d.event.id===e.id?' selected':''}>${esc(e.name)}</option>`).join('')}</select>`:'';
+  if(EMBED)return evSel?`<div class="admv"><div><b>管理者ビュー</b></div><div class="admv-r">${evSel}</div></div>`:'';
+  // 演者を選ぶと、そのページに切り替わる（2026-11-25）
+  const ms=admList||[{id:admM,name:d.model?d.model.name:admM}];
+  const mSel=`<select class="admv-sel" onchange="switchAdmModel(this.value)">${ms.map(m=>`<option value="${esc(m.id)}"${m.id===admM?' selected':''}>${esc(m.name)}${m.hidden?'（非表示）':''}</option>`).join('')}</select>`;
+  return `<div class="admv"><div class="admv-r"><b>管理者ビュー</b>${mSel}${evSel}</div><a href="?admin=1${DEMO?'&demo=1':''}">リンクの管理へ</a></div>`;
+}
+function switchAdmModel(id){
+  if(!id||id===admM)return;admM=id;view.data=null;view.evId='';
+  try{history.replaceState(null,'','?admin=1&m='+encodeURIComponent(id)+(DEMO?'&demo=1':''));}catch(e){}
+  loadTalent();
+}
+async function loadAdmList(){
+  if(EMBED||admList)return;
+  const r=await gas('listTalentKeys',{adminToken:admTok});
+  if(r&&r.ok){admList=(r.models||[]).slice().sort((a,b)=>(a.hidden-b.hidden));if(view.data)renderTalent();}
 }
 function demoBar(){return '<div class="demo"><b>テストモード</b>：架空のデータです（本番のデータではありません）</div>';}
 function demo(action){
@@ -619,7 +635,7 @@ function demo(action){
 }
 
 // ════════ はじめに ════════
-if(ADMV){loadTalent();view.timer=setInterval(()=>{if(!document.hidden)loadTalent();},60000);}
+if(ADMV){loadTalent();loadAdmList();view.timer=setInterval(()=>{if(!document.hidden)loadTalent();},60000);}
 else if(Q.get('admin')==='1'){DEMO?loadAdmin():(admTok?loadAdmin():renderAdminLogin());}
 else{loadTalent();view.timer=setInterval(()=>{if(!document.hidden)loadTalent();},60000);}
 </script>

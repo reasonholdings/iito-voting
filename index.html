@@ -1161,6 +1161,11 @@ body.ia-open{overflow:hidden}
   <!-- 設定 -->
   <!-- 演者ページ（talent.html）の専用リンクの発行・停止（2026-11-24） -->
   <div class="apanel" id="ap-talent">
+    <!-- 演者を選ぶと、その演者のページ（本人と同じ表示）を下に出す（2026-11-25） -->
+    <p style="font-size:14px;font-weight:600;margin:0">演者ページを見る</p>
+    <p style="font-size:11px;color:var(--sub);margin:6px 0 10px;line-height:1.7">演者を選ぶと、その演者の専用ページを本人と同じ表示で見られます（リンクの発行は不要です。承認の記録も残りません）。</p>
+    <select id="tv-sel" class="inp" style="max-width:320px;margin-bottom:10px" onchange="showTalentView(this.value)"><option value="">演者を選んでください</option></select>
+    <div id="tv-frame-wrap" style="display:none;border:1px solid var(--bd);border-radius:12px;overflow:hidden;margin-bottom:22px"><iframe id="tv-frame" title="演者ページ" style="display:block;width:100%;height:78vh;border:0;background:#0E0E11"></iframe></div>
     <p style="font-size:14px;font-weight:600;margin:0">演者ページ：専用リンク</p>
     <p style="font-size:11px;color:var(--sub);margin:6px 0 12px;line-height:1.7">演者（モデル本人）が「ランキング」と「投票者一覧（プラン・有料・無料の内訳）」を見られるページの専用リンクです。モデルごとに発行して、<b>本人にだけ</b>送ってください。リンクを知っている人は誰でも見られます。<br>「作り直す」を押すと古いリンクは使えなくなります。「停止」でそのモデルのページを見られなくします。</p>
     <div style="font-size:12px;min-height:18px;margin-bottom:6px" id="tl-msg"></div>
@@ -3508,7 +3513,13 @@ function exitAdmin(){
 // ── 演者ページの専用リンク（2026-11-24）──
 let tlModels=[];
 // 管理者として、そのモデルの演者ページを本人と同じ表示で開く（リンクの発行は不要。承認の記録は残らない。2026-11-25）
-function openTalentAdmin(i){const x=tlModels[i];if(!x)return;window.open(new URL('talent.html?admin=1&m='+encodeURIComponent(x.id)+(DEMO?'&demo=1':''),location.href.split('?')[0]).href,'_blank');}
+function showTalentView(id,scroll){
+  const sel=document.getElementById('tv-sel'),w=document.getElementById('tv-frame-wrap'),f=document.getElementById('tv-frame');if(!w||!f)return;
+  if(sel)sel.value=id||'';
+  if(!id){w.style.display='none';f.src='about:blank';return;}
+  f.src=new URL('talent.html?admin=1&embed=1&m='+encodeURIComponent(id)+(DEMO?'&demo=1':''),location.href.split('?')[0]).href;
+  w.style.display='block';if(scroll&&sel)sel.scrollIntoView({behavior:'smooth',block:'start'});
+}
 function talentUrl(key){return new URL('talent.html?k='+key,location.href.split('?')[0]).href;}
 async function renderTalentLinks(msg){
   const box=document.getElementById('tl-list'),m=document.getElementById('tl-msg');if(!box)return;
@@ -3516,11 +3527,13 @@ async function renderTalentLinks(msg){
   const r=await gasPost('listTalentKeys',{});
   if(!r||!r.ok){box.innerHTML=`<p style="font-size:13px;color:var(--rd)">${r&&r.error==='unknown action'?'GASが古いため使えません。最新のGASをデプロイしてください。':'読み込めませんでした。もう一度開いてください。'}</p>`;return;}
   tlModels=(r.models||[]).slice().sort((a,b)=>(a.hidden-b.hidden));
+  const sel=document.getElementById('tv-sel');
+  if(sel){const cur=sel.value;sel.innerHTML='<option value="">演者を選んでください</option>'+tlModels.map(x=>`<option value="${String(x.id).replace(/"/g,'&quot;')}">${String(x.name).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}${x.hidden?'（非表示）':''}</option>`).join('');sel.value=cur;}
   const esc=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   box.innerHTML=`<div style="overflow-x:auto"><table class="tbl"><thead><tr><th>モデル</th><th>状態</th><th>操作</th></tr></thead><tbody>${tlModels.map((x,i)=>`<tr>
     <td style="font-weight:600">${esc(x.name)}${x.hidden?' <span style="font-size:10px;color:var(--sub)">（非表示）</span>':''}</td>
     <td style="font-size:12px;${x.active?'color:var(--gr);font-weight:600':'color:var(--sub)'}">${x.active?'発行済み':'未発行'}</td>
-    <td><div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn-sm-out" onclick="openTalentAdmin(${i})"><i class="ti ti-eye" style="font-size:12px;vertical-align:-1px"></i> ページを見る</button>${x.active
+    <td><div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn-sm-out" onclick="showTalentView(tlModels[${i}].id,true)"><i class="ti ti-eye" style="font-size:12px;vertical-align:-1px"></i> ページを見る</button>${x.active
       ?`<button class="btn-sm-out" onclick="copyTalentLink(${i},true)"><i class="ti ti-message" style="font-size:12px;vertical-align:-1px"></i> 案内文ごとコピー</button><button class="btn-sm-out" onclick="copyTalentLink(${i})"><i class="ti ti-copy" style="font-size:12px;vertical-align:-1px"></i> リンクだけコピー</button><button class="btn-sm-out" onclick="issueTalentLink(${i},true)">作り直す</button><button class="btn-sm-rd-out" onclick="revokeTalentLink(${i})">停止</button>`
       :`<button class="btn-sm-out" onclick="issueTalentLink(${i},false)">発行する</button>`}</div></td></tr>`).join('')}</tbody></table></div>`;
 }
