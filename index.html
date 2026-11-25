@@ -4680,6 +4680,7 @@ async function loadPaidCSV(input){
   const perK={}; // {evId:{'ニックネーム|モデルID|free/paid':票数}}（演者ページで「無料」「有料」を分けて出すため。2026-11-23）
   const marks={},unknownModel={},noEvent={n:0,v:0};
   let rowsOk=0,dup=0,bad=0,noDate=0;
+  let minD=null,maxD=null; // CSVに入っている決済日の範囲（どの期間のデータか）
   for(const f of files){
     const text=(await f.text()).replace(/^\uFEFF/,'');
     const lines=text.split(/\r?\n/).filter(l=>l.trim());if(lines.length<2){bad++;continue;}
@@ -4695,6 +4696,7 @@ async function loadPaidCSV(input){
       const mark=rowMark([dateS,email,item,qty,ix.amount>=0?c[ix.amount]:''].join('|'));
       if(marks[mark]){dup++;return;}marks[mark]=1;
       const d=_parsePayDate(dateS);if(!d){noDate++;return;}
+      if(!minD||d<minD)minD=d;if(!maxD||d>maxD)maxD=d;
       const ev=events.find(e=>{const a=getEvStart(e),b=getEvEnd(e);return a&&b&&d>=a&&d<=b;});
       if(!ev){noEvent.n++;noEvent.v+=votes;return;}
       const mod=_findModelByItemName(mm[1]);
@@ -4708,15 +4710,27 @@ async function loadPaidCSV(input){
       rowsOk++;
     });
   }
+  // CSVが投票期間の一部しか含んでいないイベントは保存しない（2026-11-25）
+  //  保存は「そのイベントの有料票をまるごと入れ替え」なので、期間の途中から始まるCSVで過去のイベントを保存すると、
+  //  それより前の購入が消えてしまう。CSVの最初の決済日がイベントの開始以前で、
+  //  終わったイベントはCSVの最後の決済日が終了の6時間前以降のものだけ保存する。
+  const partial=[];
+  Object.keys(per).forEach(id=>{
+    const e=events.find(x=>x.id===id);const a=e&&getEvStart(e),b=e&&getEvEnd(e);
+    const ended=b&&b<new Date();
+    const okStart=minD&&a&&minD<=a, okEnd=!ended||(maxD&&b&&maxD>=new Date(b.getTime()-6*3600000));
+    if(!(okStart&&okEnd)){partial.push(e?.name||id);delete per[id];delete perK[id];}
+  });
   const evIds=Object.keys(per);
   const unk=Object.entries(unknownModel);
   const notes=[];
+  if(partial.length)notes.push(`投票期間の一部しか入っていないため保存しなかったイベント：${partial.join('、')}（期間全体が入ったCSVで読み込み直してください）`);
   if(dup)notes.push(`同じ購入の重複 ${dup}件は1回だけ数えました`);
   if(noEvent.n)notes.push(`投票期間外の購入 ${noEvent.n}件（${noEvent.v}票）は数えていません`);
   if(noDate)notes.push(`決済日が読めない ${noDate}件は数えていません`);
   if(unk.length)notes.push(`モデルが見つからない商品：${unk.map(([k,v])=>k+'（'+v+'票）').join('、')}`);
   if(bad)notes.push(`読めなかったファイル ${bad}件（「商品名」「購入数」「決済日」「ニックネーム」の列が必要です）`);
-  if(!evIds.length){if(st)st.textContent='投票期間内の投票券の購入が見つかりませんでした。'+(notes.length?notes.join('／'):'');return;}
+  if(!evIds.length){if(st)st.textContent=(partial.length?'保存できるイベントがありませんでした。':'投票期間内の投票券の購入が見つかりませんでした。')+(notes.length?notes.join('／'):'');return;}
   const summary=evIds.map(id=>{const e=events.find(x=>x.id===id);const v=Object.values(per[id]).reduce((a,o)=>a+Object.values(o).reduce((x,y)=>x+y,0),0);return `・${e?.name||id}：${Object.keys(per[id]).length}人／${v}票`;}).join('\n');
   if(!confirm('次のイベントの有料票を、このCSVの内容で入れ替えます。\n\n'+summary+(unk.length?'\n\n※モデルが見つからない商品は数えていません（モデル名を確認してください）':'')+'\n\nよろしいですか？'))return;
   if(st)st.textContent='保存中...';
