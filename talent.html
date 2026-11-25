@@ -68,6 +68,10 @@ html,body{margin:0;background:var(--bg);color:var(--tx);font-family:'Noto Sans J
 .upd button{font-family:inherit;font-size:11.5px;border:1px solid var(--bd);background:#fff;border-radius:999px;padding:3px 10px;cursor:pointer;color:var(--tx)}
 .err{max-width:460px;margin:80px auto;text-align:center;line-height:1.8;font-size:14px}
 .err h2{color:var(--ac);font-size:18px}
+.admv{position:sticky;top:0;z-index:50;display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;justify-content:space-between;background:#1F3A5F;color:#fff;font-size:12px;padding:8px 14px;line-height:1.5}
+.admv a{color:#fff;font-weight:700;text-decoration:underline;white-space:nowrap}
+.admv-r{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.admv-sel{font-family:inherit;font-size:12px;padding:3px 6px;border-radius:6px;border:none;max-width:220px}
 .demo{background:#FFF4E5;border-bottom:1px solid #F0A020;color:#7A4A00;font-size:12px;text-align:center;padding:8px 14px}
 /* ════ 演者の画面：黒地＋ゴールド。見やすさ・わかりやすさを最優先にした、シンプルな形（2026-11-24） ════ */
 html:has(body.tv){background:#0E0E11}
@@ -312,6 +316,8 @@ const GAS_URL='https://script.google.com/macros/s/AKfycbw5EGadYPogNQ5_8KMtedFfz3
 const GAS_KEY='iito2026secret';
 const Q=new URLSearchParams(location.search);
 const DEMO=Q.get('demo')==='1';
+// 管理者ビュー（2026-11-25）：talent.html?admin=1&m=モデルID で、管理者がそのモデルの演者ページをそのまま見る（承認画面は出さず、承認の記録も残さない）
+const ADMV=Q.get('admin')==='1'&&!!Q.get('m');
 const PLAN_LABEL={supporter:'サポーター',partner:'パートナー',producer:'プロデューサー'};
 const PLAN_ORDER=['supporter','partner','producer'];
 const app=document.getElementById('app');
@@ -343,15 +349,17 @@ function setBusy(on,done){
 }
 async function loadTalent(){
   const k=Q.get('k')||'';
-  if(!k&&!DEMO){showErr('リンクが正しくありません','運営から届いた専用リンクを、もう一度開いてください。');return;}
+  if(ADMV&&!admTok&&!DEMO){renderAdminLogin();return;}
+  if(!k&&!DEMO&&!ADMV){showErr('リンクが正しくありません','運営から届いた専用リンクを、もう一度開いてください。');return;}
   if(loadingNow)return;loadingNow=true;
   if(!view.data){document.body.classList.add('tv');app.innerHTML='<div class="boot"><span class="spin lg"></span><div>読み込み中...</div></div>';}
   else setBusy(true);
   let r=null;
-  try{r=await gas('talentView',{k,evId:view.evId});}finally{loadingNow=false;}
+  try{r=await gas('talentView',ADMV?{adminToken:admTok,modelId:Q.get('m'),evId:view.evId}:{k,evId:view.evId});}finally{loadingNow=false;}
   if(DEMO)await new Promise(x=>setTimeout(x,400));
   if(!r){setBusy(false);if(!view.data)showErr('読み込めませんでした','通信環境を確認して、ページを開き直してください。');return;}
   const had=!!view.data;
+  if(!r.ok&&ADMV){if(r.error==='admin_required'){admTok='';try{sessionStorage.removeItem('talent_adm');}catch(e){}renderAdminLogin('もう一度ログインしてください。');}else showErr('表示できませんでした','モデルが見つかりません。一覧から開き直してください。');stopTimer();return;}
   if(!r.ok){showErr('このリンクは使えません','リンクの有効期限が切れたか、停止されています。運営にお問い合わせください。');stopTimer();return;}
   view.data=r;if(r.event)view.evId=r.event.id;
   renderTalent();
@@ -432,7 +440,7 @@ function hasAgreed(){try{return localStorage.getItem(agreedKey())==='1';}catch(e
 function renderAgree(){
   document.body.classList.add('tv');
   const name=view.data&&view.data.model?esc(view.data.model.name)+' 様':'';
-  app.innerHTML=(DEMO?demoBar():'')+`<div class="agree-wrap"><div class="agree-box">
+  app.innerHTML=topBar()+`<div class="agree-wrap"><div class="agree-box">
     <div class="agree-ttl">ご利用の前に</div>${name?`<div class="agree-nm">${name}</div>`:''}
     ${rulesHtml(true)}
     <div class="tt-box">${termsHtml()}</div>
@@ -449,13 +457,13 @@ async function doAgree(){
   renderTalent();window.scrollTo(0,0);
 }
 function renderTalent(){
-  if(!hasAgreed()){renderAgree();return;}
+  if(!ADMV&&!hasAgreed()){renderAgree();return;}
 
   document.body.classList.add('tv');
   const d=view.data;if(!d)return;
   const at=new Date(d.at);
   const stamp=`${at.getMonth()+1}/${at.getDate()} ${pad(at.getHours())}:${pad(at.getMinutes())}時点`;
-  if(!d.event){app.innerHTML=(DEMO?demoBar():'')+`<div class="wrap"><div class="hd"><div class="nm">${esc(d.model.name)}</div></div><div class="empty">いま開催中の投票イベントはありません。</div><div class="foot">iito JAPAN</div></div>`;return;}
+  if(!d.event){app.innerHTML=topBar()+`<div class="wrap"><div class="hd"><div class="nm">${esc(d.model.name)}</div></div><div class="empty">いま開催中の投票イベントはありません。</div><div class="foot">iito JAPAN</div></div>`;return;}
   const rs=d.ranking||[],vs=d.voters||[];
   const me=rs.find(x=>x.me);
   const T=d.totals||{plan:0,free:0,paid:0,total:0};
@@ -494,7 +502,7 @@ function renderTalent(){
   }else{
     body=`<div class="ok-top">この画面のスクショ：<b>SNS掲載 OK</b></div><div class="list">${rs.map(x=>`<div class="r${k(x.rank)}${x.me?' me':''}"><span class="n">${x.rank}</span><span class="b"><span class="nm">${esc(x.name)}</span>${x.me?'<span class="pt you">あなた</span>':''}</span><span class="v">${num(x.total)}<small>票</small></span></div>`).join('')}</div>`;
   }
-  app.innerHTML=(DEMO?demoBar():'')+`<div class="wrap">${head}${body}
+  app.innerHTML=topBar()+`<div class="wrap">${head}${body}
     ${rulesHtml()}
     <details class="tt-more"><summary>演者ページ利用規約を読む</summary>${termsHtml()}</details>
     <div class="upd">${stamp}・1分ごとに自動更新 <button id="upd-btn" onclick="loadTalent()">いま更新</button></div>
@@ -531,8 +539,10 @@ function setTab(t){if(view.tab!==t){view.tab=t;try{sessionStorage.setItem('talen
 
 // ════════ 管理者：専用リンクの発行・停止 ════════
 let admTok='';try{admTok=sessionStorage.getItem('talent_adm')||'';}catch(e){}
+// 管理画面（index.html）でログイン済みなら、そのログインをそのまま使う（同じサイトなので保存場所を共有できる）
+try{if(!admTok){const a=JSON.parse(localStorage.getItem('iito_adm_login'));if(a&&a.token)admTok=a.token;}}catch(e){}
 function renderAdminLogin(msg){
-  app.innerHTML=`<div class="adm"><h1>演者ページ：専用リンクの発行</h1>
+  app.innerHTML=`<div class="adm"><h1>演者ページ：管理者</h1>
     <p class="lead">管理画面と同じパスワードでログインしてください。</p>
     <input type="password" id="pw" placeholder="管理者パスワード" onkeydown="if(event.key==='Enter')admLogin()"/>
     <div style="margin-top:10px"><button class="btn" onclick="admLogin()">ログイン</button></div>
@@ -543,7 +553,7 @@ async function admLogin(){
   const r=await gas('adminLogin',{pw});
   if(!r||!r.ok){renderAdminLogin(r&&r.error==='locked'?'しばらくログインできません。時間をおいてお試しください。':'パスワードが違います。');return;}
   admTok=r.token;try{sessionStorage.setItem('talent_adm',admTok);}catch(e){}
-  loadAdmin();
+  if(ADMV){view.data=null;loadTalent();stopTimer();view.timer=setInterval(()=>{if(!document.hidden)loadTalent();},60000);}else loadAdmin();
 }
 async function loadAdmin(note){
   if(!admTok&&!DEMO){renderAdminLogin();return;}
@@ -551,12 +561,13 @@ async function loadAdmin(note){
   if(!r||!r.ok){admTok='';try{sessionStorage.removeItem('talent_adm');}catch(e){}renderAdminLogin(r&&r.error==='admin_required'?'もう一度ログインしてください。':'読み込めませんでした。');return;}
   const base=location.origin+location.pathname;
   const ms=(r.models||[]).slice().sort((a,b)=>(a.hidden-b.hidden));admModels=ms;admBase=base;
-  app.innerHTML=(DEMO?demoBar():'')+`<div class="adm"><h1>演者ページ：専用リンクの発行</h1>
-    <p class="lead">モデルごとに専用リンクを発行し、本人にだけ送ってください。リンクを知っている人は誰でもそのページを見られます。<br>
+  app.innerHTML=topBar()+`<div class="adm"><h1>演者ページ：管理者</h1>
+    <p class="lead">「ページを見る」で、各モデルの専用ページを本人と同じ表示で確認できます（リンクの発行は不要です）。<br>モデルごとに専用リンクを発行し、本人にだけ送ってください。リンクを知っている人は誰でもそのページを見られます。<br>
     「作り直す」を押すと古いリンクは使えなくなります。「停止」でそのモデルのページを見られなくします。</p>
     <div class="msg" id="msg">${esc(note||'')}</div>
     ${ms.map((m,i)=>`<div class="mrow"><span class="mn">${esc(m.name)}${m.hidden?' <span class="st">（非表示）</span>':''}</span>
       <span class="st${m.active?' on':''}">${m.active?'発行済み':'未発行'}</span>
+      <button class="btn out" onclick="location.href='?admin=1&m='+encodeURIComponent(admModels[${i}].id)${DEMO?"+'&demo=1'":''}">ページを見る</button>
       ${m.active?`<button class="btn out" onclick="copyLink(${i})">リンクをコピー</button>
         <button class="btn gray" onclick="issue(${i},true)">作り直す</button>
         <button class="btn gray" onclick="revoke(${i})">停止</button>`
@@ -583,6 +594,12 @@ async function copyLink(i){
 }
 
 // ════════ テストモード（架空のデータ） ════════
+function topBar(){return (DEMO?demoBar():'')+(ADMV?admBar():'');}
+function admBar(){
+  const d=view.data||{},evs=d.events||[];
+  const sel=evs.length>1?`<select class="admv-sel" onchange="view.evId=this.value;loadTalent()">${evs.map(e=>`<option value="${esc(e.id)}"${d.event&&d.event.id===e.id?' selected':''}>${esc(e.name)}</option>`).join('')}</select>`:'';
+  return `<div class="admv"><div><b>管理者ビュー</b>：${esc(d.model?d.model.name:'')} さんのページ（演者本人と同じ表示です）</div><div class="admv-r">${sel}<a href="?admin=1${DEMO?'&demo=1':''}">一覧へ戻る</a></div></div>`;
+}
 function demoBar(){return '<div class="demo"><b>テストモード</b>：架空のデータです（本番のデータではありません）</div>';}
 function demo(action){
   if(action==='talentView'){
@@ -602,7 +619,8 @@ function demo(action){
 }
 
 // ════════ はじめに ════════
-if(Q.get('admin')==='1'){DEMO?loadAdmin():(admTok?loadAdmin():renderAdminLogin());}
+if(ADMV){loadTalent();view.timer=setInterval(()=>{if(!document.hidden)loadTalent();},60000);}
+else if(Q.get('admin')==='1'){DEMO?loadAdmin():(admTok?loadAdmin():renderAdminLogin());}
 else{loadTalent();view.timer=setInterval(()=>{if(!document.hidden)loadTalent();},60000);}
 </script>
 </body>
