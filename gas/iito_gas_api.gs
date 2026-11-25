@@ -560,12 +560,13 @@ function getEventWindow(evId) {
 // ════════════════════════════════════════
 // 応援ランキング（2026-11-21 追加）
 //  投票画面で「自分が投票したモデルに、いま誰が何票入れているか」の上位5名（ニックネーム・票数）を出す。
-//  ・ログインした本人だけが呼べる。本人がこのイベントで10票以上入れたモデルの分だけ返す（10票未満なら「あと何票」だけ、入れていないモデルは何も返さない）
+//  ・ログインした本人だけが呼べる。本人がこのイベントでプラン票を20票以上入れたモデルの分だけ返す（20票未満なら「あと何票」だけ、入れていないモデルは何も返さない）
+//  ・見られる条件はプラン票だけで数える（有料・無料の投票券の票は条件に数えない。2026-11-25）。ランキングの中身はプラン票＋投票券の票の合計で並べる
 //  ・返すのはニックネームと票数だけ（メールアドレスや会員番号は返さない）
 //  ・リアルタイム表示。同時アクセスに備えて、集計結果を20秒だけキャッシュする
 // ════════════════════════════════════════
 const SUPPORTER_TOP_N = 5;
-const SUPPORTER_MIN_VOTES = 10; // このイベントでそのモデルに10票以上入れた人だけが、そのモデルの応援ランキングを見られる（2026-11-21）
+const SUPPORTER_MIN_VOTES = 20; // このイベントでそのモデルにプラン票を20票以上入れた人だけが、そのモデルの応援ランキングを見られる（2026-11-21に10票で開始、2026-11-25にプラン票のみ・20票へ変更）
 function supporterRank(data) {
   const a = authVoter_(data);
   if (a.error) return { ok: false, error: a.error };
@@ -579,12 +580,13 @@ function supporterRank(data) {
     const m = agg[modelId];
     const mine = m.by[me] || 0;
     if (mine <= 0) return; // 本人が票を入れていないモデルは返さない
+    const minePlan = (m.plan && m.plan[me]) || 0; // 見られる条件はプラン票だけで数える（2026-11-25）
     // そのモデルの総投票数（全員のプラン票＋有料票の合計）
     var votes = 0;
     Object.keys(m.by).forEach(function(n){ votes += Number(m.by[n]) || 0; });
-    if (mine < SUPPORTER_MIN_VOTES) {
-      // 10票未満：ランキングの中身は返さず、「あと何票で見られるか」だけ返す
-      out.push({ modelId: modelId, name: m.name, votes: votes, locked: true, mine: mine, need: SUPPORTER_MIN_VOTES - mine, top: [], me: { rank: 0, count: mine } });
+    if (minePlan < SUPPORTER_MIN_VOTES) {
+      // プラン票が20票未満：ランキングの中身は返さず、「プラン票であと何票で見られるか」だけ返す
+      out.push({ modelId: modelId, name: m.name, votes: votes, locked: true, mine: minePlan, need: SUPPORTER_MIN_VOTES - minePlan, top: [], me: { rank: 0, count: minePlan } });
       return;
     }
     const list = Object.keys(m.by).map(function(n){ return { nick: n, count: m.by[n] }; })
@@ -608,7 +610,7 @@ function supporterRank(data) {
 function supporterAgg_(evId) {
   const safeId = String(evId || 'noevent').replace(/[\\\/\?\*\[\]:]/g, '_').slice(0, 80);
   const cache = CacheService.getScriptCache();
-  const key = 'srk_' + Utilities.base64EncodeWebSafe(safeId).slice(0, 200);
+  const key = 'srk2_' + Utilities.base64EncodeWebSafe(safeId).slice(0, 200);
   const hit = cache.get(key);
   if (hit) { try { return JSON.parse(hit); } catch (e) {} }
   const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('投票_' + safeId); // 無ければ作らない
@@ -617,13 +619,14 @@ function supporterAgg_(evId) {
     sh.getRange(3, 1, sh.getLastRow() - 2, 12).getValues().forEach(function(r){
       const nick = String(r[4] || '').trim(), modelId = String(r[8] || '').trim(), c = Number(r[10]) || 0;
       if (!nick || !modelId || !c) return;
-      if (!agg[modelId]) agg[modelId] = { name: String(r[9] || modelId), by: {} };
+      if (!agg[modelId]) agg[modelId] = { name: String(r[9] || modelId), by: {}, plan: {} };
       agg[modelId].by[nick] = (agg[modelId].by[nick] || 0) + c;
+      agg[modelId].plan[nick] = (agg[modelId].plan[nick] || 0) + c; // プラン票だけの数（見られる条件に使う）
     });
   }
-  // 投票券（有料）の票も足す（プラン票＋有料票の合計でランキング・10票の条件を数える。2026-11-22）
+  // 投票券（有料・無料）の票も足す（ランキングの並びはプラン票＋投票券の票の合計。見られる条件はプラン票だけ。2026-11-25）
   paidRows_(evId).forEach(function(p){
-    if (!agg[p.modelId]) agg[p.modelId] = { name: p.name || p.modelId, by: {} };
+    if (!agg[p.modelId]) agg[p.modelId] = { name: p.name || p.modelId, by: {}, plan: {} };
     agg[p.modelId].by[p.nick] = (agg[p.modelId].by[p.nick] || 0) + p.votes;
   });
   try { cache.put(key, JSON.stringify(agg), 20); } catch (e) {} // 大きすぎて入らないときはキャッシュしない
@@ -683,7 +686,7 @@ function savePaidVotes(data) {
   try { CacheService.getScriptCache().remove('tlv_' + Utilities.base64EncodeWebSafe(evId).slice(0, 200)); } catch (e) {}
   // 応援ランキングのキャッシュを消して、すぐ反映させる
   const safeId = evId.replace(/[\\\/\?\*\[\]:]/g, '_').slice(0, 80);
-  try { CacheService.getScriptCache().remove('srk_' + Utilities.base64EncodeWebSafe(safeId).slice(0, 200)); } catch (e) {}
+  try { CacheService.getScriptCache().remove('srk2_' + Utilities.base64EncodeWebSafe(safeId).slice(0, 200)); } catch (e) {}
   return { ok: true, saved: rows.length };
 }
 function getPaidVotes(data) {
