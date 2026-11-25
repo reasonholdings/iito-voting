@@ -1423,13 +1423,13 @@ function demoGas(action,payload){
       const fake=[['🌼香川産レタス🍐もう梨渚だけ！',441],['ふくしき🍰WeddingMuse支援中',127],['ららパパ',98],['ありあり',88],['なかちゃん@れもん🍋',78],['てつぞー@桜花',66]];
       const models=Object.entries(mine).filter(([,c])=>c>0).map(([mid,c])=>{
         const votesAll=fake.reduce((a,[,v])=>a+v,0)+c+2000; // 架空の総投票数（プラン票＋有料票）
-        if(c<10)return {modelId:mid,name:mid,votes:votesAll,locked:true,mine:c,need:10-c,top:[],me:{rank:0,count:c}};
+        if(c<20)return {modelId:mid,name:mid,votes:votesAll,locked:true,mine:c,need:20-c,top:[],me:{rank:0,count:c}};
         const list=fake.map(([n,v])=>({nick:n,count:v})).concat([{nick:DEMO_NICK,count:c,me:true}]).sort((a,b)=>b.count-a.count);
         list.forEach((x,i)=>x.rank=i+1);
         const me=list.find(x=>x.me);
         return {modelId:mid,name:mid,votes:votesAll,total:list.length,top:list.slice(0,5).map(x=>({nick:x.nick==='ららパパ'?'ゲスト':x.nick,guest:x.nick==='ららパパ',count:x.count,rank:x.rank,me:!!x.me})),me:{rank:me.rank,count:me.count}};
       });
-      return ok({models,min:10,at:Date.now()});
+      return ok({models,min:20,at:Date.now()});
     }
     default: return ok();
   }
@@ -3186,7 +3186,7 @@ function buildVoteScreen(){
 // ── 応援ランキング（2026-11-21）────────────────────────────────
 //  自分がこのイベントで票を入れたモデルについて、いま誰が何票入れているか（上位5名・ニックネームと票数）を、
 //  投票画面のバナーの右側に半透明で重ねて出す。リアルタイム（画面を開いたとき・送信後・表示中は60秒ごとに取り直す）。
-//  GASの supporterRank は、ログインした本人が10票以上入れたモデルの分だけ中身を返す（10票未満は「あと何票」だけ）。
+//  GASの supporterRank は、ログインした本人がプラン票を20票以上入れたモデルの分だけ中身を返す（20票未満は「あと何票」だけ。投票券の票は条件に数えない）。
 let srData=null,srSel='',srTimer=null,srBusy=false;
 function srHidden(){return !!ls('iito_sr_hidden');}
 function setSrHidden(v){ls('iito_sr_hidden',v?1:0);renderSupporterRank();}
@@ -3214,13 +3214,13 @@ function renderSupporterRank(){
   const bn=document.getElementById('vote-banner');
   const models=(srData&&srData.models)||[];
   if(!models.length){p.style.display='none';ob.style.display='none';if(bn)bn.style.minHeight='';return;}
-  const minV=(srData&&srData.min)||10;
+  const minV=(srData&&srData.min)||20;
   if(models.every(x=>x.locked)){
-    // どのモデルにも10票未満：ランキングの中身は出さず、「あと何票で見られるか」を小さく出す
+    // どのモデルにもプラン票が20票未満：ランキングの中身は出さず、「あと何票で見られるか」を小さく出す
     const x=models.slice().sort((a,b)=>a.need-b.need)[0];
     // 投票したモデルが1人だけなら、そのモデルの総投票数（プラン票＋投票券）も上の行に出す
     const vt=models.length===1&&Number(x.votes)>0?`<span class="sr-open-sum">総投票数 <b>${Number(x.votes).toLocaleString()}</b>票</span>`:'';
-    ob.innerHTML=vt?`${vt}<span class="sr-open-ln"><i class="ti ti-lock"></i>応援ランキングは${minV}票以上で表示 <span class="me">あと${x.need}票</span></span>`:`<i class="ti ti-lock"></i>応援ランキングは${minV}票以上で表示 <span class="me">あと${x.need}票</span>`;
+    ob.innerHTML=vt?`${vt}<span class="sr-open-ln"><i class="ti ti-lock"></i>応援ランキングはプラン票${minV}票以上で表示 <span class="me">あと${x.need}票</span></span>`:`<i class="ti ti-lock"></i>応援ランキングはプラン票${minV}票以上で表示 <span class="me">あと${x.need}票</span>`;
     ob.classList.toggle('two',!!vt);
     ob.onclick=null;ob.style.cursor='default';
     p.style.display='none';ob.style.display='flex';if(bn)bn.style.minHeight='';return;
@@ -3240,7 +3240,7 @@ function renderSupporterRank(){
   const e=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const nm=e((findMod(m.modelId)||{}).name||m.name||'');
   const tabs=models.length>1?`<div class="sr-tabs">${models.map(x=>`<button type="button" class="sr-tab${x.modelId===srSel?' on':''}" onclick="srSel='${e(x.modelId)}';renderSupporterRank()">${x.locked?'<i class="ti ti-lock"></i> ':''}${e((findMod(x.modelId)||{}).name||x.name||'')}</button>`).join('')}</div>`:'';
-  const rows=m.locked?`<div class="sr-lock"><i class="ti ti-lock"></i><div>このモデルに<br><b>${minV}票以上</b>入れると<br>見られます</div><div class="sr-need">あと ${m.need}票</div></div>`:m.top.map(r=>`<div class="sr-row${r.me?' me':''}"><span class="sr-rk">${r.rank}</span><span class="sr-body"><span class="sr-nm${r.guest?' guest':''}">${e(r.nick)}</span><span class="sr-ct">${Number(r.count).toLocaleString()}票</span></span></div>`).join('');
+  const rows=m.locked?`<div class="sr-lock"><i class="ti ti-lock"></i><div>このモデルに<br><b>プラン票で${minV}票以上</b><br>入れると見られます</div><div class="sr-need">あと ${m.need}票</div></div>`:m.top.map(r=>`<div class="sr-row${r.me?' me':''}"><span class="sr-rk">${r.rank}</span><span class="sr-body"><span class="sr-nm${r.guest?' guest':''}">${e(r.nick)}</span><span class="sr-ct">${Number(r.count).toLocaleString()}票</span></span></div>`).join('');
   const meLine=(!m.locked&&m.me&&!m.top.some(r=>r.me))?`<div class="sr-me">あなた：${m.me.rank}位　${Number(m.me.count).toLocaleString()}票</div>`:'';
   p.innerHTML=`<div class="sr-hd"><span class="sr-ttl"><i class="ti ti-trophy"></i> 応援ランキング</span><button type="button" class="sr-x" aria-label="最小化する" onclick="setSrHidden(true)"><i class="ti ti-minus"></i>最小化</button></div>`
     +tabs+(models.length>1?'':`<div class="sr-model">${nm}</div>`)
