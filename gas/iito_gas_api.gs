@@ -589,19 +589,19 @@ function supporterRank(data) {
       out.push({ modelId: modelId, name: m.name, votes: votes, locked: true, mine: minePlan, need: SUPPORTER_MIN_VOTES - minePlan, top: [], me: { rank: 0, count: minePlan } });
       return;
     }
-    // ランキングに載せるのは、見られる人（そのモデルにプラン票を20票以上入れた人）だけ。20票未満の人・投票券だけの人は載せない（2026-11-25）
+    // 順位は、投票した全員（投票券だけの人も含む）のプラン票＋投票券の票の合計で決める。
+    // 名前を出すのは、見られる人（そのモデルにプラン票を20票以上入れた会員）だけ。それ以外の人が上位5位に入ったときは「ゲスト」と表示する（2026-11-25）
     const list = Object.keys(m.by).map(function(n){ return { nick: n, count: m.by[n] }; })
-      .filter(function(x){ return x.count > 0 && ((m.plan && m.plan[x.nick]) || 0) >= SUPPORTER_MIN_VOTES; })
+      .filter(function(x){ return x.count > 0; })
       .sort(function(x, y){ return y.count - x.count || (x.nick < y.nick ? -1 : x.nick > y.nick ? 1 : 0); });
     // 同じ票数は同じ順位にする（1位・2位・2位・4位…）
     var rank = 0, prev = null;
     list.forEach(function(x, i){ if (x.count !== prev) { rank = i + 1; prev = x.count; } x.rank = rank; });
     const meRow = list.filter(function(x){ return x.nick === me; })[0];
     out.push({ modelId: modelId, name: m.name, votes: votes, total: list.length,
-               // 会員でない人（投票券だけを買った人など）は、規約に同意していないので名前を出さず「ゲスト」と表示する（2026-11-23）
                top: list.slice(0, SUPPORTER_TOP_N).map(function(x){
-                 const isMem = !!memSet[x.nick];
-                 return { nick: isMem ? x.nick : 'ゲスト', guest: !isMem, count: x.count, rank: x.rank, me: x.nick === me };
+                 const named = !!memSet[x.nick] && ((m.plan && m.plan[x.nick]) || 0) >= SUPPORTER_MIN_VOTES;
+                 return { nick: named ? x.nick : 'ゲスト', guest: !named, count: x.count, rank: x.rank, me: x.nick === me };
                }),
                me: meRow ? { rank: meRow.rank, count: meRow.count } : null });
   });

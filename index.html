@@ -1433,7 +1433,7 @@ function demoGas(action,payload){
         const list=fake.map(([n,v])=>({nick:n,count:v})).concat([{nick:DEMO_NICK,count:c,me:true}]).sort((a,b)=>b.count-a.count);
         list.forEach((x,i)=>x.rank=i+1);
         const me=list.find(x=>x.me);
-        return {modelId:mid,name:mid,votes:votesAll,total:list.length,top:list.slice(0,5).map(x=>({nick:x.nick,guest:false,count:x.count,rank:x.rank,me:!!x.me})),me:{rank:me.rank,count:me.count}};
+        return {modelId:mid,name:mid,votes:votesAll,total:list.length,top:list.slice(0,5).map(x=>({nick:x.nick==='ららパパ'?'ゲスト':x.nick,guest:x.nick==='ららパパ',count:x.count,rank:x.rank,me:!!x.me})),me:{rank:me.rank,count:me.count}};
       });
       return ok({models,min:20,at:Date.now()});
     }
