@@ -1705,15 +1705,26 @@ function talentAgree(data) {
   return { ok: true };
 }
 function talentView(data) {
-  const t = talentByKey_(data.k);
+  // 管理者は、専用リンクの鍵なしで、どのモデルのページも見られる（モデルIDと adminToken を渡す。2026-11-25）
+  var t = null, admin = false;
+  if (data.modelId) {
+    if (!isLegacy_() && !isAdmin_(data)) return { ok: false, error: 'admin_required' };
+    const mm = talentModels_().filter(function(x){ return x.id === String(data.modelId); })[0];
+    if (!mm) return { ok: false, error: 'no_model' };
+    t = { modelId: mm.id, name: mm.name }; admin = true;
+  } else {
+    t = talentByKey_(data.k);
+  }
   if (!t) return { ok: false, error: 'bad_link' };
   const now = Date.now();
   const evs = (getEvents().events || []).map(function(e){
     return { id: String(e.id), name: String(e.name || ''), start: evTime_(e.startDate, e.startTime), end: evTime_(e.endDate, e.endTime) };
   }).filter(function(e){ return e.id && e.start && e.start <= now; }).sort(function(a, b){ return b.start - a.start; });
   // 見られるのは、いま開催中のイベントだけ（2026-11-24）
-  const ev = evs.filter(function(e){ return now >= e.start && now <= e.end; })[0];
-  if (!ev) return { ok: true, model: { id: t.modelId, name: t.name }, events: [], event: null, at: now };
+  //  管理者は、過去のイベントも選んで見られる（指定がなければ開催中、なければ直近のイベント）
+  const cur = evs.filter(function(e){ return now >= e.start && now <= e.end; })[0];
+  const ev = admin ? (evs.filter(function(e){ return e.id === String(data.evId || ''); })[0] || cur || evs[0]) : cur;
+  if (!ev) return { ok: true, admin: admin, model: { id: t.modelId, name: t.name }, events: [], event: null, at: now };
   const agg = talentAgg_(ev.id);
   const models = talentModels_();
   const names = {}; models.forEach(function(m){ names[m.id] = m.name; });
@@ -1735,7 +1746,7 @@ function talentView(data) {
   }).filter(function(x){ return x.total > 0; }).sort(function(a, b){ return b.total - a.total; });
   rk = 0; prev = null;
   voters.forEach(function(x, i){ if (x.total !== prev) { rk = i + 1; prev = x.total; } x.rank = rk; });
-  return { ok: true, model: { id: t.modelId, name: names[t.modelId] || t.name },
+  return { ok: true, admin: admin, model: { id: t.modelId, name: names[t.modelId] || t.name },
            events: evs.map(function(e){ return { id: e.id, name: e.name, start: e.start, end: e.end }; }),
            event: ev, ranking: ranking, voters: voters,
            totals: { plan: mine.plan, free: mine.free, paid: mine.paid, total: mine.plan + mine.free + mine.paid }, at: now };
