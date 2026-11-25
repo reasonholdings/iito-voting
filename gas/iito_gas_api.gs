@@ -12,7 +12,7 @@ const SHEET_ADJUST  = '票の調整';      // 運営が個別に足す票（差�
 const SHEET_OSHI    = '推し設定';      // 会員が選んだ推しモデル（端末をまたいで同じ推しを出すため。2026-11-22）
 const SHEET_CONSENT = '同意記録';      // 利用規約・プライバシーポリシーへの同意：ニックネーム／版／同意した画面／日時（2026-11-23）
 // 利用規約・プライバシーポリシーの版。規約を改定して全員にもう一度同意してもらうときは、この日付を新しくする
-const TERMS_VERSION = '2026-11-24b'; // 2026-11-24b：モデルがSNS等で会員のニックネーム・票数に触れることがある旨を追加（全員にもう一度同意してもらう）。※日付だけの版名はスプレッドシートが日付に変えるので、末尾に文字を付ける // 2026-11-23b：投票先のモデルへの投票内容の表示を追加（全員にもう一度同意してもらう）
+const TERMS_VERSION = '2026-11-25b'; // 2026-11-25b：応援ランキングの内容をSNS等で公開・第三者に提供することを禁止事項（第7条）に追加（全員にもう一度同意してもらう）。 2026-11-24b：モデルがSNS等で会員のニックネーム・票数に触れることがある旨を追加（全員にもう一度同意してもらう）。※日付だけの版名はスプレッドシートが日付に変えるので、末尾に文字を付ける // 2026-11-23b：投票先のモデルへの投票内容の表示を追加（全員にもう一度同意してもらう）
 const SHEET_TALENT  = '演者リンク';    // 演者ページの専用リンク：モデルID／モデル名／鍵／有効／発行日時（2026-11-23）
 const SHEET_PAID    = '有料投票';      // 投票券（有料）の票：イベントID／ニックネーム／モデルID／モデル名／票数／記録日時。管理画面で商品購入CSVを読み込んで保存（2026-11-22）
 const SECRET_KEY    = 'iito2026secret'; // HTMLと合わせること
@@ -589,8 +589,9 @@ function supporterRank(data) {
       out.push({ modelId: modelId, name: m.name, votes: votes, locked: true, mine: minePlan, need: SUPPORTER_MIN_VOTES - minePlan, top: [], me: { rank: 0, count: minePlan } });
       return;
     }
+    // ランキングに載せるのは、見られる人（そのモデルにプラン票を20票以上入れた人）だけ。20票未満の人・投票券だけの人は載せない（2026-11-25）
     const list = Object.keys(m.by).map(function(n){ return { nick: n, count: m.by[n] }; })
-      .filter(function(x){ return x.count > 0; })
+      .filter(function(x){ return x.count > 0 && ((m.plan && m.plan[x.nick]) || 0) >= SUPPORTER_MIN_VOTES; })
       .sort(function(x, y){ return y.count - x.count || (x.nick < y.nick ? -1 : x.nick > y.nick ? 1 : 0); });
     // 同じ票数は同じ順位にする（1位・2位・2位・4位…）
     var rank = 0, prev = null;

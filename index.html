@@ -110,6 +110,7 @@ html,body{min-height:100vh;background:var(--bg2);font-family:"Zen Maru Gothic","
 .sr-lock .ti{font-size:22px;opacity:.85}
 .sr-need{font-size:15px;font-weight:700;color:#FFD86B}
 .sr-ft{font-size:10px;opacity:.85;margin-top:3px;text-align:right}
+.sr-note{font-size:9.5px;opacity:.8;margin-top:2px;line-height:1.3;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sr-open.two{flex-direction:column;align-items:flex-end;gap:2px;border-radius:12px;padding:6px 12px}
 .sr-open-sum{font-size:11px;white-space:nowrap}.sr-open-sum b{font-size:14px;color:#FFD86B}
 .sr-open-ln{display:flex;align-items:center;gap:4px;font-size:11px;white-space:nowrap}
@@ -1427,7 +1428,7 @@ function demoGas(action,payload){
         const list=fake.map(([n,v])=>({nick:n,count:v})).concat([{nick:DEMO_NICK,count:c,me:true}]).sort((a,b)=>b.count-a.count);
         list.forEach((x,i)=>x.rank=i+1);
         const me=list.find(x=>x.me);
-        return {modelId:mid,name:mid,votes:votesAll,total:list.length,top:list.slice(0,5).map(x=>({nick:x.nick==='ららパパ'?'ゲスト':x.nick,guest:x.nick==='ららパパ',count:x.count,rank:x.rank,me:!!x.me})),me:{rank:me.rank,count:me.count}};
+        return {modelId:mid,name:mid,votes:votesAll,total:list.length,top:list.slice(0,5).map(x=>({nick:x.nick,guest:false,count:x.count,rank:x.rank,me:!!x.me})),me:{rank:me.rank,count:me.count}};
       });
       return ok({models,min:20,at:Date.now()});
     }
@@ -3246,7 +3247,7 @@ function renderSupporterRank(){
     +tabs+(models.length>1?'':`<div class="sr-model">${nm}</div>`)
     +(Number(m.votes)>0?`<div class="sr-sum"><span>総投票数</span><span><b>${Number(m.votes).toLocaleString()}</b>票</span></div>`:'')
     +`<div class="sr-list">${rows}</div>`+meLine
-    +(m.locked?'':`<div class="sr-ft">${m.total}人が投票${srData.at?`・最終更新 ${pad(new Date(srData.at).getHours())}:${pad(new Date(srData.at).getMinutes())}`:''}</div>`);
+    +(m.locked?'':`<div class="sr-ft">応援者 ${m.total}人${srData.at?`・最終更新 ${pad(new Date(srData.at).getHours())}:${pad(new Date(srData.at).getMinutes())}`:''}</div><div class="sr-note"><i class="ti ti-lock"></i> 応援者限定・スクショ公開禁止</div>`);
   p.style.display='flex';
 }
 
