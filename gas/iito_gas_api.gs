@@ -14,6 +14,7 @@ const SHEET_CONSENT = '同意記録';      // 利用規約・プライバシー�
 // 利用規約・プライバシーポリシーの版。規約を改定して全員にもう一度同意してもらうときは、この日付を新しくする
 const TERMS_VERSION = '2026-11-25b'; // 2026-11-25b：応援ランキングの内容をSNS等で公開・第三者に提供することを禁止事項（第7条）に追加（全員にもう一度同意してもらう）。 2026-11-24b：モデルがSNS等で会員のニックネーム・票数に触れることがある旨を追加（全員にもう一度同意してもらう）。※日付だけの版名はスプレッドシートが日付に変えるので、末尾に文字を付ける // 2026-11-23b：投票先のモデルへの投票内容の表示を追加（全員にもう一度同意してもらう）
 const SHEET_TALENT  = '演者リンク';    // 演者ページの専用リンク：モデルID／モデル名／鍵／有効／発行日時（2026-11-23）
+const SHEET_PAID_LOG = '有料投票明細'; // 投票券の購入1件ごとの記録（購入キーで重複を防ぎ、前回の読み込み以降のCSVだけで足していけるようにする。2026-11-26）
 const SHEET_PAID    = '有料投票';      // 投票券（有料）の票：イベントID／ニックネーム／モデルID／モデル名／票数／記録日時。管理画面で商品購入CSVを読み込んで保存（2026-11-22）
 const SECRET_KEY    = 'iito2026secret'; // HTMLと合わせること
 
@@ -114,7 +115,7 @@ function handleAction(action, data) {
     getOshi: getOshi, changeAdminPw: changeAdminPw, adminLogout: adminLogout,
     appendPayments: appendPayments, getPayments: getPayments,
     getFanOverrides: getFanOverrides, saveFanOverride: saveFanOverride,
-    savePaidVotes: savePaidVotes, getPaidVotes: getPaidVotes,
+    savePaidVotes: savePaidVotes, getPaidVotes: getPaidVotes, addPaidPurchases: addPaidPurchases,
     listTalentKeys: listTalentKeys, issueTalentKey: issueTalentKey, revokeTalentKey: revokeTalentKey
   };
   if (ADMIN_ACTIONS[action]) {
@@ -652,16 +653,107 @@ function paidSheet_() {
 }
 function paidRows_(evId) {
   const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_PAID);
-  if (!sh || sh.getLastRow() <= 1) return [];
   const out = [];
-  sh.getRange(2, 1, sh.getLastRow() - 1, 7).getValues().forEach(function(r){
+  if (sh && sh.getLastRow() > 1) sh.getRange(2, 1, sh.getLastRow() - 1, 7).getValues().forEach(function(r){
     const ev = String(r[0]).trim(), nick = String(r[1]).trim(), modelId = String(r[2]).trim(), v = Number(r[4]) || 0;
     if (!ev || !nick || !modelId || v <= 0) return;
     if (evId && ev !== String(evId)) return;
     // 種別（G列）：free＝無料の投票券（0円）、それ以外＝有料。古い行（空欄）は有料として扱う（2026-11-23）
     out.push({ evId: ev, nick: nick, modelId: modelId, name: String(r[3] || ''), votes: v, kind: String(r[6] || '').trim() === 'free' ? 'free' : 'paid' });
   });
+  // 購入1件ごとの記録（有料投票明細）の票も足す（2026-11-26）
+  paidLogRows_().forEach(function(r){
+    if (evId && r.evId !== String(evId)) return;
+    if (!r.nick || !r.modelId || r.votes <= 0) return;
+    out.push({ evId: r.evId, nick: r.nick, modelId: r.modelId, name: r.name, votes: r.votes, kind: r.kind });
+  });
   return out;
+}
+// ── 購入1件ごとの記録（有料投票明細）──
+//  列：イベントID／購入キー／決済日時／ニックネーム／モデルID／モデル名／票数／種別／取り込み日時
+//  購入キーは「決済日時・メールアドレス・商品名・購入数・金額」から作った目印（メールアドレスそのものは保存しない）
+function paidLogSheet_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sh = ss.getSheetByName(SHEET_PAID_LOG);
+  if (!sh) {
+    sh = ss.insertSheet(SHEET_PAID_LOG);
+    sh.getRange(1, 1, 1, 9).setValues([['イベントID', '購入キー', '決済日時', 'ニックネーム', 'モデルID', 'モデル名', '票数', '種別', '取り込み日時']]);
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+function paidLogRows_() {
+  const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_PAID_LOG);
+  if (!sh || sh.getLastRow() <= 1) return [];
+  return sh.getRange(2, 1, sh.getLastRow() - 1, 9).getValues().map(function(r){
+    return { evId: String(r[0]).trim(), key: String(r[1]).trim(), nick: String(r[3]).trim(), modelId: String(r[4]).trim(),
+             name: String(r[5] || ''), votes: Number(r[6]) || 0, kind: String(r[7] || '').trim() === 'free' ? 'free' : 'paid' };
+  }).filter(function(r){ return r.evId; });
+}
+// 投票券の購入を、1件ずつ（購入キーつきで）保存する（2026-11-26）
+//  ・data.items：[{ evId, key, date, nick, modelId, name, votes, kind }]
+//  ・data.full：CSVに投票期間の全体が入っているイベントのID。これらは、そのイベントの記録をまるごと入れ替える
+//  ・それ以外のイベントは、まだ記録にない購入キーの分だけ足す（前回の読み込みと重なった購入は足さない）
+//  ・以前の方式（まとめて保存した「有料投票」シートの行）しかないイベントは、重なりを見分けられないため足さずに needFull で返す
+//    （一度、期間全体のCSVで読み込むと、それ以降は差分だけで足せるようになる）
+function addPaidPurchases(data) {
+  const items = (data.items || []).map(function(x){
+    return { evId: String(x.evId || '').trim(), key: String(x.key || '').trim().slice(0, 60), date: String(x.date || '').slice(0, 30),
+             nick: String(x.nick || '').trim().slice(0, 100), modelId: String(x.modelId || '').trim().slice(0, 100),
+             name: String(x.name || '').trim().slice(0, 100), votes: Math.max(0, Math.floor(Number(x.votes) || 0)), kind: x.kind === 'free' ? 'free' : 'paid' };
+  }).filter(function(x){ return x.evId && x.key && x.nick && x.modelId && x.votes > 0; });
+  const full = {}; (data.full || []).forEach(function(id){ full[String(id)] = 1; });
+  const evIds = {}; items.forEach(function(x){ evIds[x.evId] = 1; }); Object.keys(full).forEach(function(id){ evIds[id] = 1; });
+  const res = { ok: true, added: {}, dup: {}, replaced: [], needFull: [] };
+  const lock = LockService.getScriptLock();
+  lock.waitLock(25000);
+  try {
+    const legacy = paidSheet_(), log = paidLogSheet_();
+    let legRows = legacy.getLastRow() > 1 ? legacy.getRange(2, 1, legacy.getLastRow() - 1, 7).getValues() : [];
+    let logRows = log.getLastRow() > 1 ? log.getRange(2, 1, log.getLastRow() - 1, 9).getValues() : [];
+    const now = new Date();
+    // 1) 期間全体が入ったイベント：以前の行と明細をまるごと消して入れ替える
+    const fullIds = Object.keys(full);
+    if (fullIds.length) {
+      const legKeep = legRows.filter(function(r){ return !full[String(r[0]).trim()]; });
+      const logKeep = logRows.filter(function(r){ return !full[String(r[0]).trim()]; });
+      if (legKeep.length !== legRows.length) {
+        legacy.getRange(2, 1, legRows.length, 7).clearContent();
+        if (legKeep.length) legacy.getRange(2, 1, legKeep.length, 7).setValues(legKeep);
+        legRows = legKeep;
+      }
+      if (logKeep.length !== logRows.length) {
+        log.getRange(2, 1, logRows.length, 9).clearContent();
+        if (logKeep.length) log.getRange(2, 1, logKeep.length, 9).setValues(logKeep);
+        logRows = logKeep;
+      }
+      res.replaced = fullIds;
+    }
+    // 2) 以前の方式の行しかないイベントは、差分では足せない
+    const hasLeg = {}, hasLog = {}, seen = {};
+    legRows.forEach(function(r){ hasLeg[String(r[0]).trim()] = 1; });
+    logRows.forEach(function(r){ const ev = String(r[0]).trim(); hasLog[ev] = 1; seen[ev + '|' + String(r[1]).trim()] = 1; });
+    Object.keys(evIds).forEach(function(ev){ if (!full[ev] && hasLeg[ev] && !hasLog[ev]) res.needFull.push(ev); });
+    const blocked = {}; res.needFull.forEach(function(ev){ blocked[ev] = 1; });
+    // 3) まだ記録にない購入だけ足す
+    const add = [];
+    items.forEach(function(x){
+      if (blocked[x.evId]) return;
+      const k = x.evId + '|' + x.key;
+      if (seen[k]) { res.dup[x.evId] = (res.dup[x.evId] || 0) + 1; return; }
+      seen[k] = 1;
+      add.push([x.evId, x.key, x.date, x.nick, x.modelId, x.name, x.votes, x.kind, now]);
+      res.added[x.evId] = (res.added[x.evId] || 0) + 1;
+    });
+    if (add.length) log.getRange(log.getLastRow() + 1, 1, add.length, 9).setValues(add);
+  } finally { lock.releaseLock(); }
+  // 演者ページと応援ランキングのキャッシュを消して、すぐ反映させる
+  Object.keys(evIds).forEach(function(ev){
+    try { CacheService.getScriptCache().remove('tlv_' + Utilities.base64EncodeWebSafe(ev).slice(0, 200)); } catch (e) {}
+    const safeId = ev.replace(/[\\\/\?\*\[\]:]/g, '_').slice(0, 80);
+    try { CacheService.getScriptCache().remove('srk2_' + Utilities.base64EncodeWebSafe(safeId).slice(0, 200)); } catch (e) {}
+  });
+  return res;
 }
 function savePaidVotes(data) {
   const evId = String(data.evId || '').trim();
