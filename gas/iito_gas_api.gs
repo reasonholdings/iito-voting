@@ -672,6 +672,11 @@ function paidRows_(evId) {
 // ── 購入1件ごとの記録（有料投票明細）──
 //  列：イベントID／購入キー／決済日時／ニックネーム／モデルID／モデル名／票数／種別／取り込み日時
 //  購入キーは「決済日時・メールアドレス・商品名・購入数・金額」から作った目印（メールアドレスそのものは保存しない）
+// シートの行数が足りないと書き込みが失敗するので、必要な行まで増やす（新しいシートは1000行しかない。2026-11-26）
+function ensureRows_(sh, lastRow) {
+  const max = sh.getMaxRows();
+  if (lastRow > max) sh.insertRowsAfter(max, lastRow - max + 100);
+}
 function paidLogSheet_() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sh = ss.getSheetByName(SHEET_PAID_LOG);
@@ -719,12 +724,12 @@ function addPaidPurchases(data) {
       const logKeep = logRows.filter(function(r){ return !full[String(r[0]).trim()]; });
       if (legKeep.length !== legRows.length) {
         legacy.getRange(2, 1, legRows.length, 7).clearContent();
-        if (legKeep.length) legacy.getRange(2, 1, legKeep.length, 7).setValues(legKeep);
+        if (legKeep.length) { ensureRows_(legacy, legKeep.length + 1); legacy.getRange(2, 1, legKeep.length, 7).setValues(legKeep); }
         legRows = legKeep;
       }
       if (logKeep.length !== logRows.length) {
         log.getRange(2, 1, logRows.length, 9).clearContent();
-        if (logKeep.length) log.getRange(2, 1, logKeep.length, 9).setValues(logKeep);
+        if (logKeep.length) { ensureRows_(log, logKeep.length + 1); log.getRange(2, 1, logKeep.length, 9).setValues(logKeep); }
         logRows = logKeep;
       }
       res.replaced = fullIds;
@@ -745,7 +750,7 @@ function addPaidPurchases(data) {
       add.push([x.evId, x.key, x.date, x.nick, x.modelId, x.name, x.votes, x.kind, now]);
       res.added[x.evId] = (res.added[x.evId] || 0) + 1;
     });
-    if (add.length) log.getRange(log.getLastRow() + 1, 1, add.length, 9).setValues(add);
+    if (add.length) { const at = log.getLastRow() + 1; ensureRows_(log, at + add.length - 1); log.getRange(at, 1, add.length, 9).setValues(add); }
   } finally { lock.releaseLock(); }
   // 演者ページと応援ランキングのキャッシュを消して、すぐ反映させる
   Object.keys(evIds).forEach(function(ev){
@@ -774,7 +779,17 @@ function savePaidVotes(data) {
     }
     if (!String(sh.getRange(1, 7).getValue())) sh.getRange(1, 7).setValue('種別');
     const all = keep.concat(rows);
-    if (all.length) sh.getRange(2, 1, all.length, 7).setValues(all);
+    if (all.length) { ensureRows_(sh, all.length + 1); sh.getRange(2, 1, all.length, 7).setValues(all); }
+    // 以前の方式での保存は「まるごと入れ替え」なので、同じイベントの購入ごとの記録（有料投票明細）も消して二重に数えないようにする（2026-11-26）
+    const log = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_PAID_LOG);
+    if (log && log.getLastRow() > 1) {
+      const lr = log.getRange(2, 1, log.getLastRow() - 1, 9).getValues();
+      const lk = lr.filter(function(r){ return String(r[0]).trim() !== evId; });
+      if (lk.length !== lr.length) {
+        log.getRange(2, 1, lr.length, 9).clearContent();
+        if (lk.length) log.getRange(2, 1, lk.length, 9).setValues(lk);
+      }
+    }
   } finally { lock.releaseLock(); }
   try { CacheService.getScriptCache().remove('tlv_' + Utilities.base64EncodeWebSafe(evId).slice(0, 200)); } catch (e) {}
   // 応援ランキングのキャッシュを消して、すぐ反映させる
