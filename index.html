@@ -4746,9 +4746,20 @@ async function loadPaidCSV(input){
     const why=!r?'通信エラー':r.error==='unknown action'?'GASが古い（最新のGASをデプロイしてください）':r.error==='admin_required'?'管理者ログインの期限切れ（ログインし直してください）':String(r.error||'エラー');
     if(st)st.textContent=`サーバーへの保存に失敗しました（原因：${why}）。何も保存されていません。`;return;
   }
+  // 以前の方式で保存されたイベントで、CSVの最初の購入がイベント開始より後だったもの（2026-11-26）
+  //  期間全体かどうかを自動では判断できない（開始直後に購入がなかっただけの場合もある）ので、運営に確認して入れ替える
+  const need=(r.needFull||[]).filter(id=>evIds.includes(id));
+  for(const id of need){
+    const e=events.find(x=>x.id===id);const ds=items.filter(x=>x.evId===id).map(x=>_parsePayDate(x.date)).filter(Boolean).sort((a,b)=>a-b);
+    const fmt=d=>d?`${d.getMonth()+1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}`:'?';
+    const ok=confirm(`「${evName(id)}」は以前の方式で保存されています。\n\nこのCSVに入っているこのイベントの購入：${fmt(ds[0])}〜${fmt(ds[ds.length-1])}（${ds.length}件）\nイベントの開始：${fmt(e&&getEvStart(e))}\n\nこのCSVが、イベント開始からの購入をすべて含んでいる（期間全体のCSVである）場合は「OK」を押してください。このイベントの有料票を、このCSVの内容で入れ替えます。\n\n途中からのCSVの場合は「キャンセル」を押してください（何も保存しません）。`);
+    if(!ok)continue;
+    const r2=await gasPostBig('addPaidPurchases',{items:items.filter(x=>x.evId===id),full:[id]}).catch(()=>null);
+    if(r2&&r2.ok){r.needFull=r.needFull.filter(x=>x!==id);r.added=r.added||{};r.added[id]=(r2.added||{})[id]||0;fullIds.push(id);}
+  }
   await syncPaidVotes(); // 保存後のサーバーの合計を取り直す
   const lines=evIds.map(id=>{
-    if((r.needFull||[]).includes(id))return `${evName(id)}：保存しませんでした（このイベントは以前の方式で保存されているため、最初の1回だけ、投票期間の全体が入ったCSVで読み込んでください）`;
+    if((r.needFull||[]).includes(id))return `${evName(id)}：保存しませんでした（以前の方式で保存されているイベントのため、期間全体のCSVであることの確認が必要です）`;
     const add=(r.added||{})[id]||0,dup=(r.dup||{})[id]||0;
     return `${evName(id)}：${fullIds.includes(id)?'入れ替え ':''}${add}件を保存`+(dup?`（前回までと重なる ${dup}件は足していません）`:'');
   });
