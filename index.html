@@ -4681,6 +4681,7 @@ async function loadPaidCSV(input){
   const marks={},unknownModel={},noEvent={n:0,v:0};
   let rowsOk=0,dup=0,bad=0,noDate=0;
   let minD=null,maxD=null; // CSVに入っている決済日の範囲（どの期間のデータか）
+  const items=[]; // 購入1件ごと（購入キーつき）。サーバーで前回までの読み込みと重なる購入を除いて足す（2026-11-26）
   for(const f of files){
     const text=(await f.text()).replace(/^\uFEFF/,'');
     const lines=text.split(/\r?\n/).filter(l=>l.trim());if(lines.length<2){bad++;continue;}
@@ -4693,7 +4694,8 @@ async function loadPaidCSV(input){
       const status=ix.status>=0?(c[ix.status]||''):'';if(/キャンセル|返金|取消/.test(status))return;
       const qty=parseInt(c[ix.qty])||0;const each=parseInt((item.match(/(\d+)票分/)||[])[1])||1;const votes=qty*each;if(votes<=0)return;
       const email=ix.email>=0?(c[ix.email]||'').trim().toLowerCase():'';const dateS=(c[ix.date]||'').trim();
-      const mark=rowMark([dateS,email,item,qty,ix.amount>=0?c[ix.amount]:''].join('|'));
+      const markSrc=[dateS,email,item,qty,ix.amount>=0?c[ix.amount]:''].join('|');
+      const mark=rowMark(markSrc);
       if(marks[mark]){dup++;return;}marks[mark]=1;
       const d=_parsePayDate(dateS);if(!d){noDate++;return;}
       if(!minD||d<minD)minD=d;if(!maxD||d>maxD)maxD=d;
@@ -4707,42 +4709,50 @@ async function loadPaidCSV(input){
       const amt=ix.amount>=0?Number(String(c[ix.amount]||'').replace(/[^0-9.-]/g,'')):NaN;
       const kind=(ix.amount>=0&&amt===0)?'free':'paid'; // 0円の投票券＝無料
       const pk=(perK[ev.id]=perK[ev.id]||{}),kk=who+'|'+mod.id+'|'+kind;pk[kk]=(pk[kk]||0)+votes;
+      items.push({evId:ev.id,key:mark+rowMark([...markSrc].reverse().join('')),date:dateS,nick:who,modelId:mod.id,name:mod.name||'',votes,kind});
       rowsOk++;
     });
   }
-  // CSVが投票期間の一部しか含んでいないイベントは保存しない（2026-11-25）
-  //  保存は「そのイベントの有料票をまるごと入れ替え」なので、期間の途中から始まるCSVで過去のイベントを保存すると、
-  //  それより前の購入が消えてしまう。CSVの最初の決済日がイベントの開始以前で、
-  //  終わったイベントはCSVの最後の決済日が終了の6時間前以降のものだけ保存する。
-  const partial=[];
+  // 保存のしかた（2026-11-26）
+  //  ・CSVに投票期間の全体が入っているイベント → そのイベントの有料票をまるごと入れ替える
+  //    （CSVの最初の決済日がイベント開始以前で、終わったイベントは最後の決済日が終了の6時間前以降）
+  //  ・期間の一部だけのイベント → 前回までに読み込んだ購入と重なる分を除いて、新しい購入だけ足す
+  //  これで「前回読み込んだ後〜今回まで」のCSVだけを読み込めば、票数が正しく加算される
+  const fullIds=[],partial=[];
   Object.keys(per).forEach(id=>{
     const e=events.find(x=>x.id===id);const a=e&&getEvStart(e),b=e&&getEvEnd(e);
     const ended=b&&b<new Date();
     const okStart=minD&&a&&minD<=a, okEnd=!ended||(maxD&&b&&maxD>=new Date(b.getTime()-6*3600000));
-    if(!(okStart&&okEnd)){partial.push(e?.name||id);delete per[id];delete perK[id];}
+    if(okStart&&okEnd)fullIds.push(id);else partial.push(id);
   });
   const evIds=Object.keys(per);
   const unk=Object.entries(unknownModel);
   const notes=[];
-  if(partial.length)notes.push(`投票期間の一部しか入っていないため保存しなかったイベント：${partial.join('、')}（期間全体が入ったCSVで読み込み直してください）`);
   if(dup)notes.push(`同じ購入の重複 ${dup}件は1回だけ数えました`);
   if(noEvent.n)notes.push(`投票期間外の購入 ${noEvent.n}件（${noEvent.v}票）は数えていません`);
   if(noDate)notes.push(`決済日が読めない ${noDate}件は数えていません`);
   if(unk.length)notes.push(`モデルが見つからない商品：${unk.map(([k,v])=>k+'（'+v+'票）').join('、')}`);
   if(bad)notes.push(`読めなかったファイル ${bad}件（「商品名」「購入数」「決済日」「ニックネーム」の列が必要です）`);
-  if(!evIds.length){if(st)st.textContent=(partial.length?'保存できるイベントがありませんでした。':'投票期間内の投票券の購入が見つかりませんでした。')+(notes.length?notes.join('／'):'');return;}
-  const summary=evIds.map(id=>{const e=events.find(x=>x.id===id);const v=Object.values(per[id]).reduce((a,o)=>a+Object.values(o).reduce((x,y)=>x+y,0),0);return `・${e?.name||id}：${Object.keys(per[id]).length}人／${v}票`;}).join('\n');
-  if(!confirm('次のイベントの有料票を、このCSVの内容で入れ替えます。\n\n'+summary+(unk.length?'\n\n※モデルが見つからない商品は数えていません（モデル名を確認してください）':'')+'\n\nよろしいですか？'))return;
+  if(!evIds.length){if(st)st.textContent='投票期間内の投票券の購入が見つかりませんでした。'+(notes.length?notes.join('／'):'');return;}
+  const evName=id=>(events.find(x=>x.id===id)||{}).name||id;
+  const summary=evIds.map(id=>{const v=Object.values(per[id]).reduce((a,o)=>a+Object.values(o).reduce((x,y)=>x+y,0),0);
+    return `・${evName(id)}：${Object.keys(per[id]).length}人／${v}票\n　→ ${fullIds.includes(id)?'期間全体が入っているので、このCSVの内容で入れ替えます':'前回までに読み込んだ購入と重なる分を除いて、新しい購入だけ足します'}`;}).join('\n');
+  if(!confirm('投票券の票を保存します。\n\n'+summary+(unk.length?'\n\n※モデルが見つからない商品は数えていません（モデル名を確認してください）':'')+'\n\nよろしいですか？'))return;
   if(st)st.textContent='保存中...';
-  let ok=0,ng=0;const ngWhy=[];
-  for(const id of evIds){
-    const rows=[];Object.entries(perK[id]||{}).forEach(([k,v])=>{const ps=k.split('|'),kind=ps.pop(),mid=ps.pop(),nick=ps.join('|');rows.push({nick,modelId:mid,name:findMod(mid)?.name||'',votes:v,kind});});
-    paidVotes[id]=per[id];
-    // 行が多いとURLの長さの上限を超えて送れないため、POSTで送る（2026-11-24）
-    if(GAS_URL){const r=await gasPostBig('savePaidVotes',{evId:id,rows}).catch(()=>null);if(r&&r.ok)ok++;else{ng++;ngWhy.push(!r?'通信エラー':r.error==='unknown action'?'GASが古い（最新のGASをデプロイしてください）':r.error==='admin_required'?'管理者ログインの期限切れ（ログインし直してください）':String(r.error||'エラー'));}}else ok++;
+  if(!GAS_URL){evIds.forEach(id=>{paidVotes[id]=per[id];});ls(LS.paid,paidVotes);if(st)st.textContent=`${rowsOk}件の購入を数えました（${evIds.length}イベント）`;_renderResultLocal();return;}
+  // 行が多いとURLの長さの上限を超えて送れないため、POSTで送る
+  const r=await gasPostBig('addPaidPurchases',{items,full:fullIds}).catch(()=>null);
+  if(!r||!r.ok){
+    const why=!r?'通信エラー':r.error==='unknown action'?'GASが古い（最新のGASをデプロイしてください）':r.error==='admin_required'?'管理者ログインの期限切れ（ログインし直してください）':String(r.error||'エラー');
+    if(st)st.textContent=`サーバーへの保存に失敗しました（原因：${why}）。何も保存されていません。`;return;
   }
-  ls(LS.paid,paidVotes);
-  if(st)st.textContent=`${rowsOk}件の購入を数えました（${evIds.length}イベント）`+(ng?`／サーバーへの保存に失敗 ${ng}件（原因：${[...new Set(ngWhy)].join('、')}）`:'')+(notes.length?'。'+notes.join('／'):'');
+  await syncPaidVotes(); // 保存後のサーバーの合計を取り直す
+  const lines=evIds.map(id=>{
+    if((r.needFull||[]).includes(id))return `${evName(id)}：保存しませんでした（このイベントは以前の方式で保存されているため、最初の1回だけ、投票期間の全体が入ったCSVで読み込んでください）`;
+    const add=(r.added||{})[id]||0,dup=(r.dup||{})[id]||0;
+    return `${evName(id)}：${fullIds.includes(id)?'入れ替え ':''}${add}件を保存`+(dup?`（前回までと重なる ${dup}件は足していません）`:'');
+  });
+  if(st)st.textContent=lines.join('／')+(notes.length?'。'+notes.join('／'):'');
   _renderResultLocal();
 }
 
